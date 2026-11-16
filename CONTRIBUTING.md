@@ -25,9 +25,12 @@ directory contains logs, `verification.json`, the CLI wheel, and a skill ZIP
 with a file manifest. Builds and tests use temporary projects. They do not
 install global skills, change hook settings, or access provider accounts.
 
-The command fails on the first unsuccessful check and retains its output.
-Local results describe that machine only; CI covers Linux/macOS and Python
-3.10/3.14. A configured workflow is not a passing run.
+By default, the command stops at the first unsuccessful check and retains its
+output. CI uses `--jobs 2` to run the source and packaged checks concurrently
+in separate temporary directories. A failure in either phase fails the job;
+both phases finish so their logs are retained. Local results describe that
+machine only; CI covers Linux/macOS and Python 3.10/3.14. A configured workflow
+is not a passing run.
 
 ## Make a change
 
