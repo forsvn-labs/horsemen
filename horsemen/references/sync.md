@@ -164,6 +164,26 @@ When you read records for a task, also look for:
   delivered outcomes and proof; Upcoming roadmap shows future milestones.
 - No preamble about authority, providers, or verification before the content.
 
+## Pre-save edit
+
+Apply this to changed prose in the four records, supporting documents, and
+provider originals Horsemen writes. If `no-ai-slop` is available, read its
+`SKILL.md` and `eval.md` and use its edit pass. If the skill is unavailable,
+use this checklist:
+
+1. Lead with the outcome, decision, blocker, or next action. Cut setup and
+   recaps. If a sentence could fit any project, cut it or make it specific.
+2. Keep one fact in one place. Use one line per PROGRESS item where it fits.
+   Put test counts, receipts, and detail in the evidence toggle or a link.
+3. Keep the author's voice, concrete facts, real uncertainty, owners, dates,
+   sources, and delivery state. Never shorten away an open decision or gate.
+   Leave untouched sections, code, commands, and verbatim quotes alone.
+
+Re-read the changed prose before saving. Save only the edited text, never
+an editing checklist or “What changed” report. Treat length targets as
+warnings, not caps. This pass does not authorize a write, change VISION
+direction, or waive evidence and readback checks.
+
 ## Shared update guarantees
 
 Treat all four records equally carefully, not identically. For every changed

@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-17
+
+- Horsemen now edits new and changed prose before saving. It uses `no-ai-slop` when available and a bundled checklist otherwise.
+
 ## 2026-11-13
 
 - Added direct brain, vision, structure and status commands with read-only reports and explicit single-record local updates. Grouped planning tools under plan while keeping legacy command aliases. [PR #1](https://github.com/hungv47/horsemen/pull/1).

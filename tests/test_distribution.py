@@ -39,6 +39,20 @@ class Distribution(unittest.TestCase):
         self.assertEqual(receipt["version"], distribution.version(self.source))
         self.assertEqual(receipt["sha256"], hashlib.sha256(archive.read_bytes()).hexdigest())
 
+    def test_packaged_skill_routes_writes_to_a_self_contained_editing_pass(self):
+        archive = distribution.build_skill(self.source, self.output)
+        with zipfile.ZipFile(archive) as package:
+            entry = package.read("horsemen/SKILL.md").decode()
+            guidance = package.read("horsemen/references/sync.md").decode()
+            templates = package.read("horsemen/references/templates.md").decode()
+        self.assertIn("## Before every prose write", entry)
+        self.assertIn("references/sync.md#pre-save-edit", entry)
+        self.assertIn("no-ai-slop", entry)
+        self.assertIn("## Pre-save edit", guidance)
+        self.assertIn("If the skill is unavailable", guidance)
+        self.assertIn("changed prose", guidance)
+        self.assertIn("sync.md#pre-save-edit", templates)
+
     def test_symlinks_fail_before_output(self):
         target = self.source / "horsemen/private.md"
         target.symlink_to(ROOT / "README.md")

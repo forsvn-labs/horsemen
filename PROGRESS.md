@@ -1,17 +1,36 @@
 # Progress
 
-Updated: 2026-11-13 · Stage: live · Health: On track
+Updated: 2026-11-17 · Stage: live · Health: On track
 
 ## Latest day
 
 <details open>
 <summary>Latest day</summary>
 
-Horsemen now has one public MIT project for its agent skill and CLI.
-
-Next action: Use the direct record commands on a project; keep local updates within the documented exclusive-writer contract.
+Next action: Refresh existing skill installations before the next project update.
 
 ## Shipped
+
+- **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
+
+### Technical details
+
+| Item | Evidence |
+| --- | --- |
+| Shorter records | [Pre-save edit](horsemen/references/sync.md#pre-save-edit) and the distribution regression test. The source, wheel, and packaged skill checks passed locally. |
+
+### Gates
+
+Existing installations do not change until refreshed.
+
+</details>
+
+## Historical ships
+
+<details>
+<summary>Historical ships</summary>
+
+### 2026-11-13
 
 - **Direct record commands** (2026-11-13): Brain, vision, structure and status have read-only reports and explicit local updates. Whole-project checks remain; planning tools share one menu. Available from main through the documented source installation.
 
@@ -19,12 +38,12 @@ Next action: Use the direct record commands on a project; keep local updates wit
 
 - **One Horsemen project** (2026-11-13): Published source, one version, clear setup, and verification for both ways to use it.
 
-## Decisions
+#### Decisions
 
 - Public repository and MIT license confirmed by the owner on 2026-11-13.
 - Preserve private history in the original collection; publish only the checked source.
 
-### Technical details
+#### Technical details
 
 | Item | Evidence |
 | --- | --- |
@@ -34,7 +53,7 @@ Next action: Use the direct record commands on a project; keep local updates wit
 
 Existing installed copies are unchanged.
 
-### Command review evidence
+#### Command review evidence
 
 - Full local verification passed on 2026-11-13: source tests, installed CLI,
   packaged skill and legacy hooks. Added coverage for each record, exact-edit
@@ -44,17 +63,10 @@ Existing installed copies are unchanged.
 - Local writes require the caller to exclude other editors. Provider originals
   still use their authorized host workflow; no live provider writes were tested.
 
-### Gates
+#### Gates
 
 - Local checks pass. Cross-platform results are visible in [Actions](https://github.com/hungv47/horsemen/actions).
 - Batch application and live Drive saves remain unavailable. Explicit local single-record updates are available from main.
-
-</details>
-
-## Historical ships
-
-<details>
-<summary>Historical ships</summary>
 
 Earlier personal installations are not public releases of this repository.
 

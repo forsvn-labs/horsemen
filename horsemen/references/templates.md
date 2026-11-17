@@ -18,6 +18,14 @@ Shared rules:
 - Public repositories hold no private IDs, private URLs, account emails, or
   secrets. Use a neutral project key that resolves in a private registry.
 
+Run the [pre-save edit](sync.md#pre-save-edit) on the changed prose before
+saving. For example:
+
+- PROGRESS: “**PDF export:** Built. Waiting for Mai's release test.” Keep
+  the passing test count and preview link in the evidence row.
+- BRAIN: “Meeting decisions live in Drive. Read access only.” STRUCTURE:
+  “Drive → Client work → Decisions.” Link the actual folder when known.
+
 ## VISION.md
 
 VISION is the project's manifesto. It says what we are building, why it must
