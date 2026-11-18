@@ -1,6 +1,6 @@
 # Progress
 
-Updated: 2026-11-17 · Stage: live · Health: On track
+Updated: 2026-11-18 · Stage: live · Health: On track
 
 ## Latest day
 
@@ -8,6 +8,10 @@ Updated: 2026-11-17 · Stage: live · Health: On track
 <summary>Latest day</summary>
 
 Next action: Refresh existing skill installations before the next project update.
+
+## Ready for review
+
+- **Portable checkout paths** (2026-11-18): The repository map now uses an explicit root. The regression test reproduced 12 missing-path errors before the fix; all 11 distribution tests pass after it. Source review is pending.
 
 ## Shipped
 

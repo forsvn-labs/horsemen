@@ -5,7 +5,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ## Map
 
 ```text
-horsemen/
+./
 ├── assets/                 README cover and provenance notes
 ├── horsemen/               Installable agent skill
 │   ├── SKILL.md            Agent entry point
