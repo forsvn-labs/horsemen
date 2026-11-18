@@ -27,8 +27,16 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
   These are excerpts, not generated claims. Open the peek for full context.
 - Drag records to arrange them, drag the background to pan, and scroll to zoom.
   Fit brings all records into view. Alt + arrow keys move a focused record.
-- Click a card for its reading view or exact Markdown source. Missing and
-  unreadable records remain visible. Source links use the scanned commit.
+- Click a card for its visual overview: Vision brief, Progress board, Brain
+  source library, Structure map, release timeline, tool cards, or README guide.
+  Full document and Markdown source tabs preserve the complete record.
+- Open a connected artifact to go deeper. Back returns to the previous record.
+  Explore on canvas adds connected documents as movable nodes. Lines represent
+  explicit links in the source files, not assumed relationships.
+- Linked repository Markdown opens inside the app at the same scanned commit.
+  External documents and other file types show a source card and an external
+  link. Horsemen does not fetch their contents. Missing and unreadable files
+  show an error without replacing the parent record.
 - Changelog PR links can load merge details and the PR description. Image
   attachments appear as links. A merge alone is not proof of delivery.
 
@@ -45,6 +53,11 @@ reported as incomplete scans. Files larger than 512 KiB are not loaded.
 Markdown supports headings, lists, tables, fenced code, links, and simple
 expandable sections. Other HTML is shown as text. Nested Markdown formatting
 is limited; exact source is always available. PR comments are not scanned.
+Connections currently use inline Markdown links, excluding code examples and
+comments. Reference-style and HTML links are not indexed. A document exposes
+up to 200 links; a project retains up to 4,000 link targets per scan. Only a
+link found in an already-loaded record can authorize another repository read.
+The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
@@ -63,7 +76,7 @@ record loads are retried instead of cached. Nothing is written to disk.
 ## Verification
 
 ```sh
-python3 -m unittest discover -s tests -p test_gui.py
+python3 -m unittest discover -s tests -p 'test_gui*.py'
 node tests/test_gui_previews.cjs
 python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check
 ```

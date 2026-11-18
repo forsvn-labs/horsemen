@@ -18,7 +18,7 @@ horsemen/
 │   ├── REVIEW.md           Design decisions and remaining boundaries
 │   ├── references/         Templates and focused workflows
 │   └── scripts/            Compatibility hooks, provider helpers, tests
-│       └── horsemen_core/  Shared checker, CLI, and single-record local editor
+│       └── horsemen_core/  Shared checker, CLI, local editor, and GitHub reader
 ├── scripts/                Build and end-to-end verification
 ├── tests/                  Distribution regression tests
 ├── pyproject.toml          CLI packaging; version comes from shared source

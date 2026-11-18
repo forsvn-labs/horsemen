@@ -22,4 +22,19 @@ assert(preview('vision','# Vision\n## The world we are building\nA shared view.'
 
 assert(preview('structure','# Structure\nA project map.\n## Map\napp/\n## Commands\nbun test').items.some(i=>i.label==='Project map'&&i.text==='app/'));
 
-console.log('PASS: project search and seven source-based record previews');
+assert.equal(typeof require('../web/previews.js').detail,'function');
+const detail=require('../web/previews.js').detail;
+const board=detail('progress','# Progress\nNext action: Review\n## In progress\n- Search\n## Gates\n- Approval');
+assert.equal(board.layout,'board');assert.equal(board.sections[0].title,'In progress');assert(board.sections[0].body.includes('Search'));
+assert.equal(detail('brain','# Brain').layout,'library');
+assert.equal(detail('vision','# Vision').layout,'brief');
+assert.equal(detail('structure','# Structure').layout,'map');
+assert.equal(detail('changelog','# Changelog').layout,'timeline');
+assert.equal(detail('techstack','# Tech stack').layout,'tools');
+assert.equal(detail('readme','# Welcome').layout,'guide');
+assert.equal(detail('document','# Research').layout,'document');
+const tools=require('../web/previews.js').toolsTable;
+assert.equal(typeof tools,'function');
+assert.deepEqual(tools('| Tool | Purpose |\n| --- | --- |\n| Python | Reader |\n| Git | Source |'),{headers:['Tool','Purpose'],rows:[['Python','Reader'],['Git','Source']]});
+
+console.log('PASS: project search, source previews, artifact layouts, and tool tables');

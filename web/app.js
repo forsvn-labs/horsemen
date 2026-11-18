@@ -31,20 +31,99 @@ function renderMarkdown(text,base){
 }
 async function api(path,method='GET'){const r=await fetch(path,{method,headers:{'X-Horsemen-Session':session},cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
 function showToast(message){$('#toast').textContent=message;$('#toast').hidden=false;setTimeout(()=>$('#toast').hidden=true,3500)}
-function setTab(source){$('#peek-content').hidden=source;$('#source-content').hidden=!source;$('#reading-tab').classList.toggle('active',!source);$('#source-tab').classList.toggle('active',source);$('#reading-tab').setAttribute('aria-pressed',!source);$('#source-tab').setAttribute('aria-pressed',source)}
-function openPeek(key,button){const r=records[key];if(!r)return;opener=button;$('#peek-title').textContent=r.name;$('#peek-meta').textContent=(projects[current]?.repo||'')+' · '+(r.path||r.name);$('#peek-content').innerHTML=r.error?'<div class="callout amber">'+escapeHTML(r.error)+'</div>':renderMarkdown(r.content,r.url);$('#source-content').textContent=r.content||r.error;setTab(false);if(r.url){const a=document.createElement('a');a.href=r.url;a.target='_blank';a.rel='noopener noreferrer';a.textContent='Open pinned source on GitHub ↗';$('#peek-content').prepend(a)}if(key==='changelog'&&!r.error)addEvidence(r);$('#peek').showModal();$('#close-peek').focus()}
+let peekTrail=[],peekRequest=0,peekMode='overview';
+function setTab(source){setPeekMode(source?'source':'overview')}
+function setPeekMode(mode){
+  peekMode=mode;$('#peek-content').hidden=mode==='source';$('#source-content').hidden=mode!=='source';
+  for(const [id,value] of [['reading-tab','overview'],['document-tab','document'],['source-tab','source']]){const b=$('#'+id);b.classList.toggle('active',mode===value);b.setAttribute('aria-pressed',mode===value)}
+  renderPeek();
+}
+function openPeek(key,button){const r=records[key];if(!r)return;opener=button;peekRequest++;peekTrail=[{key,record:r,nodeId:key}];peekMode='overview';renderPeek();if(!$('#peek').open)$('#peek').showModal();$('#close-peek').focus()}
+function sectionCard(section,record,extra=''){return '<section class="detail-section '+extra+'"><h3>'+escapeHTML(section.title)+'</h3>'+renderMarkdown(section.body,record.url)+'</section>'}
+function overviewHTML(key,record){
+  const model=HorsemenPreview.detail(key,record.content),summary=HorsemenPreview.preview(key,record.content);
+  const intro=model.intro.replace(/^#\s+.*$/m,'').trim();
+  let hero=summary.items[0];
+  if(key==='progress')hero=summary.items.find(i=>i.label==='Next action')||hero;
+  let html='<div class="artifact-overview '+model.layout+'" data-layout="'+model.layout+'"><div class="detail-eyebrow">'+escapeHTML(key==='document'?'Connected document':key)+' · Source snapshot</div><h2>'+escapeHTML(model.title||record.name)+'</h2>';
+  if(hero&&['vision','progress','readme'].includes(key))html+='<div class="detail-hero"><span>'+escapeHTML(hero.label)+'</span><p>'+escapeHTML(hero.text)+'</p></div>';
+  if(key==='brain')html+='<p class="detail-intro">Knowledge stays with its original source. Open a connection to explore it, or inspect the access rules below.</p><div data-connections-slot></div>';
+  if(key==='progress'){
+    const current=model.sections.filter(s=>!/^historical|history|upcoming/i.test(s.title));
+    html+='<div class="status-board">'+current.map(s=>sectionCard(s,record,/gate|block/i.test(s.title)?'warning':'')).join('')+'</div>';
+    const history=model.sections.filter(s=>/^historical|history|upcoming/i.test(s.title));
+    if(history.length)html+='<details class="detail-history"><summary>History and roadmap</summary>'+history.map(s=>sectionCard(s,record)).join('')+'</details>';
+  }else if(key==='structure'){
+    const map=model.sections.find(s=>/^map$|tree|layout|structure/i.test(s.title));
+    if(map)html+=sectionCard(map,record,'directory-panel');
+    html+='<div class="detail-grid">'+model.sections.filter(s=>s!==map).map(s=>sectionCard(s,record)).join('')+'</div>';
+  }else if(key==='changelog'){
+    html+='<div class="release-timeline">'+model.sections.map(s=>sectionCard(s,record,'release-entry')).join('')+'</div>';
+  }else if(key==='techstack'){
+    for(const section of model.sections){
+      const table=HorsemenPreview.toolsTable(section.body);
+      if(!table.rows.length){html+=sectionCard(section,record,'tool-section');continue}
+      html+='<h3>'+escapeHTML(section.title)+' · '+table.rows.length+' tools</h3><div class="tool-grid">'+table.rows.map(row=>'<section class="tool-card"><div class="tool-mark">'+escapeHTML(row[0].slice(0,2).toUpperCase())+'</div><h3>'+escapeHTML(row[0])+'</h3><dl>'+row.slice(1).map((cell,i)=>'<dt>'+escapeHTML(table.headers[i+1]||'Details')+'</dt><dd>'+escapeHTML(cell)+'</dd>').join('')+'</dl></section>').join('')+'</div>';
+      const notes=section.body.split('\n').filter(line=>!line.includes('|')).join('\n');if(notes.trim())html+=renderMarkdown(notes,record.url);
+    }
+  }else{
+    html+='<div class="detail-grid">'+model.sections.map(s=>sectionCard(s,record,/boundar|never|access|permission/i.test(s.title)?'boundary':'')).join('')+'</div>';
+  }
+  if(intro)html+='<details class="detail-history" '+(!model.sections.length?'open':'')+'><summary>Document introduction</summary>'+renderMarkdown(intro,record.url)+'</details>';
+  if(!intro&&!model.sections.length)html+='<p>This record is empty.</p>';
+  return html+'</div>';
+}
+function renderPeek(){
+  const entry=peekTrail.at(-1);if(!entry)return;
+  const r=entry.record;$('#peek').dataset.kind=entry.key;$('#peek-title').textContent=r.name||entry.link?.title||'Document';
+  $('#peek-back').hidden=peekTrail.length<2;
+  $('#peek-meta').textContent=peekTrail.map(e=>e.record.name||e.link?.title).join(' / ');
+  $('#source-content').textContent=r.content||r.error||'This external document has not been loaded.';
+  $('#peek-content').hidden=peekMode==='source';$('#source-content').hidden=peekMode!=='source';
+  for(const [id,mode] of [['reading-tab','overview'],['document-tab','document'],['source-tab','source']]){const b=$('#'+id);b.classList.toggle('active',peekMode===mode);b.setAttribute('aria-pressed',peekMode===mode)}
+  const content=$('#peek-content');content.replaceChildren();$('.peek-content').scrollTop=0;
+  if(entry.link&&entry.link.kind!=='document'){
+    content.innerHTML='<div class="external-document"><span class="detail-eyebrow">'+escapeHTML(entry.link.kind)+'</span><h2>'+escapeHTML(entry.link.title)+'</h2><p>Linked from '+escapeHTML(entry.link.source)+'. The contents have not been loaded into Horsemen.</p><p class="external-address">'+escapeHTML(entry.link.href)+'</p></div>';
+  }else if(r.error)content.innerHTML='<div class="callout amber">'+escapeHTML(r.error)+'</div>';
+  else content.innerHTML=peekMode==='document'?renderMarkdown(r.content||'',r.url):overviewHTML(entry.key,r);
+  const href=r.url||entry.link?.href;
+  if(href&&safeURL(href,location.href)){
+    const a=document.createElement('a');a.className='original-source';a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=entry.link?.kind==='external'?'Open external source ↗':'Open original source ↗';content.prepend(a);
+  }
+  if(r.connections?.length){
+    const panel=document.createElement('section');panel.className='connections-panel';
+    panel.innerHTML='<div class="connections-heading"><h3>Connected artifacts <span>'+r.connections.length+'</span></h3></div><div class="connection-grid"></div>';
+    const graph=document.createElement('button');graph.className='btn';graph.textContent='Explore on canvas';graph.onclick=()=>{expandConnections(entry.nodeId,r);$('#peek').close();fitCanvas()};panel.querySelector('.connections-heading').append(graph);
+    for(const link of r.connections){const b=document.createElement('button');b.className='connection-card';b.dataset.connection=link.id;b.innerHTML='<span class="connection-type">'+escapeHTML(link.kind==='document'?'Markdown document':link.kind)+'</span><strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+' →</small>';b.onclick=()=>openConnection(link,entry.nodeId);panel.querySelector('.connection-grid').append(b)}
+    const slot=content.querySelector('[data-connections-slot]');if(slot)slot.replaceWith(panel);else content.append(panel);
+    content.querySelectorAll('a').forEach(a=>{const link=r.connections.find(l=>l.href===a.href);if(link&&!a.classList.contains('original-source'))a.onclick=e=>{if(e.metaKey||e.ctrlKey||e.shiftKey)return;e.preventDefault();openConnection(link,entry.nodeId)}});
+  }else if(entry.key==='brain'&&!r.error){const slot=content.querySelector('[data-connections-slot]');if(slot)slot.innerHTML='<div class="connection-empty">No Markdown links found in this record. Add source links to BRAIN.md to connect documents here.</div>'}
+  if(entry.key==='changelog'&&!r.error&&peekMode==='overview')addEvidence(r);
+}
+async function openConnection(link,parentId){
+  const nodeId=ensureConnectionNode(parentId,link,false),existing=Object.entries(records).find(([,r])=>r.path===link.path);
+  if(peekTrail.length>=32){showToast('Return to an earlier document before going deeper.');return}
+  const entry={key:existing?.[0]||'document',record:existing?.[1]||{name:link.title,error:link.kind==='document'?'Loading linked document…':null},link,nodeId};
+  peekTrail.push(entry);peekMode='overview';const version=++peekRequest,projectVersion=request;renderPeek();if(!$('#peek').open)$('#peek').showModal();
+  if(existing||link.kind!=='document')return;
+  try{const record=await api('/api/document?id='+projects[current].id+'&link='+link.id);if(version!==peekRequest||projectVersion!==request||!$('#peek').open)return;entry.record=record;const node=connectionNodes.get(nodeId);if(node)node.record=record;renderPeek()}
+  catch(e){if(version!==peekRequest||projectVersion!==request)return;entry.record={name:link.title,error:e.message};renderPeek()}
+}
+$('#peek-back').onclick=()=>{peekRequest++;peekTrail.pop();peekMode='overview';renderPeek()};
+$('#document-tab').onclick=()=>setPeekMode('document');
+
 function addEvidence(record){const p=projects[current],area=document.createElement('section');area.className='evidence-block';area.innerHTML='<h3>Delivery evidence & PRs</h3><p>The source above owns the delivery claim. A merged PR alone does not prove delivery. Attachments below come from the PR description; comments are not scanned.</p>';const urls=[...record.content.matchAll(/https:\/\/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/g)].filter(m=>m[1]===p.repo);for(const n of new Set(urls.map(m=>m[2]))){const b=document.createElement('button');b.className='btn';b.textContent='Load PR #'+n;b.onclick=async()=>{const version=request;b.disabled=true;try{const pr=await api('/api/pr?project='+p.id+'&number='+n);if(version!==request)return;const box=document.createElement('div');box.innerHTML='<h3>'+escapeHTML(pr.title)+'</h3><p>'+escapeHTML(pr.merged?'Merged · '+pr.merged_at:pr.state)+' · '+escapeHTML(pr.merge_commit_sha||'No merge commit')+'</p>'+renderMarkdown(pr.body||'No PR description.',pr.html_url);area.append(box);b.remove()}catch(e){b.disabled=false;showToast(e.message)}};area.append(b)}if(!urls.length)area.insertAdjacentHTML('beforeend','<p>No same-repository PR links found in this record.</p>');$('#peek-content').append(area)}
-$('#reading-tab').onclick=()=>setTab(false);$('#source-tab').onclick=()=>setTab(true);$('#close-peek').onclick=()=>$('#peek').close();$('#peek').addEventListener('close',()=>opener?.focus({preventScroll:true}));
+$('#reading-tab').onclick=()=>setTab(false);$('#source-tab').onclick=()=>setTab(true);$('#close-peek').onclick=()=>$('#peek').close();$('#peek').addEventListener('close',()=>{peekRequest++;opener?.focus({preventScroll:true})});
 for(const b of $$('[data-artifact]')){b.disabled=true;b.onclick=()=>openPeek(b.dataset.artifact,b)}
 function filter(){const q=$('#search').value.toLowerCase();let count=0;for(const b of $$('[data-artifact]')){b.hidden=!b.textContent.toLowerCase().includes(q);if(!b.hidden)count++}$('#empty').hidden=count!==0;drawWires()}
 $('#search').oninput=filter;
-function clearRecords(){request++;records={};if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-meta','#peek-content','#source-content'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML='<p>Waiting for source…</p>';const foot=b.querySelector('.cardfoot');if(foot)foot.textContent='Not loaded'}}
+function clearRecords(){request++;clearConnections();records={};if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-meta','#peek-content','#source-content'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML='<p>Waiting for source…</p>';const foot=b.querySelector('.cardfoot');if(foot)foot.textContent='Not loaded'}}
 async function selectProject(index){clearRecords();const version=request;current=index;const p=projects[index];$('#project-name').textContent=p.name;$('#crumb').textContent=p.name;$('#project-description').textContent=p.repo+(p.root?' / '+p.root:'')+' · '+p.revision.slice(0,7);$('#privacy').textContent=p.private?'PRIVATE':'PUBLIC SOURCE';$$('[data-project]').forEach(b=>b.classList.toggle('active',+b.dataset.project===index));document.body.dataset.state='loading';$('#search').value='';filter();loadCanvas();try{const data=await api('/api/project?id='+p.id);if(version!==request)return;records=data.records;for(const b of $$('[data-artifact]')){const r=records[b.dataset.artifact];b.disabled=false;const body=b.querySelector('.cardbody'),foot=b.querySelector('.cardfoot');if(body)body.innerHTML=previewHTML(b.dataset.artifact,r);
 if(foot)foot.textContent=r.error?'Missing or unreadable':'Pinned source · '+p.revision.slice(0,7);
 if(b.classList.contains('supporter')){
   b.querySelector('small').textContent=r.error?'Missing or unreadable':(HorsemenPreview.preview(b.dataset.artifact,r.content).items[0]?.text||'Empty record');
 }
-}document.body.dataset.state='ready';loadCanvas()}catch(e){if(version!==request)return;document.body.dataset.state='error';$('#scan-status').textContent=e.message}}
+}installRecordLinks();document.body.dataset.state='ready';loadCanvas()}catch(e){if(version!==request)return;document.body.dataset.state='error';$('#scan-status').textContent=e.message}}
 function previewHTML(key,record){
   if(record.error)return '<h2>Not available</h2><p>'+escapeHTML(record.error)+'</p>';
   const model=HorsemenPreview.preview(key,record.content);
@@ -74,13 +153,53 @@ const canvas=$('.canvas'), world=$('#map');
 const defaults={vision:[0,0],progress:[420,0],brain:[0,355],structure:[420,355],readme:[0,660],changelog:[280,660],techstack:[560,660]};
 let layouts={},camera={x:30,y:30,z:1},gesture=null,spaceDown=false,suppressClick=null,pinch=null;
 const pointers=new Map();let highestLayer=2;
-try{const saved=JSON.parse(localStorage.getItem('horsemen-local-layouts-v1')||'{}');for(const [id,layout] of Object.entries(saved)){const clean={};for(const key of Object.keys(defaults)){const pos=layout[key];if(Array.isArray(pos)&&pos.length===2&&pos.every(n=>Number.isFinite(n)&&Math.abs(n)<1e7))clean[key]=pos}layouts[id]=clean}}catch{}
+try{const saved=JSON.parse(localStorage.getItem('horsemen-local-layouts-v1')||'{}');for(const [id,layout] of Object.entries(saved)){const clean={};for(const key of Object.keys(layout)){if(!Object.hasOwn(defaults,key)&&!/^link-[a-f0-9]{24}$/.test(key))continue;const pos=layout[key];if(Array.isArray(pos)&&pos.length===2&&pos.every(n=>Number.isFinite(n)&&Math.abs(n)<1e7))clean[key]=pos}layouts[id]=clean}}catch{}
 function positions(){return layouts[projects[current]?.id || "empty"]??(layouts[projects[current]?.id || "empty"]={})}
 function position(key){return positions()[key]??defaults[key]}
 function saveLayout(){try{localStorage.setItem('horsemen-local-layouts-v1',JSON.stringify(layouts))}catch{}}
 const wires=document.createElementNS('http://www.w3.org/2000/svg','svg');wires.classList.add('wires');wires.setAttribute('aria-hidden','true');world.prepend(wires);
-const relations=[['vision','progress','guides'],['brain','vision','informs'],['structure','techstack','locates'],['progress','changelog','delivery evidence']];
-function drawWires(){wires.replaceChildren();if(world.classList.contains('list'))return;for(const [a,b,label] of relations){const ea=$('[data-artifact="'+a+'"]'),eb=$('[data-artifact="'+b+'"]');if(ea.hidden||eb.hidden)continue;const pa=position(a),pb=position(b);const ca={x:pa[0]+ea.offsetWidth/2,y:pa[1]+ea.offsetHeight/2},cb={x:pb[0]+eb.offsetWidth/2,y:pb[1]+eb.offsetHeight/2};const horizontal=Math.abs(cb.x-ca.x)>Math.abs(cb.y-ca.y);const x1=ca.x+(horizontal?Math.sign(cb.x-ca.x)*ea.offsetWidth/2:0),y1=ca.y+(horizontal?0:Math.sign(cb.y-ca.y)*ea.offsetHeight/2),x2=cb.x-(horizontal?Math.sign(cb.x-ca.x)*eb.offsetWidth/2:0),y2=cb.y-(horizontal?0:Math.sign(cb.y-ca.y)*eb.offsetHeight/2);const path=document.createElementNS(wires.namespaceURI,'path');path.setAttribute('d',horizontal?`M ${x1} ${y1} C ${(x1+x2)/2} ${y1}, ${(x1+x2)/2} ${y2}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`);wires.append(path);const text=document.createElementNS(wires.namespaceURI,'text');text.setAttribute('x',(x1+x2)/2);text.setAttribute('y',(y1+y2)/2-8);text.textContent=label;wires.append(text)}}
+const relations=[];
+const connectionNodes=new Map();
+function clearConnections(){
+  for(const node of connectionNodes.values()){node.element?.remove();delete defaults[node.id]}
+  connectionNodes.clear();relations.length=0;peekTrail=[];peekRequest++;drawWires();
+}
+function ensureConnectionNode(parentId,link,visible){
+  const core=Object.entries(records).find(([,r])=>r.path&&r.path===link.path);
+  let id=core?.[0];
+  if(!id){
+    let node=[...connectionNodes.values()].find(n=>n.link.href===link.href);
+    if(!node){id='link-'+link.id;node={id,link,parentId,element:null};connectionNodes.set(id,node)}else id=node.id;
+    if(visible&&!node.element){
+      const parent=position(parentId)||[0,0];const siblings=[...connectionNodes.values()].filter(n=>n.parentId===parentId&&n.element).length;
+      defaults[id]=[parent[0]-350,parent[1]+siblings*155];
+      const b=document.createElement('button');b.className='artifact connected-node';b.dataset.artifact=id;
+      b.innerHTML='<span class="connection-type">'+escapeHTML(link.kind)+'</span><strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+'</small><span class="node-open">Open connection ↗</span>';
+      b.onclick=()=>{opener=b;peekTrail=connectionTrail(node.parentId);openConnection(node.link,node.parentId)};b.title='Click to open · Drag to move';world.append(b);node.element=b;
+    }
+  }
+  if(visible&&parentId!==id&&!relations.some(([a,b])=>a===parentId&&b===id))relations.push([parentId,id,'links to']);
+  return id;
+}
+function connectionTrail(parentId){
+  const trail=[],seen=new Set();let id=parentId;
+  while(id&&!seen.has(id)&&trail.length<31){seen.add(id);if(records[id]){trail.unshift({key:id,record:records[id],nodeId:id});break}const node=connectionNodes.get(id);if(!node)break;if(node.record)trail.unshift({key:'document',record:node.record,nodeId:id,link:node.link});id=node.parentId}
+  return trail;
+}
+function expandConnections(parentId,record){
+  const parent=connectionNodes.get(parentId);
+  if(parent&&!parent.element)ensureConnectionNode(parent.parentId,parent.link,true);
+  for(const link of record.connections||[])ensureConnectionNode(parentId,link,true);
+  $('#search').value='';renderPositions();drawWires();
+}
+function installRecordLinks(){
+  for(const [key,r] of Object.entries(records)){
+    for(const link of r.connections||[]){const target=Object.entries(records).find(([,v])=>v.path&&v.path===link.path);if(target&&target[0]!==key)relations.push([key,target[0],'links to'])}
+    const foot=$('[data-artifact="'+key+'"] .cardfoot');if(foot&&r.connections?.length)foot.textContent+=' · '+r.connections.length+' connections';
+  }
+}
+
+function drawWires(){wires.replaceChildren();if(world.classList.contains('list'))return;for(const [a,b,label] of relations){const ea=$('[data-artifact="'+a+'"]'),eb=$('[data-artifact="'+b+'"]');if(!ea||!eb||ea.hidden||eb.hidden)continue;const pa=position(a),pb=position(b);const ca={x:pa[0]+ea.offsetWidth/2,y:pa[1]+ea.offsetHeight/2},cb={x:pb[0]+eb.offsetWidth/2,y:pb[1]+eb.offsetHeight/2};const horizontal=Math.abs(cb.x-ca.x)>Math.abs(cb.y-ca.y);const x1=ca.x+(horizontal?Math.sign(cb.x-ca.x)*ea.offsetWidth/2:0),y1=ca.y+(horizontal?0:Math.sign(cb.y-ca.y)*ea.offsetHeight/2),x2=cb.x-(horizontal?Math.sign(cb.x-ca.x)*eb.offsetWidth/2:0),y2=cb.y-(horizontal?0:Math.sign(cb.y-ca.y)*eb.offsetHeight/2);const path=document.createElementNS(wires.namespaceURI,'path');path.setAttribute('d',horizontal?`M ${x1} ${y1} C ${(x1+x2)/2} ${y1}, ${(x1+x2)/2} ${y2}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`);wires.append(path);const text=document.createElementNS(wires.namespaceURI,'text');text.setAttribute('x',(x1+x2)/2);text.setAttribute('y',(y1+y2)/2-8);text.textContent=label;wires.append(text)}}
 function renderPositions(){for(const el of $$('[data-artifact]')){const p=position(el.dataset.artifact);el.style.left=p[0]+'px';el.style.top=p[1]+'px'}drawWires()}
 function renderCamera(){const list=world.classList.contains('list');world.style.transform=list?'none':`translate(${camera.x}px,${camera.y}px) scale(${camera.z})`;zoom=camera.z;$('#zoom-label').textContent=Math.round(zoom*100)+'%';$('#zoom-out').disabled=list||zoom<=.15;$('#zoom-in').disabled=list||zoom>=3.5;$('#fit').disabled=list;$('#reset-layout').disabled=list;canvas.style.backgroundSize=`${24*zoom}px ${24*zoom}px`;canvas.style.backgroundPosition=`${camera.x}px ${camera.y}px`}
 function zoomAt(next,x=canvas.clientWidth/2,y=canvas.clientHeight/2){next=Math.max(.15,Math.min(3.5,next));const wx=(x-camera.x)/camera.z,wy=(y-camera.y)/camera.z;camera={x:x-wx*next,y:y-wy*next,z:next};renderCamera()}

@@ -14,6 +14,7 @@ import threading
 import time
 from urllib.parse import parse_qs, quote, urlsplit
 from .legacy import sections
+from .gui_links import connections
 
 FILES = {'vision': 'VISION.md', 'progress': 'PROGRESS.md', 'brain': 'BRAIN.md',
          'structure': 'STRUCTURE.md', 'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'techstack': 'TECHSTACK.md'}
@@ -110,7 +111,7 @@ class GitHubReader:
             jobs = {key:pool.submit(self.load_record, project, key, default) for key,default in FILES.items()}
             records = {key:job.result() for key,job in jobs.items()}
         return {'project':{k:v for k,v in project.items() if k!='files'}, 'records':records, 'loaded_at':now()}
-    def load_record(self, project, key, default):
+    def load_record(self, project, key, default, blob=None):
         file = project['files'].get(key)
         if not file:
             return {'name':default, 'error':'Record is missing from this project root.'}
@@ -118,17 +119,24 @@ class GitHubReader:
         rec = {'name':name, 'path':path, 'url':f'https://github.com/{project["repo"]}/blob/{project["revision"]}/{quote(path, safe="/")}', 'blob':file['sha']}
         try:
             if file.get('size') is None or file['size'] > MAX_FILE: raise ProviderError('Record exceeds the 512 KiB size limit.', 413)
-            blob = self.api(f'/repos/{project["repo"]}/git/blobs/{file["sha"]}')
+            if blob is None:blob = self.api(f'/repos/{project["repo"]}/git/blobs/{file["sha"]}')
             if blob.get('encoding') != 'base64': raise ProviderError('Unsupported record encoding.')
             encoded = re.sub(r'\s', '', blob['content'])
             if len(encoded) > MAX_FILE * 2: raise ProviderError('Record exceeds the size limit.', 413)
             content = base64.b64decode(encoded, validate=True)
             if len(content) > MAX_FILE: raise ProviderError('Record exceeds the size limit.', 413)
             text = content.decode('utf-8-sig')
-            rec.update(content=text, sections=dict(sections(text)))
+            rec.update(content=text, sections=dict(sections(text)), connections=connections(text,path,project["repo"],project["revision"]))
         except ProviderError as error: rec['error'] = str(error)
         except (ValueError, UnicodeError, KeyError): rec['error'] = 'Record could not be decoded as UTF-8 Markdown.'
         return rec
+    def load_document(self, project, link):
+        path=link['path']
+        blob=self.api(f'/repos/{project["repo"]}/contents/{quote(path,safe="/")}?ref={project["revision"]}')
+        if not isinstance(blob,dict) or blob.get('type')!='file':raise ProviderError('The linked path is not a readable file.',422)
+        nested=dict(project,files={'document':{'path':path,'size':blob.get('size'),'sha':blob.get('sha')}})
+        return self.load_record(nested,'document',PurePosixPath(path).name,blob)
+
     def pull_request(self, project, number):
         if not re.fullmatch(r'[1-9][0-9]{0,8}', str(number)): raise ProviderError('Invalid PR number.', 400)
         data = self.api(f'/repos/{project["repo"]}/pulls/{number}')
@@ -138,12 +146,12 @@ class ScanState:
     def __init__(self, reader):
         self.reader=reader;self.lock=threading.RLock();self.generation=0;self.worker=None
         self.data={'phase':'idle','account':None,'projects':[],'issues':[],'completed':0,'total':0,'finished_at':None}
-        self.projects={};self.cache={}
+        self.projects={};self.cache={};self.links={}
     def snapshot(self):
         with self.lock: return copy.deepcopy(self.data)
     def clear(self):
         with self.lock:
-            self.generation+=1;self.projects={};self.cache={}
+            self.generation+=1;self.projects={};self.cache={};self.links={}
             self.data={'phase':'idle','account':None,'projects':[],'issues':[],'completed':0,'total':0,'finished_at':None}
     def _begin(self):
         with self.lock:
@@ -195,11 +203,30 @@ class ScanState:
         result=self.reader.load(project)
         with self.lock:
             if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            self.register_links(key,result['records'].values())
             # Bound memory to 16 projects; never cache transient record failures.
             if all('content' in result['records'][key] for key in project['files']):
                 if len(self.cache)>=16:self.cache.pop(next(iter(self.cache)))
                 self.cache[key]=copy.deepcopy(result)
         return result
+
+    def register_links(self, key, records):
+        known=self.links.setdefault(key,{})
+        for record in records:
+            for link in record.get('connections',[]):
+                if len(known)<4000:known[link['id']]=link
+    def load_document(self, key, link_id):
+        with self.lock:generation=self.generation
+        project=self.project(key)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            link=copy.deepcopy(self.links.get(key,{}).get(link_id))
+            if not link or link['kind']!='document':raise ProviderError('Open a document linked from a loaded record.',404)
+        record=self.reader.load_document(project,link)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            self.register_links(key,[record])
+        return record
 
     def project(self, key):
         with self.lock:
@@ -241,6 +268,8 @@ class Handler(BaseHTTPRequestHandler):
             query=parse_qs(urlsplit(self.path).query)
             if path=='/api/project':
                 return self.respond(200,self.server.state.load_project(query.get('id',[''])[0]))
+            if path=='/api/document':
+                return self.respond(200,self.server.state.load_document(query.get('id',[''])[0],query.get('link',[''])[0]))
             if path=='/api/pr':
                 project=self.server.state.project(query.get('project',[''])[0])
                 generation=self.server.state.generation

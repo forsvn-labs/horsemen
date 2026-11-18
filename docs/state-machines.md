@@ -53,3 +53,23 @@ cover parallel loads, cache reuse, invalidation, credential changes, and expiry.
 Remaining limits: no persistence, scheduled refresh, multi-user isolation,
 GitHub Enterprise host support, or complete-tree fallback. An account change
 outside the app requires refresh; status metadata is the last scan snapshot.
+
+## Connected documents
+
+Loading a record registers its explicit Markdown links in the current scan.
+Only registered Markdown targets can use the document endpoint. Relative
+paths resolve against the containing file; paths that escape the repository
+are rejected. External URLs are never fetched. Linked reads use the scanned
+commit and the same file-size, decoding, and account checks as root records.
+Clear and refresh remove the link registry. A stale document response cannot
+register more links or replace the current peek.
+
+The peek keeps a bounded navigation history. Opening a connection pushes a
+record; Back pops it. Closing the peek or changing projects invalidates its
+pending request. The canvas expands only requested connections and keeps the
+same artifact reader. Link discovery does not create provider access.
+
+`tests/test_gui_links.py` covers relative paths, code examples, unsafe URLs,
+unknown targets, recursive links, revision pinning, and clear. Browser checks
+cover Brain → document → decision → Back, external source cards, expansion
+onto the canvas, and the artifact-specific overview layouts.

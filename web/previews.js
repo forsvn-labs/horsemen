@@ -43,6 +43,27 @@
     if(!items.length){const content=blocks.map(b=>excerpt(b)).find(Boolean);add('From the source',content)}
     return {title,items:items.slice(0,3)};
   }
+  function detail(key,text){
+    const layouts={vision:'brief',progress:'board',brain:'library',structure:'map',changelog:'timeline',techstack:'tools',readme:'guide'};
+    const sections=[];let current={title:'',body:''},fence=false;
+    for(const line of (text||'').split('\n')){
+      if(/^\s*```/.test(line))fence=!fence;
+      const heading=!fence&&line.match(/^##\s+(.+)/);
+      if(heading){sections.push(current);current={title:plain(heading[1]),body:''}}else current.body+=line+'\n';
+    }
+    sections.push(current);
+    return {layout:layouts[key]||'document',intro:sections.shift()?.body||'',sections:sections.filter(s=>s.body.trim()),title:plain((text||'').match(/^#\s+(.+)/m)?.[1]||'')};
+  }
+  function toolsTable(body){
+    const lines=body.split('\n'),cells=line=>line.trim().replace(/^\||\|$/g,'').split('|').map(plain);
+    for(let i=0;i<lines.length-1;i++){
+      if(!lines[i].includes('|')||!cells(lines[i+1]).every(c=>/^:?-{3,}:?$/.test(c)))continue;
+      const headers=cells(lines[i]),rows=[];i+=2;
+      while(i<lines.length&&lines[i].includes('|')){rows.push(cells(lines[i]));i++}
+      return {headers,rows};
+    }
+    return {headers:[],rows:[]};
+  }
   function matchesProject(project,query){const hay=[project.name,project.repo,project.root].join(' ').toLocaleLowerCase();return query.trim().toLocaleLowerCase().split(/\s+/).every(word=>hay.includes(word))}
-  const api={preview,matchesProject};if(typeof module!=='undefined')module.exports=api;else root.HorsemenPreview=api;
+  const api={preview,matchesProject,detail,toolsTable};if(typeof module!=='undefined')module.exports=api;else root.HorsemenPreview=api;
 })(globalThis);
