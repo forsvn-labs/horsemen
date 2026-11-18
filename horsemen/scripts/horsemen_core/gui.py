@@ -245,6 +245,9 @@ class ScanState:
                 self.clear();raise ProviderError('GitHub account changed. Scan again before opening a project.',409)
         return project
 
+ASSET_NAME=re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
+ASSET_TYPES={'.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.txt':'text/plain; charset=utf-8'}
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_): pass  # No personal project paths or URLs in request logs.
     def respond(self, status, body, kind='application/json'):
@@ -276,7 +279,14 @@ class Handler(BaseHTTPRequestHandler):
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8')}
+            if path.startswith('/assets/'):
+                # Bundled fonts and icons only: plain names, known types, no traversal or links.
+                parts=path[len('/assets/'):].split('/')
+                target=(self.server.assets/'assets').joinpath(*parts) if all(ASSET_NAME.fullmatch(part) for part in parts) else None
+                kind=ASSET_TYPES.get(target.suffix) if target else None
+                if not kind or target.is_symlink() or not target.is_file():return self.respond(404,{'error':'Not found.'})
+                return self.respond(200,target.read_bytes(),kind)
             if path not in files:return self.respond(404,{'error':'Not found.'})
             filename,kind=files[path];body=(self.server.assets/filename).read_bytes()
             if path=='/':body=body.replace(b'__SESSION__',self.server.session.encode())

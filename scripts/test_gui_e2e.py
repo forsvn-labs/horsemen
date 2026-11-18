@@ -159,6 +159,16 @@ try:
     browser('click','#collapse-all')
     assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
     browser('click','[data-card-toggle="brain"]');browser('click','#fit')
+    overlap_check='JSON.stringify((()=>{const cards=[...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).map(e=>({id:e.dataset.artifact,x:position(e.dataset.artifact)[0],y:position(e.dataset.artifact)[1],w:e.offsetWidth,h:e.offsetHeight}));const hits=[];for(const a of cards)for(const b of cards)if(a.id<b.id&&HorsemenCanvas.overlaps(a,b,0))hits.push(a.id+"/"+b.id);return hits})())'
+    assert value(overlap_check)==[], 'Expanded links do not overlap any card'
+    research=value('JSON.stringify(document.querySelector(".connected-node[data-document-path=\\"docs/research.md\\"]").dataset.artifact)')
+    browser('click',f'[data-card-toggle="{research}"]')
+    browser('wait','--fn','document.querySelectorAll(".connected-node:not([hidden])").length === 3')
+    assert value(overlap_check)==[], 'Nested links do not overlap any card'
+    browser('click','[data-card-toggle="structure"]') if value('Boolean(document.querySelector("[data-card-toggle=structure]"))') else None
+    assert value(overlap_check)==[], 'A second branch does not overlap the first'
+    browser('click','#fit');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('screenshot',str(args.output/'expanded.png'))
 
     browser('dblclick','.connected-node[data-document-path="docs/research.md"]')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
@@ -209,6 +219,17 @@ try:
     browser('screenshot',str(args.output/'mobile-brain-peek.png'))
     browser('press','Escape')
     browser('set','viewport','1440','1100');browser('click','#fit');browser('screenshot',str(args.output/'desktop.png'))
+    scheme=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
+    browser('click','#theme-toggle')
+    other=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
+    assert {scheme,other}=={'light','dark'} and value('JSON.stringify(localStorage.getItem("horsemen-theme"))')==other, 'Theme switch changes and saves the theme'
+    browser('screenshot',str(args.output/('desktop-'+other+'.png')))
+    browser('dblclick','[data-artifact="brain"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('screenshot',str(args.output/('brain-peek-'+other+'.png')));browser('press','Escape')
+    browser('click','#theme-toggle')
+    assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')==scheme
+    dock=value('JSON.stringify((()=>{const d=document.querySelector(".canvas-controls").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().bottom<=d.top)})())')
+    assert dock, 'Fit keeps every card clear of the tool dock'
     browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#clear')
     browser('wait','--fn','document.body.dataset.state === "idle"')
     assert browser('get','text','#source-content').strip()==''

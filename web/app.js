@@ -3,6 +3,9 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structure:'STRUCTURE.md',readme:'README.md',changelog:'CHANGELOG.md',techstack:'TECHSTACK.md'};
 let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
 const session=$('meta[name="horsemen-session"]').content;
+const riders=['vision','progress','brain','structure'];
+const icon=(name,cls='icon')=>'<svg class="'+cls+'" aria-hidden="true"><use href="/assets/icons/'+(name.startsWith('seal-')?'seals':'icons')+'.svg#'+name+'"/></svg>';
+const kindIcon=kind=>kind==='document'?'document':kind==='external'?'external':'link';
 const escapeHTML=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 function safeURL(value,base){try{const u=new URL(value,base);return ['https:','http:'].includes(u.protocol)?u.href:null}catch{return null}}
 function inline(text,base){return text.split(/(!?\[[^\]]*\]\([^\s)]+\)|`[^`]+`)/g).map(part=>{const m=part.match(/^(!?)\[([^\]]*)\]\(([^\s)]+)\)$/);if(m){const url=safeURL(m[3],base);return url?'<a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(url)+'">'+(m[1]?'Attachment: ':'')+escapeHTML(m[2]||url)+'</a>':escapeHTML(m[2])}if(part.startsWith('`')&&part.endsWith('`'))return '<code>'+escapeHTML(part.slice(1,-1))+'</code>';return escapeHTML(part).replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')}).join('')}
@@ -45,7 +48,7 @@ function overviewHTML(key,record){
   const intro=model.intro.replace(/^#\s+.*$/m,'').trim();
   let hero=summary.items[0];
   if(key==='progress')hero=summary.items.find(i=>i.label==='Next action')||hero;
-  let html='<div class="artifact-overview '+model.layout+'" data-layout="'+model.layout+'"><div class="detail-eyebrow">'+escapeHTML(key==='document'?'Connected document':key)+' · Source snapshot</div><h2>'+escapeHTML(model.title||record.name)+'</h2>';
+  let html='<div class="artifact-overview '+model.layout+'" data-layout="'+model.layout+'">'+(riders.includes(key)?icon('seal-'+key,'overview-seal'):'')+'<div class="detail-eyebrow">'+escapeHTML(key==='document'?'Connected document':key)+' · Source snapshot</div><h2>'+escapeHTML(model.title||record.name)+'</h2>';
   if(hero&&['vision','progress','readme'].includes(key))html+='<div class="detail-hero"><span>'+escapeHTML(hero.label)+'</span><p>'+escapeHTML(hero.text)+'</p></div>';
   if(key==='brain')html+='<p class="detail-intro">Knowledge stays with its original source. Open a connection to explore it, or inspect the access rules below.</p><div data-connections-slot></div>';
   if(key==='progress'){
@@ -75,7 +78,7 @@ function overviewHTML(key,record){
 }
 function renderPeek(){
   const entry=peekTrail.at(-1);if(!entry)return;
-  const r=entry.record;$('#peek').dataset.kind=entry.key;$('#peek-title').textContent=r.name||entry.link?.title||'Document';
+  const r=entry.record;$('#peek').dataset.kind=entry.key;$('#peek-kind').innerHTML=icon(Object.hasOwn(names,entry.key)?entry.key:kindIcon(entry.link?.kind||'document'));$('#peek-title').textContent=r.name||entry.link?.title||'Document';
   $('#peek-back').hidden=peekTrail.length<2;
   $('#peek-meta').textContent=peekTrail.map(e=>e.record.name||e.link?.title).join(' / ');
   $('#source-content').textContent=r.content||r.error||'This external document has not been loaded.';
@@ -88,14 +91,14 @@ function renderPeek(){
   else content.innerHTML=peekMode==='document'?renderMarkdown(r.content||'',r.url):overviewHTML(entry.key,r);
   const href=r.url||entry.link?.href;
   if(href&&safeURL(href,location.href)){
-    const a=document.createElement('a');a.className='original-source';a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=entry.link?.kind==='external'?'Open external source ↗':'Open original source ↗';content.prepend(a);
+    const a=document.createElement('a');a.className='original-source';a.href=href;a.target='_blank';a.rel='noopener noreferrer';a.innerHTML=(entry.link?.kind==='external'?'Open external source':'Open original source')+icon('arrow-up-right');content.prepend(a);
   }
   if(r.connections?.length){
     const panel=document.createElement('section');panel.className='connections-panel';
     panel.innerHTML='<div class="connections-heading"><h3>Connected artifacts <span>'+r.connections.length+'</span></h3></div><div class="connection-grid"></div>';
     const graph=document.createElement('button');graph.className='btn';graph.textContent='Explore on canvas';graph.onclick=()=>{expandConnections(entry.nodeId,r);$('#peek').close();fitCanvas()};panel.querySelector('.connections-heading').append(graph);
     if(expandedConnections.has(entry.nodeId)){const collapse=document.createElement('button');collapse.className='btn';collapse.textContent='Collapse links';collapse.onclick=()=>{expandedConnections.delete(entry.nodeId);refreshGraph();renderPeek()};panel.querySelector('.connections-heading').append(collapse)}
-    for(const link of r.connections){const b=document.createElement('button');b.className='connection-card';b.dataset.connection=link.id;b.innerHTML='<span class="connection-type">'+escapeHTML(link.kind==='document'?'Markdown document':link.kind)+'</span><strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+' →</small>';b.onclick=()=>openConnection(link,entry.nodeId);panel.querySelector('.connection-grid').append(b)}
+    for(const link of r.connections){const b=document.createElement('button');b.className='connection-card';b.dataset.connection=link.id;b.innerHTML='<span class="connection-type">'+icon(kindIcon(link.kind))+escapeHTML(link.kind==='document'?'Markdown document':link.kind)+'</span><strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+'</small>';b.onclick=()=>openConnection(link,entry.nodeId);panel.querySelector('.connection-grid').append(b)}
     const slot=content.querySelector('[data-connections-slot]');if(slot)slot.replaceWith(panel);else content.append(panel);
     content.querySelectorAll('a').forEach(a=>{const link=r.connections.find(l=>l.href===a.href);if(link&&!a.classList.contains('original-source'))a.onclick=e=>{if(e.metaKey||e.ctrlKey||e.shiftKey)return;e.preventDefault();openConnection(link,entry.nodeId)}});
   }else if(entry.key==='brain'&&!r.error){const slot=content.querySelector('[data-connections-slot]');if(slot)slot.innerHTML='<div class="connection-empty">No Markdown links found in this record. Add source links to BRAIN.md to connect documents here.</div>'}
@@ -120,7 +123,7 @@ function filter(){const q=$('#search').value.toLowerCase();let count=0;for(const
 $('#search').oninput=filter;
 function clearRecords(){request++;records={};clearConnections();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-meta','#peek-content','#source-content'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML='<p>Waiting for source…</p>';const foot=b.querySelector('.cardfoot');if(foot)foot.textContent='Not loaded'}}
 async function selectProject(index){clearRecords();const version=request;current=index;const p=projects[index];$('#project-name').textContent=p.name;$('#crumb').textContent=p.name;$('#project-description').textContent=p.repo+(p.root?' / '+p.root:'')+' · '+p.revision.slice(0,7);$('#privacy').textContent=p.private?'PRIVATE':'PUBLIC SOURCE';$$('[data-project]').forEach(b=>b.classList.toggle('active',+b.dataset.project===index));document.body.dataset.state='loading';$('#search').value='';filter();loadCanvas();try{const data=await api('/api/project?id='+p.id);if(version!==request)return;records=data.records;for(const b of $$('[data-artifact]')){const r=records[b.dataset.artifact];b.disabled=false;const body=b.querySelector('.cardbody'),foot=b.querySelector('.cardfoot');if(body)body.innerHTML=previewHTML(b.dataset.artifact,r);
-if(foot)foot.textContent=r.error?'Missing or unreadable':'Pinned source · '+p.revision.slice(0,7);
+if(foot)foot.textContent=r.error?names[b.dataset.artifact]+' · missing or unreadable':names[b.dataset.artifact]+' · pinned '+p.revision.slice(0,7);
 if(b.classList.contains('supporter')){
   b.querySelector('small').textContent=r.error?'Missing or unreadable':(HorsemenPreview.preview(b.dataset.artifact,r.content).items[0]?.text||'Empty record');
 }
@@ -151,7 +154,7 @@ function receiveProjects(found){
 async function scan(){const run=++scanRun;clearRecords();projects=[];renderProjects();$('#connect').disabled=true;$('#crumb').textContent='';$('#privacy').textContent='LOCAL';$('#account').textContent='Local GitHub workspace';$('#project-name').textContent='Discovering your projects';$('#project-description').textContent='Reading default branches. Your files stay on this machine.';document.body.dataset.state='scanning';try{await api('/api/scan','POST');while(run===scanRun){const state=await api('/api/status');if(run!==scanRun)return;$('#account').textContent=state.account?'GitHub · '+state.account:'Local GitHub workspace';$('#scan-status').textContent=state.phase==='error'?'Discovery failed':state.completed+' / '+state.total+' repositories checked · '+state.projects.length+' projects found'+(state.phase==='scanning'?' · Scanning…':'');$('#issues').hidden=!state.issues.length;$('#issues').textContent=state.issues.map(i=>(i.repo?i.repo+': ':'')+i.message).join('\n');receiveProjects(state.projects);if(state.phase!=='scanning'){if(!projects.length){document.body.dataset.state=state.phase;$('#project-name').textContent=state.phase==='error'?'GitHub needs attention':'No Horsemen projects found';$('#project-description').textContent='Projects need at least two core records, including VISION or PROGRESS (legacy STATUS is supported).'}break}await new Promise(r=>setTimeout(r,1000))}}catch(e){if(run===scanRun){$('#scan-status').textContent=e.message;document.body.dataset.state='error'}}finally{if(run===scanRun)$('#connect').disabled=false}}
 $('#connect').onclick=scan;$('#clear').onclick=async()=>{scanRun++;clearRecords();projects=[];renderProjects();await api('/api/clear','POST');$('#connect').disabled=false;$('#account').textContent='Local GitHub workspace';$('#crumb').textContent='';$('#issues').textContent='';$('#project-name').textContent='Workspace cleared';$('#project-description').textContent='Refresh GitHub to load your projects again.';$('#scan-status').textContent='Local memory cleared. GitHub sign-in is unchanged.';$('#privacy').textContent='LOCAL';$('#issues').hidden=true;document.body.dataset.state='idle'};
 const canvas=$('.canvas'), world=$('#map');
-const defaults={vision:[0,0],progress:[420,0],brain:[0,355],structure:[420,355],readme:[0,660],changelog:[280,660],techstack:[560,660]};
+const defaults={vision:[0,0],progress:[440,0],brain:[0,400],structure:[440,400],readme:[0,800],changelog:[280,800],techstack:[560,800]};
 let layouts={},camera={x:30,y:30,z:1},gesture=null,spaceDown=false,suppressClick=null,pinch=null;
 const pointers=new Map();let highestLayer=2;
 let selected=new Set(),tool='select';const expandedConnections=new Map(),baseRelations=[],loadingLinks=new Set();
@@ -177,7 +180,7 @@ function ensureConnectionNode(parentId,link,visible){
       const parent=position(parentId)||[0,0];const siblings=[...connectionNodes.values()].filter(n=>n.parentId===parentId&&n.element).length;
       defaults[id]=[parent[0]-350,parent[1]+siblings*210];
       const b=document.createElement('button');b.className='artifact connected-node';b.dataset.artifact=id;b.dataset.documentPath=link.path||'';
-      b.innerHTML='<span class="connection-type">'+escapeHTML(link.kind)+'</span><strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+'</small><span class="node-open">Open connection ↗</span>';
+      b.innerHTML='<span class="connection-type">'+icon(kindIcon(link.kind))+escapeHTML(link.kind)+'</span><strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+'</small><span class="node-open">Double-click to open</span>';
       bindArtifact(b);world.append(b);node.element=b;
     }
   }
@@ -189,10 +192,26 @@ function connectionTrail(parentId){
   while(id&&!seen.has(id)&&trail.length<31){seen.add(id);if(records[id]){trail.unshift({key:id,record:records[id],nodeId:id});break}const node=connectionNodes.get(id);if(!node)break;if(node.record)trail.unshift({key:'document',record:node.record,nodeId:id,link:node.link});id=node.parentId}
   return trail;
 }
+const shownLinks=()=>new Set([...connectionNodes.values()].filter(n=>n.element&&!n.element.hidden).map(n=>n.id));
+/* Linked cards that just appeared take free space beside their parent. Cards already on the canvas and cards the operator moved stay put. */
+function arrangeLinked(before){
+  if(world.classList.contains('list'))return;
+  const saved=positions(),moving=new Set([...shownLinks()].filter(id=>!before.has(id)&&!Object.hasOwn(saved,id)));if(!moving.size)return;
+  const box=id=>{const el=$('[data-artifact="'+id+'"]'),p=position(id);return{x:p[0],y:p[1],w:el.offsetWidth,h:el.offsetHeight}};
+  const fixed=$$('[data-artifact]').filter(el=>!el.hidden&&!moving.has(el.dataset.artifact)).map(el=>box(el.dataset.artifact));
+  const groups=[],seen=new Set(Object.keys(names)),queue=[...seen];
+  for(let i=0;i<queue.length;i++){
+    const parent=queue[i],children=[];
+    for(const child of expandedConnections.get(parent)||[]){if(seen.has(child))continue;seen.add(child);queue.push(child);if(moving.has(child)){const el=connectionNodes.get(child).element;children.push({id:child,w:el.offsetWidth,h:el.offsetHeight})}}
+    if(children.length)groups.push(moving.has(parent)?{parentId:parent,children}:{parent:box(parent),children});
+  }
+  for(const [id,spot] of HorsemenCanvas.arrange(fixed,groups,40))defaults[id]=spot;
+}
 function expandConnections(parentId,record){
+  const before=shownLinks();
   for(const id of HorsemenCanvas.pathToRoot(parentId,connectionNodes,Object.keys(names))){const node=connectionNodes.get(id);if(node)ensureConnectionNode(node.parentId,node.link,true)}
   for(const link of record.connections||[])ensureConnectionNode(parentId,link,true);
-  $('#search').value='';refreshGraph();renderPositions();
+  $('#search').value='';refreshGraph();arrangeLinked(before);renderPositions();
 }
 function installRecordLinks(){
   for(const [key,r] of Object.entries(records)){
@@ -221,16 +240,16 @@ async function toggleConnections(id){
   finally{loadingLinks.delete(token);if(version===request)updateSelection()}
 }
 
-function drawWires(){wires.replaceChildren();if(world.classList.contains('list'))return;for(const [a,b,label] of relations){const ea=$('[data-artifact="'+a+'"]'),eb=$('[data-artifact="'+b+'"]');if(!ea||!eb||ea.hidden||eb.hidden)continue;const pa=position(a),pb=position(b);const ca={x:pa[0]+ea.offsetWidth/2,y:pa[1]+ea.offsetHeight/2},cb={x:pb[0]+eb.offsetWidth/2,y:pb[1]+eb.offsetHeight/2};const horizontal=Math.abs(cb.x-ca.x)>Math.abs(cb.y-ca.y);const x1=ca.x+(horizontal?Math.sign(cb.x-ca.x)*ea.offsetWidth/2:0),y1=ca.y+(horizontal?0:Math.sign(cb.y-ca.y)*ea.offsetHeight/2),x2=cb.x-(horizontal?Math.sign(cb.x-ca.x)*eb.offsetWidth/2:0),y2=cb.y-(horizontal?0:Math.sign(cb.y-ca.y)*eb.offsetHeight/2);const path=document.createElementNS(wires.namespaceURI,'path');path.setAttribute('d',horizontal?`M ${x1} ${y1} C ${(x1+x2)/2} ${y1}, ${(x1+x2)/2} ${y2}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`);wires.append(path);const text=document.createElementNS(wires.namespaceURI,'text');text.setAttribute('x',(x1+x2)/2);text.setAttribute('y',(y1+y2)/2-8);text.textContent=label;wires.append(text)}}
+function drawWires(){wires.replaceChildren();if(world.classList.contains('list'))return;for(const [a,b,label] of relations){const ea=$('[data-artifact="'+a+'"]'),eb=$('[data-artifact="'+b+'"]');if(!ea||!eb||ea.hidden||eb.hidden)continue;const pa=position(a),pb=position(b);const ca={x:pa[0]+ea.offsetWidth/2,y:pa[1]+ea.offsetHeight/2},cb={x:pb[0]+eb.offsetWidth/2,y:pb[1]+eb.offsetHeight/2};const horizontal=Math.abs(cb.x-ca.x)>Math.abs(cb.y-ca.y);const x1=ca.x+(horizontal?Math.sign(cb.x-ca.x)*ea.offsetWidth/2:0),y1=ca.y+(horizontal?0:Math.sign(cb.y-ca.y)*ea.offsetHeight/2),x2=cb.x-(horizontal?Math.sign(cb.x-ca.x)*eb.offsetWidth/2:0),y2=cb.y-(horizontal?0:Math.sign(cb.y-ca.y)*eb.offsetHeight/2);const path=document.createElementNS(wires.namespaceURI,'path');path.setAttribute('d',horizontal?`M ${x1} ${y1} C ${(x1+x2)/2} ${y1}, ${(x1+x2)/2} ${y2}, ${x2} ${y2}`:`M ${x1} ${y1} C ${x1} ${(y1+y2)/2}, ${x2} ${(y1+y2)/2}, ${x2} ${y2}`);const title=document.createElementNS(wires.namespaceURI,'title');title.textContent=label;path.append(title);wires.append(path);for(const [x,y] of [[x1,y1],[x2,y2]]){const dot=document.createElementNS(wires.namespaceURI,'circle');dot.setAttribute('cx',x);dot.setAttribute('cy',y);dot.setAttribute('r',3.5);wires.append(dot)}}}
 function renderPositions(){for(const el of $$('[data-artifact]')){const p=position(el.dataset.artifact);el.style.left=p[0]+'px';el.style.top=p[1]+'px'}drawWires();renderCardToggles()}
 function renderCamera(){const list=world.classList.contains('list');world.style.transform=list?'none':`translate(${camera.x}px,${camera.y}px) scale(${camera.z})`;zoom=camera.z;$('#zoom-label').textContent=Math.round(zoom*100)+'%';$('#zoom-out').disabled=list||zoom<=.15;$('#zoom-in').disabled=list||zoom>=3.5;$('#fit').disabled=list;$('#reset-layout').disabled=list;canvas.style.backgroundSize=`${24*zoom}px ${24*zoom}px`;canvas.style.backgroundPosition=`${camera.x}px ${camera.y}px`}
 function zoomAt(next,x=canvas.clientWidth/2,y=canvas.clientHeight/2){next=Math.max(.15,Math.min(3.5,next));const wx=(x-camera.x)/camera.z,wy=(y-camera.y)/camera.z;camera={x:x-wx*next,y:y-wy*next,z:next};renderCamera()}
-function fitCanvas(onlySelected=false){if(world.classList.contains('list'))return;const nodes=$$('[data-artifact]').filter(e=>!e.hidden&&(!onlySelected||selected.has(e.dataset.artifact)));if(!nodes.length)return;const minX=Math.min(...nodes.map(e=>position(e.dataset.artifact)[0])),minY=Math.min(...nodes.map(e=>position(e.dataset.artifact)[1])),maxX=Math.max(...nodes.map(e=>position(e.dataset.artifact)[0]+e.offsetWidth)),maxY=Math.max(...nodes.map(e=>position(e.dataset.artifact)[1]+e.offsetHeight));const z=Math.min(1,(canvas.clientWidth-60)/(maxX-minX),(canvas.clientHeight-60)/(maxY-minY));camera={x:(canvas.clientWidth-(maxX-minX)*z)/2-minX*z,y:(canvas.clientHeight-(maxY-minY)*z)/2-minY*z,z:Math.max(.15,z)};renderCamera()}
+function fitCanvas(onlySelected=false){if(world.classList.contains('list'))return;const nodes=$$('[data-artifact]').filter(e=>!e.hidden&&(!onlySelected||selected.has(e.dataset.artifact)));if(!nodes.length)return;const minX=Math.min(...nodes.map(e=>position(e.dataset.artifact)[0])),minY=Math.min(...nodes.map(e=>position(e.dataset.artifact)[1])),maxX=Math.max(...nodes.map(e=>position(e.dataset.artifact)[0]+e.offsetWidth)),maxY=Math.max(...nodes.map(e=>position(e.dataset.artifact)[1]+e.offsetHeight));const top=56,bottom=84,room=Math.max(120,canvas.clientHeight-top-bottom),z=Math.max(.15,Math.min(1,(canvas.clientWidth-60)/(maxX-minX),room/(maxY-minY)));/* Keep clear of the legend and the tool dock. */camera={x:(canvas.clientWidth-(maxX-minX)*z)/2-minX*z,y:top+(room-(maxY-minY)*z)/2-minY*z,z};renderCamera()}
 function loadCanvas(){gesture=null;pointers.clear();pinch=null;renderPositions();fitCanvas()}
 function setView(list){cancelGesture();$('.canvas-controls').hidden=list;world.classList.toggle('list',list);canvas.classList.toggle('list-mode',list);$('#canvas-view').setAttribute('aria-pressed',!list);$('#list-view').setAttribute('aria-pressed',list);renderCamera();drawWires();renderCardToggles()}
 $('#list-view').onclick=()=>setView(true);$('#canvas-view').onclick=()=>setView(false);
 $('#zoom-out').onclick=()=>zoomAt(camera.z/1.2);$('#zoom-in').onclick=()=>zoomAt(camera.z*1.2);$('#fit').onclick=()=>fitCanvas();
-$('#reset-layout').onclick=()=>{layouts[projects[current]?.id || "empty"]={};saveLayout();loadCanvas();showToast('Layout reset for '+(projects[current]?.name || 'workspace')+'.')};
+$('#reset-layout').onclick=()=>{layouts[projects[current]?.id || "empty"]={};saveLayout();arrangeLinked(new Set());loadCanvas();showToast('Layout reset for '+(projects[current]?.name || 'workspace')+'.')};
 function openArtifact(id,button){
   if(records[id])return openPeek(id,button);
   const node=connectionNodes.get(id);if(!node)return;
@@ -260,16 +279,16 @@ function renderCardToggles(){
     }
     card.classList.add('has-link-control');
     control.hidden=card.hidden||card.disabled;control.disabled=state.disabled;
-    control.textContent=(state.disabled?'':state.expanded?'▾ ':'▸ ')+state.label;
+    const face=state.label+'|'+state.disabled;if(control.dataset.face!==face){control.dataset.face=face;control.innerHTML=icon(state.disabled?'refresh':'chevron-right')+'<span>'+escapeHTML(state.label)+'</span>'}
     control.setAttribute('aria-expanded',state.expanded);
     control.setAttribute('aria-busy',state.disabled);
     const name=record?.name||node?.link.title||names[id];
     const action=state.expanded?'Collapse':'Expand';
     control.setAttribute('aria-label',action+' linked items for '+name);control.title=action+' linked items';
     if(control.hidden)continue;
-    const rect=card.getBoundingClientRect(),bottom=card.classList.contains('supporter')||card.classList.contains('connected-node');
+    const rect=card.getBoundingClientRect(),inset=card.classList.contains('plate')?8:10;
     control.style.left=((rect.right-origin.left)/scale-control.offsetWidth-12)+'px';
-    control.style.top=(bottom?(rect.bottom-origin.top)/scale-control.offsetHeight-10:(rect.top-origin.top)/scale+8)+'px';
+    control.style.top=((rect.bottom-origin.top)/scale-control.offsetHeight-inset)+'px';
     control.style.zIndex=String((Number(card.style.zIndex)||1)+1);
   }
 }
@@ -363,6 +382,12 @@ window.addEventListener('keydown',e=>{
 window.addEventListener('keyup',e=>{if(e.code==='Space'){spaceDown=false;canvas.classList.remove('pan-ready')}});
 window.addEventListener('blur',()=>{spaceDown=false;canvas.classList.remove('pan-ready');cancelGesture()});
 canvas.dataset.tool='select';
+function applyTheme(next){
+  if(next){document.documentElement.dataset.theme=next;try{localStorage.setItem('horsemen-theme',next)}catch{}}
+  const dark=(document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark';
+  $('#theme-toggle').setAttribute('aria-label','Switch to '+(dark?'light':'dark')+' theme');return dark;
+}
+$('#theme-toggle').onclick=()=>applyTheme(applyTheme()?'light':'dark');applyTheme();
 
 new ResizeObserver(()=>{drawWires();renderCardToggles()}).observe(world);
 renderPositions();fitCanvas();

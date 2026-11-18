@@ -37,8 +37,10 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
   items. No selection is required. Unopened Markdown documents load their links
   on demand. These controls also work in List view. Collapse all in the toolbar
   hides all expanded branches. Shared documents remain visible
-  while another expanded branch reaches them. Hidden artifacts keep their
-  positions, and deeper exploration reveals the ancestor path.
+  while another expanded branch reaches them. Linked cards that appear take
+  free space beside their parent, so cards do not overlap. Cards on the canvas
+  and cards you moved keep their place. Reset layout arranges all links again.
+  Deeper exploration reveals the ancestor path.
 - List view keeps single-click opening. These controls follow the navigation
   pattern in [Excalidraw](https://plus.excalidraw.com/changelog); this app does
   not include freehand drawing, shape editing, or the Excalidraw editor.
@@ -54,6 +56,20 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
   show an error without replacing the parent record.
 - Changelog PR links can load merge details and the PR description. Image
   attachments appear as links. A merge alone is not proof of delivery.
+
+## Design
+
+The look is a modern engraving: bone paper, ink, and one pigment for each
+record. Vision is Conquest (gilt), Progress is War (vermilion), Brain is
+Famine (indigo), and Structure is Death (verdigris). Names and icons carry
+the same meaning without colour. The moon or sun button in the left rail
+switches between the light and dark themes; without a choice, the app follows
+the system setting. Motion stops when the system asks for reduced motion.
+
+Fonts come from [fontzz](https://fontzz.vercel.app) and are served locally:
+Cleft (titles), Gravure (labels), Halden (interface), Vellum (reading), and
+Signal (code). See [the font notice](assets/fonts/NOTICE.txt). Icons, seals,
+and the app icon are original; see [the icon system](../docs/product/icon-system.md).
 
 ## Boundaries
 
@@ -76,7 +92,7 @@ The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
-by the app. The browser stores only opaque project IDs and canvas positions.
+by the app. The browser stores only opaque project IDs, canvas positions, and the theme choice.
 External images do not load automatically. Opening an external link leaves
 the local app. Do not expose this server through a tunnel or reverse proxy.
 After switching GitHub accounts, refresh discovery. Project loads also check

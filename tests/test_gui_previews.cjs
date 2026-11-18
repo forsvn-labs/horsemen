@@ -37,4 +37,6 @@ const tools=require('../web/previews.js').toolsTable;
 assert.equal(typeof tools,'function');
 assert.deepEqual(tools('| Tool | Purpose |\n| --- | --- |\n| Python | Reader |\n| Git | Source |'),{headers:['Tool','Purpose'],rows:[['Python','Reader'],['Git','Source']]});
 
+const toolNames=preview('techstack','# Tech stack\n## Tools\n| Tool | Purpose |\n| --- | --- |\n| Python | Local reader |\n| GitHub CLI | Reads records |');
+assert.deepEqual(toolNames.items[0],{label:'Tools',text:'Python · GitHub CLI'},'Tool tables preview as names, not raw table rows');
 console.log('PASS: project search, source previews, artifact layouts, and tool tables');
