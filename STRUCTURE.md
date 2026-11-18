@@ -7,8 +7,9 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ```text
 horsemen/
 ├── web/                   Local GitHub canvas, interaction rules, previews, and setup guide
+│   └── assets/            Bundled fonts with their notice, icons, seals, and app icon
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
-├── docs/product/           GUI requirements and release boundaries
+├── docs/product/           GUI requirements, icon system, and release boundaries
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
