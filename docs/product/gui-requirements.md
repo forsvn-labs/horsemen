@@ -21,13 +21,13 @@ the editing boundary, or whether public shares are snapshots or live views.
 | Surface | Required behavior |
 | --- | --- |
 | Portfolio | List discovered projects, reported health, next action, source revision, and last successful sync. Distinguish missing records from failed access. |
-| Canvas | Place the four records consistently. Show supporters and linked evidence on demand. Provide fit, zoom, search, and a list alternative. |
+| Canvas | Start with the four records arranged clearly, then allow free artifact movement on an infinite canvas. Support pointer and touch pan/zoom, Fit, Reset, saved per-project layouts, search, and a list alternative. |
 | Peek | Open any artifact without losing canvas position. Support deep links, keyboard close, readable full content, source view, and return focus. |
 | Vision | Show purpose, audience, boundaries, and unresolved owner decisions. |
 | Progress | Show next action, shipped outcomes, ready work, blockers, and linked proof. Preserve the difference between ready and shipped. |
 | Brain | Show knowledge destinations and access boundaries. A link is not access to its contents. |
 | Structure | Show navigable paths, entry points, and commands. |
-| Supporters | Render README as a guide, CHANGELOG as release history, TECHSTACK as components and their roles. Unknown artifacts keep a readable source view. |
+| Supporters | Render README as a guide, CHANGELOG as release history with delivery evidence, PR/commit references, and before/after PR screenshots, and TECHSTACK as components and their roles. Unknown artifacts keep a readable source view. |
 | Public share | Preview the exact included artifacts and linked assets before publishing. Make removal possible. Exclude private source data from public responses. |
 
 ## GitHub connection
@@ -89,3 +89,16 @@ or a paid AI service. Choose the application stack after the prototype is review
 The design exploration does not verify authentication, synchronization,
 publication, or production deployment. Those require a working backend and real
 integration tests with disposable repositories.
+
+## Ship evidence and PR media
+
+Each Changelog entry must state what reached people and link its delivery proof:
+a release, verified deployment, published source revision, sent artifact, or
+owner confirmation. A merge and passing checks alone are insufficient.
+
+Keep the PR URL, merge status, delivered commit, screenshot or recording URLs,
+captions, and capture context beside the outcome. Before/after images are welcome
+for visible changes. State when media is missing or inaccessible; never replace
+it with generated imagery presented as proof. Preserve the original PR attachment
+rather than committing screenshots to the source repository. Public sharing must
+check attachment access and inclusion independently of the PR visibility.

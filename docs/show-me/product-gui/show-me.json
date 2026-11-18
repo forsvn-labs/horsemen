@@ -1,6 +1,6 @@
 {
   "title": "Horsemen visual workspace",
-  "summary": "Explore the canvas model, then try the interactive prototype. All project content is fictional.",
+  "summary": "Explore the infinite canvas and try artifact dragging, pan, zoom, and evidence peeks.",
   "views": [
     {
       "id": "canvas-options",
@@ -8,9 +8,9 @@
       "question": "How should an operator move through a project?",
       "updated": "2026-11-18",
       "keyPoints": [
-        "Start with the project atlas: four stable landmarks and a focused peek.",
-        "Use the reading board on small screens and for a simpler scan.",
-        "Keep a free graph as a later exploration; dense projects need layout tools."
+        "Start aligned, then drag artifacts anywhere on an infinite canvas.",
+        "Pan, scroll or pinch to zoom, and use Fit to recover the whole project. Layouts are saved per demo project.",
+        "Changelog separates delivery evidence, PR and commit references, and screenshots."
       ],
       "blocks": [
         {
@@ -37,6 +37,10 @@
     }
   ],
   "log": [
+    {
+      "date": "2026-11-18",
+      "change": "Added an infinite canvas with saved layouts and a source-backed ship evidence example."
+    },
     {
       "date": "2026-11-18",
       "change": "Created the project atlas prototype and three editable canvas concepts."
