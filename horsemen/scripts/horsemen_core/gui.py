@@ -11,6 +11,7 @@ import re
 import secrets
 import subprocess
 import threading
+import time
 from urllib.parse import parse_qs, quote, urlsplit
 from .legacy import sections
 
@@ -62,9 +63,30 @@ def discover_roots(entries):
             if len(set(files) & {'vision','progress','brain','structure'}) >= 2
             and ('vision' in files or 'progress' in files)}
 
+def credential_identity():
+    """Detect local account/token switches without a network round trip."""
+    try:
+        result=subprocess.run(['gh','auth','token','--hostname','github.com'],capture_output=True,timeout=10)
+    except (FileNotFoundError,subprocess.TimeoutExpired) as error:
+        raise ProviderError('GitHub sign-in could not be checked. Run gh auth status.',401) from error
+    if result.returncode or not result.stdout.strip():
+        raise ProviderError('GitHub sign-in is required. Run gh auth login.',401)
+    return hashlib.sha256(result.stdout.strip()).digest()
+
 class GitHubReader:
-    def __init__(self, api=gh_json): self.api = api
-    def profile(self): return self.api('/user')['login']
+    def __init__(self, api=gh_json, credential_identity=None):
+        self.api=api
+        self.identity=credential_identity or (globals()['credential_identity'] if api is gh_json else None)
+        self.profile_lock=threading.Lock();self.profile_cache=None
+    def profile(self):
+        if self.identity is None:return self.api('/user')['login']
+        identity=self.identity()
+        with self.profile_lock:
+            cached=self.profile_cache
+            if cached and cached[0]==identity and time.monotonic()-cached[1]<30:return cached[2]
+            login=self.api('/user')['login']
+            self.profile_cache=(identity,time.monotonic(),login)
+            return login
     def repositories(self):
         return self.api('/user/repos?per_page=100&sort=pushed&affiliation=owner,collaborator,organization_member', paginate=True)
     def scan_repo(self, repo):
@@ -83,27 +105,30 @@ class GitHubReader:
                            'revision':revision, 'files':files, 'missing':[k for k in ('vision','progress','brain','structure') if k not in files], 'scanned_at':now()})
         return output
     def load(self, project):
-        records = {}
-        for key, default in FILES.items():
-            file = project['files'].get(key)
-            if not file:
-                records[key] = {'name':default, 'error':'Record is missing from this project root.'}; continue
-            path = file['path']; name = PurePosixPath(path).name
-            rec = {'name':name, 'path':path, 'url':f'https://github.com/{project["repo"]}/blob/{project["revision"]}/{quote(path, safe="/")}', 'blob':file['sha']}
-            try:
-                if file.get('size') is None or file['size'] > MAX_FILE: raise ProviderError('Record exceeds the 512 KiB size limit.', 413)
-                blob = self.api(f'/repos/{project["repo"]}/git/blobs/{file["sha"]}')
-                if blob.get('encoding') != 'base64': raise ProviderError('Unsupported record encoding.')
-                encoded = re.sub(r'\s', '', blob['content'])
-                if len(encoded) > MAX_FILE * 2: raise ProviderError('Record exceeds the size limit.', 413)
-                content = base64.b64decode(encoded, validate=True)
-                if len(content) > MAX_FILE: raise ProviderError('Record exceeds the size limit.', 413)
-                text = content.decode('utf-8-sig')
-                rec.update(content=text, sections=dict(sections(text)))
-            except ProviderError as error: rec['error'] = str(error)
-            except (ValueError, UnicodeError, KeyError): rec['error'] = 'Record could not be decoded as UTF-8 Markdown.'
-            records[key] = rec
+        # Network latency dominates: read independent immutable blobs in parallel.
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            jobs = {key:pool.submit(self.load_record, project, key, default) for key,default in FILES.items()}
+            records = {key:job.result() for key,job in jobs.items()}
         return {'project':{k:v for k,v in project.items() if k!='files'}, 'records':records, 'loaded_at':now()}
+    def load_record(self, project, key, default):
+        file = project['files'].get(key)
+        if not file:
+            return {'name':default, 'error':'Record is missing from this project root.'}
+        path = file['path']; name = PurePosixPath(path).name
+        rec = {'name':name, 'path':path, 'url':f'https://github.com/{project["repo"]}/blob/{project["revision"]}/{quote(path, safe="/")}', 'blob':file['sha']}
+        try:
+            if file.get('size') is None or file['size'] > MAX_FILE: raise ProviderError('Record exceeds the 512 KiB size limit.', 413)
+            blob = self.api(f'/repos/{project["repo"]}/git/blobs/{file["sha"]}')
+            if blob.get('encoding') != 'base64': raise ProviderError('Unsupported record encoding.')
+            encoded = re.sub(r'\s', '', blob['content'])
+            if len(encoded) > MAX_FILE * 2: raise ProviderError('Record exceeds the size limit.', 413)
+            content = base64.b64decode(encoded, validate=True)
+            if len(content) > MAX_FILE: raise ProviderError('Record exceeds the size limit.', 413)
+            text = content.decode('utf-8-sig')
+            rec.update(content=text, sections=dict(sections(text)))
+        except ProviderError as error: rec['error'] = str(error)
+        except (ValueError, UnicodeError, KeyError): rec['error'] = 'Record could not be decoded as UTF-8 Markdown.'
+        return rec
     def pull_request(self, project, number):
         if not re.fullmatch(r'[1-9][0-9]{0,8}', str(number)): raise ProviderError('Invalid PR number.', 400)
         data = self.api(f'/repos/{project["repo"]}/pulls/{number}')
@@ -113,12 +138,12 @@ class ScanState:
     def __init__(self, reader):
         self.reader=reader;self.lock=threading.RLock();self.generation=0;self.worker=None
         self.data={'phase':'idle','account':None,'projects':[],'issues':[],'completed':0,'total':0,'finished_at':None}
-        self.projects={}
+        self.projects={};self.cache={}
     def snapshot(self):
         with self.lock: return copy.deepcopy(self.data)
     def clear(self):
         with self.lock:
-            self.generation+=1;self.projects={}
+            self.generation+=1;self.projects={};self.cache={}
             self.data={'phase':'idle','account':None,'projects':[],'issues':[],'completed':0,'total':0,'finished_at':None}
     def _begin(self):
         with self.lock:
@@ -161,6 +186,21 @@ class ScanState:
             with self.lock:
                 if generation==self.generation:
                     self.projects={};self.data.update(phase='error',projects=[],account=None,issues=[{'message':str(error) if isinstance(error,ProviderError) else 'Discovery failed. Retry the scan.'}],finished_at=now())
+    def load_project(self, key):
+        with self.lock:generation=self.generation
+        project=self.project(key)  # Revalidate the account even on a cache hit.
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            if key in self.cache:return copy.deepcopy(self.cache[key])
+        result=self.reader.load(project)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            # Bound memory to 16 projects; never cache transient record failures.
+            if all('content' in result['records'][key] for key in project['files']):
+                if len(self.cache)>=16:self.cache.pop(next(iter(self.cache)))
+                self.cache[key]=copy.deepcopy(result)
+        return result
+
     def project(self, key):
         with self.lock:
             project=self.projects.get(key);account=self.data['account'];generation=self.generation
@@ -200,18 +240,14 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/status': return self.respond(200,self.server.state.snapshot())
             query=parse_qs(urlsplit(self.path).query)
             if path=='/api/project':
-                project=self.server.state.project(query.get('id',[''])[0])
-                generation=self.server.state.generation
-                result=self.server.state.reader.load(project)
-                if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
-                return self.respond(200,result)
+                return self.respond(200,self.server.state.load_project(query.get('id',[''])[0]))
             if path=='/api/pr':
                 project=self.server.state.project(query.get('project',[''])[0])
                 generation=self.server.state.generation
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}
             if path not in files:return self.respond(404,{'error':'Not found.'})
             filename,kind=files[path];body=(self.server.assets/filename).read_bytes()
             if path=='/':body=body.replace(b'__SESSION__',self.server.session.encode())

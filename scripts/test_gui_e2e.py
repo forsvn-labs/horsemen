@@ -1,5 +1,6 @@
 """Browser integration test against a disposable fake GitHub provider."""
 import argparse
+import base64
 import json
 from pathlib import Path
 import subprocess
@@ -11,7 +12,26 @@ from horsemen_core.gui import GitHubReader, ScanState, make_server
 
 parser=argparse.ArgumentParser();parser.add_argument('--output',required=True,type=Path);args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1]
-server=make_server(0,ScanState(GitHubReader(Fake())),root/'web')
+release_scan=threading.Event()
+class ProgressiveFake(Fake):
+    sources={
+        'vision':'# Record\n\nActual source.\n## Why we exist\nHelp small teams keep decisions close to their work.\n## Who we build for\nIndependent builders and project operators.\n## The world we are building\nA clear view of every active project.',
+        'progress':'# Progress\nNext action: Invite three operators to the pilot.\n## Shipped\n- Search is available to the pilot group.\n## Gates\n- Review the pilot feedback before wider access.',
+        'brain':'# Brain\n## Providers\n- Research notebook: interviews and decisions.\n## Access\nRead originals within existing permissions.\n## Save and cleanup\nKeep owner decisions with their source.',
+        'structure':'# Structure\n## Map\n```text\napp/ — operator workspace\ndocs/ — decisions and references\ntests/ — verification\n```\n## Read before changing\nStart with the current progress snapshot.\n## Commands\npython3 scripts/serve_gui.py'
+    }
+    def __call__(self,path,paginate=False):
+        if '/git/blobs/' in path:
+            key=path.rsplit('/',1)[-1]
+            if key in self.sources:return {'encoding':'base64','content':base64.b64encode(self.sources[key].encode()).decode()}
+        result=super().__call__(path,paginate)
+        if '/git/trees/' in path:
+            for file in result['tree']:file['sha']=file['path'].split('.')[0].lower()
+        if path.startswith('/user/repos'):
+            second=dict(result[0],id=2,full_name='example/aardvark');return result+[second]
+        if '/repos/example/aardvark/commits/' in path:release_scan.wait(45)
+        return result
+server=make_server(0,ScanState(GitHubReader(ProgressiveFake())),root/'web')
 thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 log=[]
 def browser(*args):
@@ -22,8 +42,21 @@ def browser(*args):
 try:
     browser('open',f'http://127.0.0.1:{server.server_port}')
     browser('wait','--fn','document.body.dataset.state === "ready"')
+    assert server.state.snapshot()['phase']=='scanning', 'First project must open before discovery completes'
     assert 'alpha' in browser('get','text','#project-name')
+    release_scan.set()
+    browser('wait','--fn','projects.length === 2')
+    assert 'alpha' in browser('get','text','#project-name'), 'New results must preserve selection'
+
     assert 'PRIVATE' in browser('get','text','#privacy')
+    browser('fill','#project-search','no-match')
+    assert 'No matching projects' in browser('get','text','#no-projects')
+    assert browser('eval','document.querySelectorAll("[data-project]").length').strip()=='0'
+    browser('fill','#project-search','EXAMPLE alpha')
+    assert browser('eval','document.querySelectorAll("[data-project]").length').strip()=='1'
+    assert 'Help small teams' in browser('get','text','[data-artifact="vision"]')
+    assert 'Invite three operators' in browser('get','text','[data-artifact="progress"]')
+    browser('fill','#project-search','')
     browser('click','[data-artifact="vision"]');browser('wait','#peek[open]')
     assert 'Actual source.' in browser('get','text','#peek-content')
     browser('click','#source-tab');assert '# Record' in browser('get','text','#source-content')
@@ -55,4 +88,4 @@ try:
     assert not browser('errors').strip()
     print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, no browser errors.')
 finally:
-    browser('close');server.shutdown();server.server_close();thread.join();(args.output/'output.txt').write_text('\n'.join(log))
+    release_scan.set();browser('close');server.shutdown();server.server_close();thread.join();(args.output/'output.txt').write_text('\n'.join(log))

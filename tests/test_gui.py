@@ -4,6 +4,7 @@ import json
 import sys
 import threading
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError
@@ -56,6 +57,41 @@ class ReaderTests(unittest.TestCase):
             if '/git/blobs/' in path:return {'encoding':'base64','content':'!invalid!'}
             return f(path,paginate)
         r=GitHubReader(bad);p=r.scan_repo(f('/user/repos')[0])[0];self.assertIn('error',r.load(p)['records']['vision'])
+
+class PerformanceTests(unittest.TestCase):
+    def test_profile_cache_checks_credential_changes_and_expiry(self):
+        f=Fake();identity=['one'];r=GitHubReader(f,credential_identity=lambda:identity[0])
+        with patch('horsemen_core.gui.time.monotonic',return_value=100):
+            self.assertEqual(r.profile(),'operator');r.profile()
+        self.assertEqual(f.calls.count('/user'),1)
+        identity[0]='two';f.login='changed'
+        with patch('horsemen_core.gui.time.monotonic',return_value=101):self.assertEqual(r.profile(),'changed')
+        self.assertEqual(f.calls.count('/user'),2)
+        with patch('horsemen_core.gui.time.monotonic',return_value=200):r.profile()
+        self.assertEqual(f.calls.count('/user'),3)
+    def test_records_load_concurrently(self):
+        f=Fake();barrier=threading.Barrier(4)
+        def parallel(path,paginate=False):
+            if '/git/blobs/' in path:barrier.wait(timeout=2)
+            return f(path,paginate)
+        r=GitHubReader(parallel);p=r.scan_repo(f('/user/repos')[0])[0]
+        self.assertTrue(all('content' in v for k,v in r.load(p)['records'].items() if k in p['files']))
+    def test_memory_cache_reuses_blobs_but_checks_account(self):
+        f=Fake();s=ScanState(GitHubReader(f));s.scan_sync();pid=s.snapshot()['projects'][0]['id']
+        s.load_project(pid);count=sum('/git/blobs/' in p for p in f.calls)
+        s.load_project(pid);self.assertEqual(sum('/git/blobs/' in p for p in f.calls),count)
+        f.login='changed'
+        with self.assertRaises(ProviderError):s.load_project(pid)
+        self.assertEqual(s.cache,{})
+    def test_refresh_invalidates_cache_and_stale_load(self):
+        f=Fake();s=ScanState(GitHubReader(f));s.scan_sync();pid=s.snapshot()['projects'][0]['id'];s.load_project(pid)
+        s.scan_sync();self.assertEqual(s.cache,{})
+        load=s.reader.load
+        def stale(project):
+            data=load(project);s.clear();return data
+        s.reader.load=stale
+        with self.assertRaises(ProviderError):s.load_project(pid)
+        self.assertEqual(s.cache,{})
 
 class StateTests(unittest.TestCase):
     def test_scan_retry_and_membership(self):

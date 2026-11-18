@@ -22,7 +22,12 @@ Project selection clears prior content before loading. Only IDs in the current
 scan can be read. The active GitHub account must match the scan account.
 A changed account clears that scan. A stale check cannot clear a newer scan.
 Record reads use blob SHAs from the scanned commit, not a moving branch.
-Missing, oversized, or invalid records fail independently.
+Missing, oversized, or invalid records fail independently. Four record workers
+read independent blobs concurrently. A bounded cache holds at most 16 project
+snapshots in memory. Refresh, clear, or an account mismatch removes the cache.
+A load from an old generation cannot populate it. Transient failures are not
+cached. Each load checks a local credential fingerprint. Remote account
+identity is reused for at most 30 seconds and refreshed on credential changes.
 
 Browser request counters prevent an earlier project or PR response from
 replacing the latest selection. Host, Origin, and per-process session checks
@@ -39,6 +44,11 @@ The stale-check regression failed before the generation guard was corrected.
 `scripts/test_gui_e2e.py` checks the browser against a disposable provider,
 including missing records, safe Markdown, source view, saved layouts, zoom,
 mobile bounds, and removal of prior peek content when clearing the workspace.
+It also checks search, early project loading during discovery, and preservation
+of selection when newly discovered projects sort before the current project.
+`tests/test_gui_previews.cjs` covers all seven record previews, empty content,
+project search, and exclusion of historical Progress entries. Reader tests
+cover parallel loads, cache reuse, invalidation, credential changes, and expiry.
 
 Remaining limits: no persistence, scheduled refresh, multi-user isolation,
 GitHub Enterprise host support, or complete-tree fallback. An account change

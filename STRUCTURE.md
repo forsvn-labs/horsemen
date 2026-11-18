@@ -6,7 +6,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 
 ```text
 horsemen/
-├── web/                   Local GitHub canvas and setup guide
+├── web/                   Local GitHub canvas, source previews, and setup guide
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
 ├── docs/product/           GUI requirements and release boundaries
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
@@ -35,6 +35,7 @@ horsemen/
 ## Commands
 
 - Run local GUI: `python3 scripts/serve_gui.py`; see [setup and limits](web/README.md).
+- Preview checks: `node tests/test_gui_previews.cjs`.
 - Browser check: `python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check`.
 - Verify: `.venv/bin/python -B scripts/verify.py --output /tmp/horsemen-verification`.
 - Read one record: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core brain --json`.
