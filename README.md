@@ -21,12 +21,12 @@ Both use the same checker. The CLI has no runtime dependencies beyond Python
 updates can save a local edit under an exclusive-writer contract. The CLI
 does not contact outside services.
 
-A visual workspace is in discovery: GitHub project discovery, a canvas with
-artifact peeks, and public sharing in a self-hosted GUI. It is not available
-yet. Try the offline [interactive design](docs/show-me/product-gui/prototype.html),
-compare the [canvas options](docs/show-me/product-gui/index.html), or read the
-[GUI requirements](docs/product/gui-requirements.md). The design uses fictional
-data and does not connect accounts or publish content.
+A [local visual workspace](web/README.md) reads your GitHub projects through
+an existing `gh` sign-in. Drag records on an infinite canvas and open their
+reading or source views. Run `python3 scripts/serve_gui.py` from this checkout,
+then open <http://127.0.0.1:8787>. It is read-only and available from source;
+public sharing and hosted sign-in remain future work. The offline
+[design prototype](docs/show-me/product-gui/prototype.html) uses fictional data.
 
 ## Get started
 

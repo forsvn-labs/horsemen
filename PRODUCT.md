@@ -22,14 +22,15 @@ support public sharing. Keep the product open source and self-hostable.
 
 The design exploration uses offline HTML, CSS, and JavaScript. This is a
 prototype choice under the owner's instruction to proceed with design.
-The production stack is undecided.
+The local preview uses the same browser stack and a Python standard-library
+server. GitHub CLI supplies the existing sign-in.
 
 ## Capabilities and constraints
 
-The skill and Python CLI already exist. The GUI, GitHub connection, and public
-sharing are proposed. Markdown remains the source. Demo data must be labeled.
-The prototype assumes read-only operation and selected public snapshots.
-These assumptions do not settle the first release scope.
+The owner chose a private local app first on 2026-11-18. The local preview
+reads GitHub projects and their Markdown through `gh`. Public sharing and
+hosted sign-in remain future work. Markdown remains the source; no GUI edits
+are available. The separate offline design still uses labeled fictional data.
 
 ## Evidence on hand
 

@@ -1,17 +1,40 @@
 # Progress
 
-Updated: 2026-11-13 · Stage: live · Health: On track
+Updated: 2026-11-18 · Stage: live · Health: On track
 
 ## Latest day
 
 <details open>
 <summary>Latest day</summary>
 
-Horsemen now has one public MIT project for its agent skill and CLI.
-
-Next action: Use the direct record commands on a project; keep local updates within the documented exclusive-writer contract.
+Next action: Use the local GitHub workspace and review project discovery and record reading.
 
 ## Shipped
+
+- Nothing shipped on this update day.
+
+## In progress
+
+- **Visual workspace**: The local app now uses an existing GitHub sign-in to discover projects and load their records. The canvas supports dragging, pan, zoom, source peeks, and PR evidence links. A live account scan and record read passed locally. Public sharing and hosted sign-in remain pending.
+
+### Technical details
+
+| Item | Evidence |
+| --- | --- |
+| Visual workspace | [Prototype](docs/show-me/product-gui/prototype.html), [canvas options](docs/show-me/product-gui/index.html), and [GUI requirements](docs/product/gui-requirements.md). Demo checks passed at desktop, tablet, and phone sizes; full repository verification passed locally. Run [the demo checks](docs/show-me/product-gui/verify.py) or the verification command in CONTRIBUTING.md. The owner chose a private local app first. Run `python3 scripts/serve_gui.py`; [setup and limits](web/README.md). Reader tests and fixture browser checks passed for discovery, source views, missing records, access failures, saved layouts, and clearing old content. Full source, wheel, and packaged-skill verification passed locally. No public GUI release has been made. |
+
+### Gates
+
+CI, publication, and installation are still pending.
+
+</details>
+
+## Historical ships
+
+<details>
+<summary>Historical ships</summary>
+
+### 2026-11-13
 
 - **Direct record commands** (2026-11-13): Brain, vision, structure and status have read-only reports and explicit local updates. Whole-project checks remain; planning tools share one menu. Available from main through the documented source installation.
 
@@ -19,12 +42,12 @@ Next action: Use the direct record commands on a project; keep local updates wit
 
 - **One Horsemen project** (2026-11-13): Published source, one version, clear setup, and verification for both ways to use it.
 
-## Decisions
+#### Decisions
 
 - Public repository and MIT license confirmed by the owner on 2026-11-13.
 - Preserve private history in the original collection; publish only the checked source.
 
-### Technical details
+#### Technical details
 
 | Item | Evidence |
 | --- | --- |
@@ -34,7 +57,7 @@ Next action: Use the direct record commands on a project; keep local updates wit
 
 Existing installed copies are unchanged.
 
-### Command review evidence
+#### Command review evidence
 
 - Full local verification passed on 2026-11-13: source tests, installed CLI,
   packaged skill and legacy hooks. Added coverage for each record, exact-edit
@@ -44,17 +67,10 @@ Existing installed copies are unchanged.
 - Local writes require the caller to exclude other editors. Provider originals
   still use their authorized host workflow; no live provider writes were tested.
 
-### Gates
+#### Gates
 
 - Local checks pass. Cross-platform results are visible in [Actions](https://github.com/hungv47/horsemen/actions).
 - Batch application and live Drive saves remain unavailable. Explicit local single-record updates are available from main.
-
-</details>
-
-## Historical ships
-
-<details>
-<summary>Historical ships</summary>
 
 Earlier personal installations are not public releases of this repository.
 
@@ -65,7 +81,8 @@ Earlier personal installations are not public releases of this repository.
 <details>
 <summary>Upcoming roadmap</summary>
 
-- Gather feedback from use of the unified project before adding scope.
+- Use the local GitHub reader, then decide the scope for hosted sign-in and public sharing.
+- Gather feedback on the existing skill and CLI while developing the visual workspace.
 - Safe automatic writes remain separate future work, with no promised date.
 
 </details>
