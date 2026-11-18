@@ -33,8 +33,10 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
   selected artifacts by one pixel; Shift + arrows moves them by ten. Escape
   cancels an unfinished drag or clears selection. Shift + 1 fits the map;
   Shift + 2 fits the selection. `0` resets zoom to 100%.
-- Select a Horseman or document, then use Expand links or Collapse links.
-  Collapse all hides all expanded branches. Shared documents remain visible
+- Use the link count and chevron on a card to expand or collapse its linked
+  items. No selection is required. Unopened Markdown documents load their links
+  on demand. These controls also work in List view. Collapse all in the toolbar
+  hides all expanded branches. Shared documents remain visible
   while another expanded branch reaches them. Hidden artifacts keep their
   positions, and deeper exploration reveals the ancestor path.
 - List view keeps single-click opening. These controls follow the navigation

@@ -15,5 +15,8 @@
     return selected.has(id)?new Set(selected):new Set([id]);
   }
   function insideRect(node,rect){return node.x>=rect.x&&node.y>=rect.y&&node.x+node.w<=rect.x+rect.w&&node.y+node.h<=rect.y+rect.h}
-  const api={visibleGraph,hitSelection,insideRect,pathToRoot};if(typeof module!=='undefined')module.exports=api;else root.HorsemenCanvas=api;
+  function branchControl({count=0,canLoad=false,expanded=false,loading=false}){
+    return {visible:Boolean(count||canLoad||expanded||loading),disabled:Boolean(loading),expanded:Boolean(expanded),label:loading?'Loading…':count?count+' links':'Links'};
+  }
+  const api={visibleGraph,hitSelection,insideRect,pathToRoot,branchControl};if(typeof module!=='undefined')module.exports=api;else root.HorsemenCanvas=api;
 })(globalThis);

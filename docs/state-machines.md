@@ -94,3 +94,10 @@ cannot expand the newly selected project.
 paths, additive selection, and marquee bounds. Browser tests exercise native
 mouse marquee and group drag, single-click selection, Enter/double-click open,
 Hand/Space pan, wheel pan and modifier zoom, Escape cancellation, and collapse.
+
+Card link controls are separate button elements positioned on the card, not
+nested inside its selection button. Pointer and keyboard events stay with the
+link control, so expansion does not start a drag, select a card, or open its
+peek. Controls show loading and expanded states and disappear for known leaf
+nodes. The same control works in canvas and list views. Browser checks cover
+mouse activation, Enter activation, unchanged selection/position, and list use.

@@ -20,4 +20,10 @@ const nodes=new Map([['research',{parentId:'brain'}],['decision',{parentId:'rese
 assert.deepEqual(pathToRoot('decision',nodes,['brain']),['brain','research','decision']);
 nodes.set('research',{parentId:'decision'});assert.deepEqual(pathToRoot('decision',nodes,['brain']),[]);
 
-console.log('PASS: branch reachability, shared descendants, cycles, ancestor paths, selection, marquee bounds');
+const {branchControl}=require('../web/canvas-state.js');
+assert.equal(branchControl({count:0,canLoad:false}).visible,false);
+assert.deepEqual(branchControl({count:2,expanded:true}),{visible:true,disabled:false,expanded:true,label:'2 links'});
+assert.equal(branchControl({canLoad:true}).label,'Links');
+assert.equal(branchControl({canLoad:true,loading:true}).disabled,true);
+
+console.log('PASS: branch visibility, selection, marquee bounds, and inline control states');

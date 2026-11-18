@@ -70,6 +70,18 @@ try:
 
     assert 'PRIVATE' in browser('get','text','#privacy')
     browser('click','[data-artifact="vision"]')
+    original_position=value('JSON.stringify(position("brain"))')
+    browser('click','[data-card-toggle="brain"]')
+    assert browser('get','attr','[data-card-toggle="brain"]','aria-expanded').strip()=='true'
+    assert value('JSON.stringify([...selected])')==['vision'], 'Inline expand does not change selection'
+    assert value('JSON.stringify(position("brain"))')==original_position, 'Inline expand does not drag the card'
+    assert browser('eval','document.querySelector("#peek").open').strip()=='false'
+    browser('focus','[data-card-toggle="brain"]');browser('press','Enter')
+    assert browser('get','attr','[data-card-toggle="brain"]','aria-expanded').strip()=='false'
+    assert browser('eval','document.querySelector("#peek").open').strip()=='false', 'Enter on the branch button does not open the selected card'
+    assert browser('eval','document.querySelector("[data-card-toggle]").closest("[data-artifact]") === null').strip()=='true', 'Controls are not nested inside card buttons'
+
+    browser('click','[data-artifact="vision"]')
     assert browser('eval','document.querySelector("#peek").open').strip()=='false', 'Single click selects without opening'
     assert browser('eval','selected.has("vision")').strip()=='true'
     browser('press','Enter');browser('wait','#peek[open]');browser('press','Escape')
@@ -140,15 +152,15 @@ try:
     browser('click','#peek-back')
     browser('click','.connections-heading button')
     assert browser('eval','document.querySelectorAll(".connected-node").length').strip()=='2'
-    browser('click','[data-artifact="brain"]');browser('click','#toggle-links')
+    browser('click','[data-artifact="brain"]');browser('click','[data-card-toggle="brain"]')
     assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
-    browser('click','#toggle-links')
+    browser('click','[data-card-toggle="brain"]')
     assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='2'
     browser('click','#collapse-all')
     assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
-    browser('click','#toggle-links');browser('click','#fit')
+    browser('click','[data-card-toggle="brain"]');browser('click','#fit')
 
-    browser('dblclick','.connected-node:nth-last-child(2)')
+    browser('dblclick','.connected-node[data-document-path="docs/research.md"]')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
     browser('press','Escape')
     browser('dblclick','[data-artifact="readme"]');assert 'missing' in browser('get','text','#peek-content')
@@ -162,6 +174,11 @@ try:
         browser('press','Escape')
     browser('click','#list-view')
     assert 'list' in browser('get','attr','#map','class')
+    was_expanded=browser('get','attr','[data-card-toggle="brain"]','aria-expanded').strip()
+    browser('click','[data-card-toggle="brain"]')
+    assert browser('get','attr','[data-card-toggle="brain"]','aria-expanded').strip()!=was_expanded
+    assert browser('eval','document.querySelector("#peek").open').strip()=='false', 'List-view toggle does not open the card'
+
     browser('click','#canvas-view')
     result=browser('eval', r'''(() => { const s=renderMarkdown('<script>window.pwned=1</script>\n[bad](javascript:alert(1))\n# Heading\n\n- Item','https://github.com/example/alpha/blob/abc/VISION.md'); if(s.includes('<script>')||s.includes('href="javascript:'))throw Error('unsafe rendering'); if(!s.includes('<h1>')||!s.includes('<li>'))throw Error('lost structure'); const rich=renderMarkdown('| Tool | Purpose |\n| --- | --- |\n| Python | Reader |\n<details>\n<summary>Evidence</summary>\nProof\n</details>','https://github.com'); if(!rich.includes('<table>')||!rich.includes('<summary>Evidence</summary>'))throw Error('lost table or disclosure'); return 'SAFE'; })()''')
     assert 'SAFE' in result
