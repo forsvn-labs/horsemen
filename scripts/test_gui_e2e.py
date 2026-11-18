@@ -26,7 +26,9 @@ class ProgressiveFake(Fake):
         if '/contents/docs/research.md?' in path:
             return {'type':'file','sha':'e'*40,'size':100,'encoding':'base64','content':base64.b64encode(b'# Research notebook\n## Findings\nOperators need a clear next step.\n[Decision](decision.md)').decode()}
         if '/contents/docs/decision.md?' in path:
-            return {'type':'file','sha':'f'*40,'size':80,'encoding':'base64','content':base64.b64encode(b'# Pilot decision\nKeep the first pilot small.').decode()}
+            return {'type':'file','sha':'f'*40,'size':80,'encoding':'base64','content':base64.b64encode(b'# Pilot decision\nKeep the first pilot small.\n[Delivery](delivery.md)').decode()}
+        if '/contents/docs/delivery.md?' in path:
+            return {'type':'file','sha':'1'*40,'size':50,'encoding':'base64','content':base64.b64encode(b'# Delivery\nA fictional pilot receipt.').decode()}
         if '/git/blobs/'  in path:
             key=path.rsplit('/',1)[-1]
             if key in self.sources:return {'encoding':'base64','content':base64.b64encode(self.sources[key].encode()).decode()}
@@ -46,8 +48,18 @@ def browser(*args):
     log.append(p.stdout+p.stderr)
     if p.returncode:raise AssertionError(p.stderr)
     return p.stdout
+def value(code):
+    result=json.loads(browser('eval',code))
+    return json.loads(result) if isinstance(result,str) else result
+
+def drag_points(start,end):
+    browser('mouse','move',str(round(start[0])),str(round(start[1])))
+    browser('mouse','down','left')
+    browser('mouse','move',str(round(end[0])),str(round(end[1])))
+    browser('mouse','up','left')
+
 try:
-    browser('set','viewport','1440','1100')
+    browser('set','viewport' ,'1440','1100')
     browser('open',f'http://127.0.0.1:{server.server_port}')
     browser('wait','--fn','document.body.dataset.state === "ready"')
     assert server.state.snapshot()['phase']=='scanning', 'First project must open before discovery completes'
@@ -57,6 +69,47 @@ try:
     assert 'alpha' in browser('get','text','#project-name'), 'New results must preserve selection'
 
     assert 'PRIVATE' in browser('get','text','#privacy')
+    browser('click','[data-artifact="vision"]')
+    assert browser('eval','document.querySelector("#peek").open').strip()=='false', 'Single click selects without opening'
+    assert browser('eval','selected.has("vision")').strip()=='true'
+    browser('press','Enter');browser('wait','#peek[open]');browser('press','Escape')
+
+    boxes=value('JSON.stringify(["vision","progress"].map(id=>{const r=document.querySelector(`[data-artifact=${id}]`).getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}}))')
+    drag_points((min(b['x'] for b in boxes)-10,min(b['y'] for b in boxes)-10),(max(b['x']+b['w'] for b in boxes)+10,max(b['y']+b['h'] for b in boxes)+10))
+    assert value('JSON.stringify([...selected].sort())')==['progress','vision'], 'Marquee selects both cards'
+    before=value('JSON.stringify([position("vision"),position("progress")])')
+    box=boxes[0];drag_points((box['x']+box['w']/2,box['y']+50),(box['x']+box['w']/2+30,box['y']+70))
+    after=value('JSON.stringify([position("vision"),position("progress")])')
+    assert after[0][0]>before[0][0] and abs((after[0][0]-before[0][0])-(after[1][0]-before[1][0]))<.1, 'Group drag moves both equally'
+    assert browser('eval','document.querySelector("#peek").open').strip()=='false'
+    camera_before=value('JSON.stringify(camera)')
+    browser('eval','document.querySelector(".canvas").dispatchEvent(new WheelEvent("wheel",{deltaY:40,bubbles:true,cancelable:true}))')
+    camera_after=value('JSON.stringify(camera)')
+    assert camera_after['z']==camera_before['z'] and camera_after['y']==camera_before['y']-40, 'Wheel pans without zoom'
+    browser('eval','document.querySelector(".canvas").dispatchEvent(new WheelEvent("wheel",{deltaY:-40,ctrlKey:true,clientX:700,clientY:500,bubbles:true,cancelable:true}))')
+    assert value('camera.z')>camera_before['z'], 'Ctrl-wheel zooms'
+    browser('click','#hand-tool')
+    camera_before=value('JSON.stringify(camera)');before=value('JSON.stringify(position("vision"))')
+    box=value('JSON.stringify((()=>{const r=document.querySelector("[data-artifact=vision]").getBoundingClientRect();return {x:r.x,y:r.y}})())')
+    drag_points((box['x']+40,box['y']+40),(box['x']+70,box['y']+60))
+    assert value('JSON.stringify(position("vision"))')==before and value('camera.x')>camera_before['x'], 'Hand pans over a card without moving it'
+    browser('click','#select-tool');browser('click','#fit')
+    browser('focus','[data-artifact="vision"]')
+    browser('eval','document.querySelector("[data-artifact=vision]").dispatchEvent(new KeyboardEvent("keydown",{key:" ",code:"Space",bubbles:true,cancelable:true}))')
+    before=value('JSON.stringify(position("vision"))');camera_before=value('JSON.stringify(camera)')
+    box=value('JSON.stringify((()=>{const r=document.querySelector("[data-artifact=vision]").getBoundingClientRect();return {x:r.x,y:r.y}})())')
+    drag_points((box['x']+40,box['y']+40),(box['x']+60,box['y']+60))
+    browser('eval','document.querySelector("[data-artifact=vision]").dispatchEvent(new KeyboardEvent("keyup",{key:" ",code:"Space",bubbles:true}))')
+    assert value('JSON.stringify(position("vision"))')==before and value('camera.x')>camera_before['x'], 'Space pans even when an artifact has focus'
+    browser('click','#fit')
+    box=value('JSON.stringify((()=>{const r=document.querySelector("[data-artifact=vision]").getBoundingClientRect();return {x:r.x,y:r.y}})())')
+    browser('mouse','move',str(round(box['x']+40)),str(round(box['y']+40)));browser('mouse','down','left')
+    browser('mouse','move',str(round(box['x']+80)),str(round(box['y']+70)))
+    assert value('JSON.stringify(position("vision"))')!=before
+    browser('press','Escape');browser('mouse','up','left')
+    assert value('JSON.stringify(position("vision"))')==before, 'Escape cancels an unfinished drag'
+
+
     browser('fill','#project-search','no-match')
     assert 'No matching projects' in browser('get','text','#no-projects')
     assert browser('eval','document.querySelectorAll("[data-project]").length').strip()=='0'
@@ -65,12 +118,12 @@ try:
     assert 'Help small teams' in browser('get','text','[data-artifact="vision"]')
     assert 'Invite three operators' in browser('get','text','[data-artifact="progress"]')
     browser('fill','#project-search','')
-    browser('click','[data-artifact="vision"]');browser('wait','#peek[open]')
+    browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
     assert 'Help small teams' in browser('get','text','#peek-content')
     browser('click','#document-tab');assert 'Actual source.' in browser('get','text','#peek-content')
     browser('click','#source-tab');assert '# Record' in browser('get','text','#source-content')
     browser('press','Escape')
-    browser('click','[data-artifact="brain"]')
+    browser('dblclick','[data-artifact="brain"]')
     assert browser('eval','Boolean(document.querySelector("[data-layout=library]"))').strip()=='true'
     browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
     browser('screenshot',str(args.output/'brain-peek.png'))
@@ -87,13 +140,21 @@ try:
     browser('click','#peek-back')
     browser('click','.connections-heading button')
     assert browser('eval','document.querySelectorAll(".connected-node").length').strip()=='2'
-    browser('eval','document.querySelector(".connected-node").click()')
+    browser('click','[data-artifact="brain"]');browser('click','#toggle-links')
+    assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
+    browser('click','#toggle-links')
+    assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='2'
+    browser('click','#collapse-all')
+    assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
+    browser('click','#toggle-links');browser('click','#fit')
+
+    browser('dblclick','.connected-node:nth-last-child(2)')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
     browser('press','Escape')
-    browser('click','[data-artifact="readme"]');assert 'missing' in browser('get','text','#peek-content')
+    browser('dblclick','[data-artifact="readme"]');assert 'missing' in browser('get','text','#peek-content')
     browser('press','Escape')
     for key,layout in [('vision','brief'),('progress','board'),('structure','map'),('changelog','timeline'),('techstack','tools')]:
-        browser('click',f'[data-artifact="{key}"]')
+        browser('dblclick',f'[data-artifact="{key}"]')
         assert browser('eval',f'Boolean(document.querySelector("[data-layout={layout}]"))').strip()=='true'
         browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
         browser('screenshot',str(args.output/(key+'-peek.png')))
@@ -113,15 +174,25 @@ try:
     calls=len(server.state.reader.api.calls)
     browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
     assert not any('/git/trees/' in p for p in server.state.reader.api.calls[calls:])
+    browser('dblclick','[data-artifact="brain"]');browser('click','.connection-card:first-child')
+    browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
+    browser('eval','document.querySelector(".connection-card").scrollIntoView({block:"center"})')
+    browser('click','.connection-card')
+    browser('wait','--fn','document.querySelector("#peek-title").textContent === "decision.md"')
+    browser('eval','document.querySelector(".connections-heading button").scrollIntoView({block:"center"})')
+    browser('click','.connections-heading button')
+    assert browser('eval','[...document.querySelectorAll(".connected-node:not([hidden]) strong")].some(e=>e.textContent === "Delivery")').strip()=='true', 'Exploring a deep document reveals its ancestor path'
+    browser('click','#collapse-all');browser('click','#fit')
+
     browser('set','viewport','390','844');browser('click','#fit')
     assert browser('eval','document.documentElement.scrollWidth <= innerWidth').strip()=='true'
     browser('screenshot','--full',str(args.output/'mobile.png'))
-    browser('click','[data-artifact="brain"]')
+    browser('dblclick','[data-artifact="brain"]')
     browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
     browser('screenshot',str(args.output/'mobile-brain-peek.png'))
     browser('press','Escape')
     browser('set','viewport','1440','1100');browser('click','#fit');browser('screenshot',str(args.output/'desktop.png'))
-    browser('click','[data-artifact="vision"]');browser('press','Escape');browser('click','#clear')
+    browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#clear')
     browser('wait','--fn','document.body.dataset.state === "idle"')
     assert browser('get','text','#source-content').strip()==''
     assert browser('get','text','#peek-content').strip()==''

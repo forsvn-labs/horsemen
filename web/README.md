@@ -1,6 +1,6 @@
 # Local GitHub workspace
 
-Open real Horsemen projects as a draggable canvas. Click a record to read it
+Open real Horsemen projects as a draggable canvas. Double-click a record to read it
 or inspect its exact Markdown. The app reads GitHub; it does not edit files.
 
 From this source checkout, with Python 3.10+ and GitHub CLI installed:
@@ -25,9 +25,22 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
 - Cards show source excerpts suited to each record: purpose and audience,
   next action and gates, knowledge sources, paths, releases, and tools.
   These are excerpts, not generated claims. Open the peek for full context.
-- Drag records to arrange them, drag the background to pan, and scroll to zoom.
-  Fit brings all records into view. Alt + arrow keys move a focused record.
-- Click a card for its visual overview: Vision brief, Progress board, Brain
+- Click to select; Shift-click adds or removes an artifact. Drag an empty area
+  to select several artifacts, then drag the selection to move it together.
+- Use Select (`V`) or Hand (`H`). Space + drag pans even over a card. Middle
+  or right mouse drag also pans. Scroll pans; Ctrl/Cmd + scroll or pinch zooms.
+- Enter, Open, or double-click opens the selected artifact. Arrow keys move
+  selected artifacts by one pixel; Shift + arrows moves them by ten. Escape
+  cancels an unfinished drag or clears selection. Shift + 1 fits the map;
+  Shift + 2 fits the selection. `0` resets zoom to 100%.
+- Select a Horseman or document, then use Expand links or Collapse links.
+  Collapse all hides all expanded branches. Shared documents remain visible
+  while another expanded branch reaches them. Hidden artifacts keep their
+  positions, and deeper exploration reveals the ancestor path.
+- List view keeps single-click opening. These controls follow the navigation
+  pattern in [Excalidraw](https://plus.excalidraw.com/changelog); this app does
+  not include freehand drawing, shape editing, or the Excalidraw editor.
+- Open a card for its visual overview: Vision brief, Progress board, Brain
   source library, Structure map, release timeline, tool cards, or README guide.
   Full document and Markdown source tabs preserve the complete record.
 - Open a connected artifact to go deeper. Back returns to the previous record.
@@ -78,6 +91,7 @@ record loads are retried instead of cached. Nothing is written to disk.
 ```sh
 python3 -m unittest discover -s tests -p 'test_gui*.py'
 node tests/test_gui_previews.cjs
+node tests/test_canvas_state.cjs
 python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check
 ```
 

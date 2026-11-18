@@ -73,3 +73,24 @@ same artifact reader. Link discovery does not create provider access.
 unknown targets, recursive links, revision pinning, and clear. Browser checks
 cover Brain → document → decision → Back, external source cards, expansion
 onto the canvas, and the artifact-specific overview layouts.
+
+## Canvas interaction and branch visibility
+
+The canvas separates selection from reading. Pointer down selects an artifact;
+dragging moves the selection as one group. Empty-space dragging selects an
+area. Hand, Space, middle mouse, and right mouse dragging change the camera.
+Wheel input pans; modified wheel input zooms around the pointer. Cancel rolls
+back an unfinished drag. List view keeps ordinary single-click navigation.
+
+Expanded branches form a directed graph rooted at the seven main artifacts.
+Visibility is reachability from those roots through expanded edges. Collapsing
+one parent hides only nodes that have no remaining visible path. Cycles cannot
+keep an orphan branch visible. Node positions survive collapse. Exploring a
+deep document reveals its ancestor path before adding children. Project
+changes clear the selection and expansion state; old asynchronous reads
+cannot expand the newly selected project.
+
+`tests/test_canvas_state.cjs` covers shared descendants, orphan cycles, ancestor
+paths, additive selection, and marquee bounds. Browser tests exercise native
+mouse marquee and group drag, single-click selection, Enter/double-click open,
+Hand/Space pan, wheel pan and modifier zoom, Escape cancellation, and collapse.

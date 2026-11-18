@@ -276,7 +276,7 @@ class Handler(BaseHTTPRequestHandler):
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8')}
             if path not in files:return self.respond(404,{'error':'Not found.'})
             filename,kind=files[path];body=(self.server.assets/filename).read_bytes()
             if path=='/':body=body.replace(b'__SESSION__',self.server.session.encode())

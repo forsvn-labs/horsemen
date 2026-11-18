@@ -21,7 +21,7 @@ the editing boundary, or whether public shares are snapshots or live views.
 | Surface | Required behavior |
 | --- | --- |
 | Portfolio | List discovered projects, reported health, next action, source revision, and last successful sync. Distinguish missing records from failed access. |
-| Canvas | Start with the four records arranged clearly, then allow free artifact movement on an infinite canvas. Support pointer and touch pan/zoom, Fit, Reset, saved per-project layouts, search, and a list alternative. |
+| Canvas | Start with the four records arranged clearly, then allow free artifact movement on an infinite canvas. Use click-to-select, double-click/Enter-to-open, group dragging, marquee selection, Hand/Space pan, and modified-wheel zoom. Support expand/collapse for linked branches, Fit, Reset, saved per-project layouts, search, and a list alternative. |
 | Peek | Open any artifact without losing canvas position. Support deep links, keyboard close, readable full content, source view, and return focus. |
 | Vision | Show purpose, audience, boundaries, and unresolved owner decisions. |
 | Progress | Show next action, shipped outcomes, ready work, blockers, and linked proof. Preserve the difference between ready and shipped. |
