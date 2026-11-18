@@ -23,7 +23,10 @@ does not contact outside services.
 
 A visual workspace is in discovery: GitHub project discovery, a canvas with
 artifact peeks, and public sharing in a self-hosted GUI. It is not available
-yet. See the [GUI requirements](docs/product/gui-requirements.md).
+yet. Try the offline [interactive design](docs/show-me/product-gui/prototype.html),
+compare the [canvas options](docs/show-me/product-gui/index.html), or read the
+[GUI requirements](docs/product/gui-requirements.md). The design uses fictional
+data and does not connect accounts or publish content.
 
 ## Get started
 
