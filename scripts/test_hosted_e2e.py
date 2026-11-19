@@ -10,6 +10,8 @@ import argparse
 import base64
 import hashlib
 import json
+import os
+import signal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import secrets
@@ -92,9 +94,10 @@ origin = f'http://localhost:{args.port}'
 log = []
 variables = {'GITHUB_API': github, 'GITHUB_WEB': github, 'GITHUB_CLIENT_ID': 'Iv1.fictional', 'GITHUB_CLIENT_SECRET': 'fictional',
              'GITHUB_APP_SLUG': 'horsemen-fictional', 'SESSION_KEY': base64.b64encode(secrets.token_bytes(32)).decode(), 'POLL_SECONDS': '5'}
-command = ['bunx', 'wrangler', 'dev', '--port', str(args.port), '--ip', '127.0.0.1', '--local', '--local-upstream', f'localhost:{args.port}', '--show-interactive-dev-session=false']
+local_wrangler = root / 'worker/node_modules/.bin/wrangler'
+command = [str(local_wrangler) if local_wrangler.exists() else 'bunx', *([] if local_wrangler.exists() else ['wrangler']), 'dev', '--port', str(args.port), '--ip', '127.0.0.1', '--local', '--local-upstream', f'localhost:{args.port}', '--show-interactive-dev-session=false']
 for k, v in variables.items(): command += ['--var', f'{k}:{v}']
-dev = subprocess.Popen(command, cwd=root / 'worker', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+dev = subprocess.Popen(command, cwd=root / 'worker', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
 
 
 def browser(*parts):
@@ -149,9 +152,16 @@ try:
     assert value("document.querySelector('#project-description').textContent.includes('bbbbbbb')")
     browser('screenshot', str(args.output / '03-live-update.png'))
 
+    # A reload shows projects from the saved index at once; the index never holds record text.
+    assert value("(t=>t.includes('example/alpha') && t.includes('PROGRESS.md') && !t.includes('Publish the pilot') && !t.includes('Invite three'))(localStorage.getItem('horsemen.discovery.v1')||'')"), 'index has paths, not record text'
+    browser('eval', 'location.reload()')
+    until("document.querySelector('[data-artifact=progress]') && !document.querySelector('[data-artifact=progress]').disabled && document.querySelector('[data-artifact=progress]').innerText.includes('Publish the pilot results')", 15)
+    until("document.querySelector('#scan-status').textContent.includes('Checked')", 20)
+
     browser('click', '#sign-out')
     until("document.body.innerText.includes('Sign in with GitHub')")
     assert world['revoked'] == 1, 'sign-out revokes the token'
+    assert value("localStorage.getItem('horsemen.discovery.v1')") is None, 'sign-out removes the saved index'
     cookies = browser('cookies')
     assert '__Host-horsemen=' not in cookies or 'ghu_' not in cookies
     browser('screenshot', str(args.output / '04-signed-out.png'))
@@ -159,9 +169,10 @@ try:
 finally:
     try: browser('close')
     except Exception: pass
-    dev.terminate()
+    try: os.killpg(dev.pid, signal.SIGTERM)  # wrangler starts workerd children
+    except ProcessLookupError: pass
     try: out, _ = dev.communicate(timeout=10)
-    except subprocess.TimeoutExpired: dev.kill(); out, _ = dev.communicate()
+    except subprocess.TimeoutExpired: os.killpg(dev.pid, signal.SIGKILL); out, _ = dev.communicate()
     fake.shutdown()
     (args.output / 'browser.log').write_text('\n'.join(log))
     (args.output / 'wrangler.log').write_text(out.replace(variables['SESSION_KEY'], '<session key>'))

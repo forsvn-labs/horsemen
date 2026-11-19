@@ -155,14 +155,17 @@
   const clone = value => structuredClone(value);
 
   class Reader {
-    constructor(api, repositories, profileTtl = 30000) { this.api = api; this.repositories = repositories; this.profileTtl = profileTtl; this.profileCache = null; }
+    constructor(api, repositories, profileTtl = 30000, knownLogin = null) { this.api = api; this.repositories = repositories; this.profileTtl = profileTtl; this.knownLogin = knownLogin; this.profileCache = null; }
     async profile() {
+      // Hosted pages know the signed-in account; a new sign-in loads a new page.
+      if (this.knownLogin) return this.knownLogin;
       if (this.profileCache && Date.now() - this.profileCache.at < this.profileTtl) return this.profileCache.login;
       const login = (await this.api('/user')).login; this.profileCache = { login, at: Date.now() }; return login;
     }
-    async scanRepo(repo) {
+    async scanRepo(repo) { return (await this.scanRepoDetailed(repo)).projects; }
+    async scanRepoDetailed(repo) {
       const name = repo.full_name, branch = repo.default_branch;
-      if (!branch) return [];
+      if (!branch) return { revision: null, projects: [] };
       const commit = await this.api(`/repos/${name}/commits/${quote(branch, '')}`);
       const revision = commit.sha, treeSha = commit.commit.tree.sha;
       const tree = await this.api(`/repos/${name}/git/trees/${treeSha}?recursive=1`);
@@ -173,7 +176,7 @@
           private: !!repo.private, archived: !!repo.archived, branch, revision, files,
           missing: CORE.filter(k => !(k in files)), scanned_at: now() });
       }
-      return output;
+      return { revision, projects: output };
     }
     async load(project) {
       const entries = await Promise.all(Object.entries(FILES).map(async ([key, name]) => [key, await this.loadRecord(project, key, name)]));
@@ -206,14 +209,15 @@
       const data = await this.api(`/repos/${project.repo}/pulls/${number}`);
       return Object.fromEntries(['number', 'title', 'html_url', 'body', 'state', 'merged', 'merged_at', 'merge_commit_sha'].map(k => [k, data[k] ?? null]));
     }
-    async head(project) { return (await this.api(`/repos/${project.repo}/commits/${quote(project.branch, '')}`)).sha; }
+    /* The branch head for a project or a { repo, branch } pair. */
+    async head(target) { return (await this.api(`/repos/${target.repo}/commits/${quote(target.branch, '')}`)).sha; }
   }
 
   const blank = () => ({ phase: 'idle', account: null, projects: [], issues: [], completed: 0, total: 0, finished_at: null });
 
   /* Same lifecycle as the Python ScanState: generations cancel stale work. */
   class ScanState {
-    constructor(reader) { this.reader = reader; this.generation = 0; this.data = blank(); this.projects = new Map(); this.cache = new Map(); this.links = new Map(); this.repos = new Map(); this.running = null; }
+    constructor(reader, { concurrency = 4 } = {}) { this.concurrency = concurrency; this.reader = reader; this.generation = 0; this.data = blank(); this.projects = new Map(); this.cache = new Map(); this.links = new Map(); this.repos = new Map(); this.running = null; }
     snapshot() { return clone(this.data); }
     clear() { this.generation++; this.repos = new Map(); this.projects = new Map(); this.cache = new Map(); this.links = new Map(); this.data = blank(); this.running = null; }
     begin() { if (this.data.phase === 'scanning') return null; this.clear(); this.reader.profileCache = null; this.data.phase = 'scanning'; return this.generation; }
@@ -231,7 +235,7 @@
           while (live() && next < repos.length) {
             const repo = repos[next++]; let found = [], issue = null;
             this.repos.set(repo.full_name, repo);
-            try { found = await this.reader.scanRepo(repo); }
+            try { const result = await this.reader.scanRepoDetailed(repo); found = result.projects; this.repos.set(repo.full_name, { ...repo, revision: result.revision }); }
             catch (error) {
               if (error instanceof ProviderError) issue = error.status === 409 ? null : { repo: repo.full_name, message: error.message };
               else issue = { repo: repo.full_name, message: 'Could not inspect repository. Retry the scan.' };
@@ -242,7 +246,7 @@
             this.data.completed++; this.publish();
           }
         };
-        await Promise.all(Array.from({ length: 4 }, worker));
+        await Promise.all(Array.from({ length: this.concurrency }, worker));
         if (live()) Object.assign(this.data, { phase: this.data.issues.length ? 'partial' : 'ready', finished_at: now() });
       } catch (error) {
         if (live()) {
@@ -304,14 +308,79 @@
       if (generation !== this.generation || sha === project.revision) return null;
       const repo = this.repos.get(project.repo);
       if (!repo) return null;
-      const found = await this.reader.scanRepo(repo);
+      const { revision, projects: found } = await this.reader.scanRepoDetailed(repo);
       if (generation !== this.generation) return null;
-      for (const [id, p] of this.projects) if (p.repo === project.repo) { this.projects.delete(id); this.cache.delete(id); this.links.delete(id); }
-      for (const p of found) this.projects.set(p.id, p);
+      this.replaceRepo(repo, revision, found);
       this.publish();
       return this.projects.has(key) ? without(this.projects.get(key), 'files') : null;
     }
   }
+
+  /* Saved discovery index: repository names, record paths, and revisions only. */
+  const INDEX_VERSION = 1;
+  const REPO_FIELDS = ['id', 'full_name', 'default_branch', 'private', 'archived', 'pushed_at', 'revision'];
+  Object.assign(ScanState.prototype, {
+    replaceRepo(repo, revision, found) {
+      for (const [id, p] of this.projects) if (p.repo === repo.full_name) { this.projects.delete(id); this.cache.delete(id); this.links.delete(id); }
+      for (const p of found) this.projects.set(p.id, p);
+      this.repos.set(repo.full_name, { ...repo, revision });
+      this.publish();
+    },
+    exportIndex() {
+      if (!['ready', 'partial'].includes(this.data.phase) || !this.data.account) return null;
+      return clone({ version: INDEX_VERSION, account: this.data.account, saved_at: this.data.finished_at || now(),
+        repos: [...this.repos.values()].map(r => Object.fromEntries(REPO_FIELDS.filter(k => k in r).map(k => [k, r[k]]))),
+        projects: [...this.projects.values()] });
+    },
+    restore(index, account) {
+      if (!index || index.version !== INDEX_VERSION || !account || index.account !== account || !Array.isArray(index.repos) || !Array.isArray(index.projects)) return false;
+      if (index.projects.some(p => !p || typeof p.id !== 'string' || !p.files || typeof p.files !== 'object')) return false;
+      this.clear();
+      for (const r of index.repos) if (r && typeof r.full_name === 'string') this.repos.set(r.full_name, r);
+      for (const p of index.projects) this.projects.set(p.id, p);
+      Object.assign(this.data, { phase: 'ready', account, completed: this.repos.size, total: this.repos.size, finished_at: index.saved_at || null });
+      this.publish();
+      return true;
+    },
+    /* Check every repository against the saved index. Unchanged branches keep their projects. */
+    async revalidate() {
+      const generation = this.generation, live = () => generation === this.generation;
+      if (this.data.phase === 'scanning') return;
+      this.data.revalidating = true;
+      const issues = [];
+      try {
+        let repos;
+        try { repos = await this.reader.repositories(); }
+        catch (error) { if (live()) { issues.push({ message: error instanceof ProviderError ? error.message : 'Discovery failed. Retry the scan.' }); } return; }
+        if (!live()) return;
+        const names = new Set(repos.map(r => r.full_name));
+        for (const name of [...this.repos.keys()]) if (!names.has(name)) { this.replaceRepo({ full_name: name }, null, []); this.repos.delete(name); }
+        let next = 0;
+        const worker = async () => {
+          while (live() && next < repos.length) {
+            const repo = repos[next++], known = this.repos.get(repo.full_name);
+            try {
+              if (known && known.default_branch === repo.default_branch && known.revision && repo.default_branch) {
+                const sha = await this.reader.head({ repo: repo.full_name, branch: repo.default_branch });
+                if (!live()) return;
+                if (sha === known.revision) { this.repos.set(repo.full_name, { ...repo, revision: sha }); continue; }
+              }
+              const { revision, projects } = await this.reader.scanRepoDetailed(repo);
+              if (live()) this.replaceRepo(repo, revision, projects);
+            } catch (error) {
+              if (live() && !(error instanceof ProviderError && error.status === 409)) issues.push({ repo: repo.full_name, message: error instanceof ProviderError ? error.message : 'Could not inspect repository. Retry the scan.' });
+            }
+          }
+        };
+        await Promise.all(Array.from({ length: this.concurrency }, worker));
+      } finally {
+        if (live()) {
+          Object.assign(this.data, { issues, phase: issues.length ? 'partial' : 'ready', completed: this.repos.size, total: this.repos.size, finished_at: now(), revalidating: false });
+          this.publish();
+        }
+      }
+    },
+  });
 
   const api = { FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenReader = api;

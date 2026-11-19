@@ -120,6 +120,8 @@ The peek history holds up to 32 levels; Back and project changes release it.
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
 by the app. The browser stores only opaque project IDs, canvas positions, the theme choice, and the layout choice for each record type.
+In hosted mode, the browser also keeps a discovery index without record text; see
+[fast reloads](../worker/README.md#how-it-works).
 External images do not load automatically. Opening an external link leaves
 the local app. Do not expose this server through a tunnel or reverse proxy.
 After switching GitHub accounts, refresh discovery. Project loads also check

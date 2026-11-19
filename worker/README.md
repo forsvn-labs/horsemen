@@ -28,6 +28,12 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   checks the branch every `POLL_SECONDS` (default 60) with an ETag. An
   unchanged branch returns 304, which GitHub does not count against the rate
   limit. A new commit reloads the project; an open record waits until it closes.
+- **Fast reloads.** After discovery, the browser saves a discovery index in
+  `localStorage`: repository names, record paths, revisions, and ETags. It
+  never saves record text. A reload shows the projects at once and opens the
+  last project, then checks every branch in the background. Only changed or
+  new repositories are scanned again. Sign-out and Clear workspace remove the
+  index. Discovery reads up to 12 repositories in parallel.
 - **Agents.** Agents update records the normal way: edit, commit, and push.
   The viewer shows the default branch, so unpushed edits do not appear.
 
@@ -61,7 +67,13 @@ To rotate the session key, which signs everyone out:
 ```sh
 node --test ../tests/test_hosted_reader.cjs test/       # unit tests
 python3 ../scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check
+python3 ../scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench
 ```
+
+The benchmark uses a fake GitHub with a fixed delay for each call. It prints
+the time to the first project and to the end of discovery, for a first visit
+and a reload. `wrangler dev` uses HTTP/1.1, so the browser sends at most six
+requests at a time; production uses HTTP/2, so real parallel reads are faster.
 
 The end-to-end check runs `wrangler dev` against a fake GitHub. It signs in,
 opens a fictional project, detects a new commit, and signs out. It needs
@@ -70,9 +82,10 @@ opens a fictional project, detects a new commit, and signs out. It needs
 ## Limits
 
 - Only default branches are shown. Branch and pull request views are not built.
-- Discovery reads every installed repository each time the page loads.
-  Very large installations are slow, and each read counts against the user's
-  GitHub rate limit (5,000 requests an hour).
+- A first visit reads every installed repository: two calls for each one.
+  A reload makes one branch check for each repository; unchanged branches
+  return 304 and do not count against the GitHub rate limit (5,000 requests
+  an hour).
 - Public share links are not built. They will need stored share metadata,
   not stored records.
 - Private PR image attachments open on GitHub; the viewer does not load them.
