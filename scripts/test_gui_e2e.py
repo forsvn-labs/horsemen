@@ -15,12 +15,12 @@ root=Path(__file__).resolve().parents[1]
 release_scan=threading.Event()
 class ProgressiveFake(Fake):
     sources={
-        'vision':'# Record\n\nActual source.\n## Why we exist\nHelp small teams keep decisions close to their work.\n## Who we build for\nIndependent builders and project operators.\n## The world we are building\nA clear view of every active project.',
-        'progress':'# Progress\nNext action: Invite three operators to the pilot.\n## Shipped\n- Search is available to the pilot group.\n## Gates\n- Review the pilot feedback before wider access.',
+        'vision':'# Record\n\nOwner: A fictional team · Confirmed: 2026-11-02\n\nActual source.\n## Why we exist\nHelp small teams keep decisions close to their work.\n## Who we build for\nIndependent builders and project operators.\n## The world we are building\nA clear view of every active project.\n## How we get there\n- Now: Prove the pilot with three operators.\n- Next: Shared team spaces.\n- Later: Every project has a clear next step.\n## Open questions\n- Pricing for teams? The owner decides.\n## Direction changes\n- 2026-11-02: Narrowed the pilot to operators. Previous: all builders.',
+        'progress':'# Progress\n\nUpdated: 2026-11-18 · Stage: pilot · Health: On track\n\nNext action: Invite three operators to the pilot.\n\n## Latest day\n\n<details open>\n<summary>Latest day · 2026-11-18</summary>\n\n## Shipped\n\n- **Search** (2026-11-18): Search is available to the pilot group.\n\n## In progress\n\n- **Export** (started 2026-11-12): Operators can save a board as a PDF.\n\n## Up next\n\n- **Saved views** (target December 2026): Keep a filter between visits.\n\n## Gates\n\n- Review the pilot feedback before wider access.\n\n### Technical details\n\n| Item | Evidence |\n| --- | --- |\n| Search | [PR #12](https://github.com/example/alpha/pull/12) and the [release note](https://example.com/notes/search). |\n\n</details>\n\n## Historical ships\n\n<details>\n<summary>Historical ships · newest first</summary>\n\n### 2026-11-10\n\n- **Walkthrough** (2026-11-10): The first walkthrough reached two operators.\n\n#### Technical details\n\n| Item | Evidence |\n| --- | --- |\n| Walkthrough | [PR #9](https://github.com/example/alpha/pull/9), commit [a1b2c3d](https://github.com/example/alpha/commit/a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0). |\n\n</details>\n\n## Upcoming roadmap\n\n<details>\n<summary>Upcoming roadmap</summary>\n\n- Next: Shared team spaces.\n- Later: A hosted reader.\n\n</details>',
         'brain':'# Brain\n## Providers\n- [Research notebook](docs/research.md): interviews and decisions.\n- [External reference](https://example.com/reference)\n## Access\nRead originals within existing permissions.\n## Save and cleanup\nKeep owner decisions with their source.',
-        'techstack':'# Tech stack\n## Tools\n| Tool | Purpose | Needs |\n| --- | --- | --- |\n| Python | Local reader | Python 3.10+ |\n| GitHub CLI | Read project records | Existing sign-in |',
-        'changelog':'# Changelog\n## 2026-11-18\nSearch reached the fictional pilot.\n## 2026-11-10\nFirst walkthrough delivered.',
-        'structure':'# Structure\n## Map\n```text\napp/ — operator workspace\ndocs/ — decisions and references\ntests/ — verification\n```\n## Read before changing\nStart with the current progress snapshot.\n## Commands\npython3 scripts/serve_gui.py'
+        'techstack':'# Tech stack\n## Tools\n| Tool | Purpose | Needs |\n| --- | --- | --- |\n| Python 3.10+ | Local reader | Python 3.10+ |\n| GitHub CLI | Read project records | Existing sign-in |',
+        'changelog':'# Changelog\n## 2026-11-18\n- Search reached the fictional pilot. [PR #12](https://github.com/example/alpha/pull/12)\n## 2026-11-10\nFirst walkthrough delivered.',
+        'structure':'# Structure\n## Map\n```text\napp/ — operator workspace (start here)\ndocs/ — decisions and references\ntests/ — verification\n```\n## Read before changing\nStart with the current progress snapshot.\n## Commands\npython3 scripts/serve_gui.py'
     }
     def __call__(self,path,paginate=False):
         if '/contents/docs/research.md?' in path:
@@ -182,6 +182,33 @@ try:
         browser('screenshot',str(args.output/(key+'-peek.png')))
         if key=='techstack':assert browser('eval','document.querySelectorAll(".tool-card").length').strip()=='2'
         browser('press','Escape')
+    # Artifact views: status board, proof links, exact dates, source lines, and a saved list choice.
+    browser('dblclick','[data-artifact="progress"]');browser('wait','#peek[open]')
+    assert value('document.querySelectorAll("#peek-content .day.latest .lane").length')==4, 'Progress shows four status lanes'
+    assert value('document.querySelectorAll("#peek-content details.day").length')==1, 'Earlier days fold'
+    assert value('JSON.stringify(document.querySelector("#peek-content .lane[data-status=shipped] .chip.pr").getAttribute("href"))')=='https://github.com/example/alpha/pull/12', 'Shipped items link to their PR'
+    assert value('JSON.stringify(document.querySelector("#peek-content .lane[data-status=progress] time").getAttribute("title"))')=='2026-11-12', 'Relative dates keep the exact date'
+    assert value('JSON.stringify([...document.querySelectorAll("#peek-content a.src")].every(a=>/[?]plain=1#L[0-9]+$/.test(a.href)))') is True, 'Source links point to exact lines'
+    browser('click','[data-view-choice="list"]')
+    assert value('document.querySelectorAll("#peek-content .rows-list .row").length')==7, 'List view has one row for each item'
+    browser('press','Escape');browser('dblclick','[data-artifact="progress"]');browser('wait','#peek[open]')
+    assert value('Boolean(document.querySelector("#peek-content .rows-list"))') is True, 'The list choice is saved'
+    browser('click','[data-record="vision"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "VISION.md"')
+    assert value('Boolean(document.querySelector("#peek-content .path-step"))') is True, 'Each record type keeps its own choice'
+    assert value('Boolean(document.querySelector("#peek-content .open-panel"))') is True, 'Vision shows open questions'
+    browser('click','[data-record="progress"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "PROGRESS.md"')
+    browser('click','[data-view-choice="rich"]')
+    assert value('localStorage.getItem("horsemen-peek-views")')=={'progress':'rich'}
+    browser('click','#document-tab');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
+    browser('click','#source-tab');assert '<summary>Latest day' in browser('get','text','#source-content'), 'Markdown source stays exact'
+    browser('click','#reading-tab')
+    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "STRUCTURE.md"')
+    assert value('JSON.stringify(document.querySelector("[data-copy]").dataset.copy)')=='python3 scripts/serve_gui.py'
+    assert value('JSON.stringify(document.querySelector(".tree-path a").getAttribute("href"))')=='https://github.com/example/alpha/tree/'+'a'*40+'/app/', 'Tree paths open on GitHub'
+    assert value('JSON.stringify(document.querySelector(".tree .tag.start").textContent)')=='start here'
+    browser('click','[data-copy]')
+    browser('wait','--fn','document.querySelector("[data-copy]").textContent === "Copied" || !document.querySelector("#toast").hidden')
+    browser('press','Escape')
     browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
     assert value('JSON.stringify(document.querySelector("#peek-records [aria-current=page]").dataset.record)')=='vision', 'The record list marks the open record'
     assert value('document.querySelectorAll("#peek-outline button").length')>=2, 'The outline lists the sections'
@@ -238,6 +265,16 @@ try:
     browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
     browser('screenshot',str(args.output/'mobile-brain-peek.png'))
     browser('press','Escape')
+    fits='document.querySelector(".peek-content").scrollWidth <= document.querySelector(".peek-content").clientWidth'
+    for key in ['progress','vision','structure','changelog','techstack']:
+        browser('eval',f'openPeek("{key}",document.querySelector("[data-artifact={key}]"))');browser('wait','#peek[open]')
+        assert browser('eval',fits).strip()=='true', key+' fits a phone without sideways scrolling'
+        browser('click','[data-view-choice="list"]');assert browser('eval',fits).strip()=='true', key+' list fits a phone'
+        browser('click','[data-view-choice="rich"]')
+        if key=='progress':
+            browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+            browser('screenshot',str(args.output/'mobile-progress-peek.png'))
+        browser('press','Escape')
     browser('set','viewport','1440','1100');browser('click','#fit');browser('screenshot',str(args.output/'desktop.png'))
     scheme=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
     other='ember' if scheme=='light' else 'pale'
