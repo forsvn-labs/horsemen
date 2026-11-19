@@ -343,7 +343,7 @@ class Handler(BaseHTTPRequestHandler):
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/canvas-sections.js':('canvas-sections.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
             if path.startswith('/assets/'):
                 # Bundled fonts and icons only: plain names, known types, no traversal or links.
                 parts=path[len('/assets/'):].split('/')

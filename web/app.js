@@ -2,6 +2,9 @@
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structure:'STRUCTURE.md',readme:'README.md',changelog:'CHANGELOG.md',techstack:'TECHSTACK.md'};
 let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
+/* Canvases: Home shows the records; each record has a generated canvas of its sections.
+   Section cards have fixed places from HorsemenSections; nothing about them is saved. */
+let canvasKey='home',needsFit=false;const sectionSpots=new Map(),sectionNodes=new Map(),lastCanvas=new Map(),cameras=new Map();
 const session=$('meta[name="horsemen-session"]').content;
 const titles={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Structure',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
 const icon=(name,cls='icon')=>'<svg class="'+cls+'" aria-hidden="true"><use href="/assets/icons/'+(name.startsWith('seal-')?'seals':'icons')+'.svg#'+name+'"/></svg>';
@@ -12,17 +15,35 @@ const hosted=!!window.HorsemenHosted, copy=(local,remote)=>hosted?remote:local;
 async function api(path,method='GET'){if(hosted)return HorsemenHosted.api(path,method);const r=await fetch(path,{method,headers:{'X-Horsemen-Session':session},cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
 function showToast(message){$('#toast').textContent=message;$('#toast').hidden=false;setTimeout(()=>$('#toast').hidden=true,3500)}
 let peekTrail=[],peekRequest=0,peekMode='overview';
-/* A link to open: a local #p=<id>&r=<record> hash, or in hosted mode a readable /owner/repo?record= share link. */
-let pendingLink=window.HorsemenHosted?.target?{target:HorsemenHosted.target,r:HorsemenHosted.target.record}:(m=>m?{p:m[1],r:m[2]}:null)(location.hash.match(/^#p=([a-f0-9]{24})(?:&r=([a-z]+))?$/));
+/* A link to open: a local #p=<id>&c=<canvas>&n=<element>&r=<record> hash, or in hosted mode a readable /owner/repo?canvas=&node=&record= share link. */
+let pendingLink=window.HorsemenHosted?.target?{target:HorsemenHosted.target,r:HorsemenHosted.target.record,c:HorsemenHosted.target.canvas,n:HorsemenHosted.target.node}:HorsemenSections.parseHash(location.hash);
 const linkMatches=p=>!!(p&&pendingLink)&&(pendingLink.target?HorsemenReader.matchesTarget(p,pendingLink.target):p.id===pendingLink.p);
+/* The place a link names: the open canvas and, when one section card is selected, that card. */
+function viewState(){const only=selected.size===1?[...selected][0]:null;return {canvas:canvasKey==='home'?null:canvasKey,node:canvasKey!=='home'&&sectionSpots.has(only)?only:null}}
 function syncHash(){
-  const p=projects[current],key=$('#peek').open?peekTrail[0]?.key:null;
-  if(window.HorsemenHosted){if(!p)return;const u=new URL(HorsemenHosted.shareURL(p,Object.hasOwn(names,key||'')?key:null));if(location.pathname+location.search!==u.pathname+u.search||location.hash)try{history.replaceState(null,'',u.pathname+u.search)}catch{}return}
-  const hash=p?'#p='+p.id+(Object.hasOwn(names,key||'')?'&r='+key:''):'';
+  const p=projects[current],key=$('#peek').open?peekTrail[0]?.key:null,record=Object.hasOwn(names,key||'')?key:null,view=viewState();
+  if(window.HorsemenHosted){if(!p)return;const u=new URL(HorsemenHosted.shareURL(p,record,view.canvas,view.node));if(location.pathname+location.search!==u.pathname+u.search||location.hash)try{history.replaceState(null,'',u.pathname+u.search)}catch{}return}
+  const hash=p?HorsemenSections.formatHash({p:p.id,c:view.canvas,n:view.node,r:record}):'';
   if(location.hash!==hash)try{history.replaceState(null,'',hash||location.pathname)}catch{}
 }
 function setPeekMode(mode){peekMode=mode;renderPeek();$('.peek-content').focus({preventScroll:true})}
-function openPeek(key,button){const r=records[key];if(!r)return;opener=button;peekRequest++;peekTrail=[{key,record:r,nodeId:key}];peekMode='overview';renderPeek();if(!$('#peek').open)$('#peek').showModal();markOutline();$('.peek-content').focus({preventScroll:true});syncHash()}
+function openPeek(key,button,section=null){const r=records[key];if(!r)return;opener=button;peekRequest++;peekTrail=[{key,record:r,nodeId:key}];peekMode='overview';renderPeek();if(!$('#peek').open)$('#peek').showModal();markOutline();$('.peek-content').focus({preventScroll:true});if(section)showSection(key,section);syncHash()}
+/* A section card opens the reading view at its section: in the layout of the record when the layout names the section, else in the full document.
+   Diagrams and images load after the text, so the section holds its place for a moment unless the reader moves. */
+let sectionAnchor=null;
+function showSection(key,id){
+  const sections=HorsemenSections.parse(records[key]?.content||'');if(!sections.some(s=>s.id===id))return;
+  let targets=outlineTargets.filter(el=>el.dataset.outline||el.tagName==='H2'),at=HorsemenSections.headingIndex(sections,id,targets.map(el=>el.dataset.outline||el.textContent));
+  if(at<0){
+    if(peekMode!=='document'){peekMode='document';renderPeek()}
+    targets=[...$('#peek-content').querySelectorAll('.prose h2')];at=HorsemenSections.headingIndex(sections,id,targets.map(el=>el.textContent),{byOrder:true});
+  }
+  const target=targets[at];if(!target)return;
+  for(let fold=target.closest('details');fold;fold=fold.parentElement?.closest('details'))fold.open=true;
+  target.scrollIntoView({block:'start',behavior:'instant'});markOutline();sectionAnchor={el:target,until:performance.now()+2500};
+}
+new ResizeObserver(()=>{if(sectionAnchor&&sectionAnchor.el.isConnected&&performance.now()<sectionAnchor.until)sectionAnchor.el.scrollIntoView({block:'start',behavior:'instant'});else sectionAnchor=null}).observe($('#peek-content'));
+for(const type of ['wheel','pointerdown','keydown','touchstart'])$('#peek').addEventListener(type,()=>{sectionAnchor=null},{passive:true,capture:true});
 /* The layout choice is saved for each record type. Only "rich" and "list" are kept; a type without a saved choice uses its default. */
 const viewChoices=()=>{try{const saved=JSON.parse(localStorage.getItem('horsemen-peek-views')||'{}');return saved&&typeof saved==='object'?saved:{}}catch{return {}}};
 const viewMode=key=>['rich','list'].includes(viewChoices()[key])?viewChoices()[key]:HorsemenViews.defaultMode(key);
@@ -37,7 +58,7 @@ function factsLine(record){
 }
 const entryTitle=entry=>Object.hasOwn(titles,entry.key)?titles[entry.key]:entry.record?.name||entry.link?.title||'Document';
 function renderPeek(){
-  const entry=peekTrail.at(-1);if(!entry)return;
+  const entry=peekTrail.at(-1);if(!entry)return;sectionAnchor=null;
   const r=entry.record,core=Object.hasOwn(names,entry.key);$('#peek').dataset.kind=entry.key;$('#peek-kind').innerHTML=icon(core?entry.key:kindIcon(entry.link?.kind||'document'));$('#peek-title').textContent=entryTitle(entry);
   /* One quiet line under the name: the file for linked documents, then the facts the record states. */
   const sub=$('#peek-sub');sub.replaceChildren();
@@ -62,7 +83,7 @@ function renderPeek(){
   if(r.connections?.length&&peekMode!=='source'){
     const panel=document.createElement('section');panel.className='part connections-panel';
     panel.dataset.outline='Linked documents';panel.innerHTML='<div class="connections-heading"><h3 class="part-title">Linked documents</h3></div><ul class="connection-grid"></ul>';
-    const graph=document.createElement('button');graph.className='link-btn';graph.textContent='Show on canvas';graph.onclick=()=>{expandConnections(entry.nodeId,r);$('#peek').close();fitCanvas()};panel.querySelector('.connections-heading').append(graph);
+    const graph=document.createElement('button');graph.className='link-btn';graph.textContent='Show on canvas';graph.onclick=()=>{showCanvas('home');expandConnections(entry.nodeId,r);$('#peek').close();fitCanvas()};panel.querySelector('.connections-heading').append(graph);
     if(expandedConnections.has(entry.nodeId)){const collapse=document.createElement('button');collapse.className='link-btn';collapse.textContent='Hide on canvas';collapse.onclick=()=>{expandedConnections.delete(entry.nodeId);refreshGraph();renderPeek()};panel.querySelector('.connections-heading').append(collapse)}
     for(const link of r.connections){const li=document.createElement('li'),b=document.createElement('button');b.className='connection-card';b.dataset.connection=link.id;b.innerHTML=icon(kindIcon(link.kind))+'<strong>'+escapeHTML(link.title)+'</strong><small>'+escapeHTML(link.path||new URL(link.href).hostname)+'</small>';b.onclick=()=>openConnection(link,entry.nodeId);li.append(b);panel.querySelector('.connection-grid').append(li)}
     const slot=content.querySelector('[data-connections-slot]');if(slot)slot.replaceWith(panel);else content.append(panel);
@@ -98,7 +119,9 @@ function renderPeekPath(){
   });
 }
 const readable=()=>Object.keys(names).filter(key=>records[key]&&!records[key].error);
-function stepRecord(delta){const order=readable(),at=order.indexOf(peekTrail[0]?.key);if(order.length<2)return;const key=order[(Math.max(at,0)+delta+order.length)%order.length];openPeek(key,$('[data-artifact="'+key+'"]'))}
+/* Where focus returns when a record closes: its Home card, or on a record canvas the card or control that opened the reading view. */
+const recordOpener=key=>{const card=$('[data-artifact="'+key+'"]');return card&&!card.hidden?card:opener?.isConnected&&!opener.hidden?opener:$('[data-canvas="'+canvasKey+'"]')};
+function stepRecord(delta){const order=readable(),at=order.indexOf(peekTrail[0]?.key);if(order.length<2)return;const key=order[(Math.max(at,0)+delta+order.length)%order.length];openPeek(key,recordOpener(key))}
 let outlineTargets=[];
 function renderPeekNav(){
   const list=$('#peek-records'),root=peekTrail[0]?.key;list.replaceChildren();
@@ -106,7 +129,7 @@ function renderPeekNav(){
     const r=records[key],b=document.createElement('button');b.className='peek-record '+key+(r?.error?' missing':'');b.dataset.record=key;b.disabled=!r||!!r.error;
     b.innerHTML=icon(key)+'<span>'+escapeHTML(titles[key])+'</span>';if(r?.error)b.title=names[key]+' is missing or unreadable';
     if(key===root)b.setAttribute('aria-current',peekTrail.length===1?'page':'true');
-    b.onclick=()=>openPeek(key,$('[data-artifact="'+key+'"]'));list.append(b);
+    b.onclick=()=>openPeek(key,recordOpener(key));list.append(b);
   }
   const order=readable(),at=order.indexOf(root);
   for(const [id,delta] of [['#peek-prev',-1],['#peek-next',1]]){const b=$(id);b.hidden=order.length<2||peekTrail.length>1;if(!b.hidden)b.querySelector('span').textContent=titles[order[(Math.max(at,0)+delta+order.length)%order.length]]}
@@ -168,26 +191,73 @@ $('#peek-content').addEventListener('click',e=>{
 });
 $('#close-peek').onclick=()=>$('#peek').close();$('#peek').addEventListener('close',()=>{peekRequest++;toggleMenu($('#peek-menu'),false);opener?.focus({preventScroll:true});syncHash()});
 $('#peek-more').onclick=()=>toggleMenu($('#peek-menu'));
-for(const b of $$('[data-artifact]')){b.disabled=true;bindArtifact(b)}
+const recordCards=$$('[data-artifact]');for(const b of recordCards){b.disabled=true;bindArtifact(b)}
 const waiting='<span class="waiting">Waiting for source…</span>';
-function clearRecords(){request++;records={};releaseImages();clearConnections();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-sub','#peek-meta','#peek-content','#source-content','#peek-records','#peek-outline','#peek-menu'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML=waiting}}
+function clearRecords(){request++;records={};releaseImages();clearConnections();buildCanvas();renderRail();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-sub','#peek-meta','#peek-content','#source-content','#peek-records','#peek-outline','#peek-menu'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML=waiting}}
 /* The quiet line under the project name: where it lives, when Progress says it was updated, and the commit read. */
 function projectMeta(p){
   const updated=records.progress&&!records.progress.error?HorsemenPreview.facts(records.progress.content).find(f=>/^updated$/i.test(f.label)):null,r=updated&&HorsemenViews.relative(updated.value.slice(0,10));
   return [p.repo+(p.root?' / '+p.root:''),r?'updated '+r.text.toLocaleLowerCase():'','commit '+p.revision.slice(0,7)].filter(Boolean).join(' · ');
 }
 function setPrivacy(p){$('#privacy').hidden=!p?.private;$('#privacy').title=p?.private?'Private repository':''}
+/* The header names the open canvas: the project on Home, the record on its canvas. */
+function renderHeader(){
+  const p=projects[current];if(!p)return;const home=canvasKey==='home',count=[...sectionNodes.values()].filter(n=>n.kind==='section').length;
+  $('#project-name').textContent=home?p.name:titles[canvasKey];
+  $('#project-description').textContent=(home||!count?'':count+(count===1?' section · ':' sections · '))+projectMeta(p);
+}
+const hasCanvas=key=>key==='home'||(Object.hasOwn(names,key)&&!!records[key]&&!records[key].error);
+/* Cards of the open canvas. Home keeps its record cards; a record canvas gets one card for each section. */
+function buildCanvas(){
+  for(const el of $$('.section-card'))el.remove();sectionSpots.clear();sectionNodes.clear();
+  const home=canvasKey==='home',record=records[canvasKey],shown=!home&&record&&!record.error;
+  for(const el of recordCards)el.hidden=!home;world.dataset.canvas=canvasKey;
+  const nodes=shown?HorsemenSections.canvas(canvasKey,record.content).nodes:[];
+  for(const node of nodes){
+    const b=document.createElement('button');b.type='button';b.className='artifact card section-card '+canvasKey;b.dataset.artifact=node.id;b.dataset.node=node.id;b.dataset.kind=node.kind;
+    b.innerHTML=HorsemenSections.cardHTML(node);b.setAttribute('aria-label',HorsemenSections.cardLabel(node));
+    bindArtifact(b);world.append(b);sectionSpots.set(node.id,[node.x,node.y]);sectionNodes.set(node.id,node);
+  }
+  $('#canvas-note').hidden=!shown||nodes.length>0;needsFit=world.classList.contains('list');
+  refreshGraph();renderPositions();
+}
+/* Bring a card that a link names into view: in the list by scrolling, on a large canvas by zooming to it. */
+function revealNode(id){
+  const el=$('[data-artifact="'+id+'"]');if(!el)return;
+  if(world.classList.contains('list'))el.scrollIntoView({block:'center',behavior:'instant'});else if(camera.z<.6)fitCanvas(true);
+  el.focus({preventScroll:true});
+}
+/* Change canvas inside the open project. Each canvas keeps its camera until the project changes. */
+function showCanvas(key,node=null){
+  const p=projects[current];if(!p)return;if(!hasCanvas(key))key='home';
+  if(key!==canvasKey){
+    cancelGesture();cameras.set(canvasKey,{...camera});canvasKey=key;lastCanvas.set(p.id,key);buildCanvas();setSelection(new Set());
+    const saved=cameras.get(key);if(saved&&!world.classList.contains('list')){camera={...saved};renderCamera()}else fitCanvas();
+    if(world.classList.contains('list'))canvas.scrollTo({top:0,behavior:'instant'});
+    renderHeader();renderRail();
+  }
+  if(node&&sectionSpots.has(node)){setSelection(new Set([node]));revealNode(node)}
+  syncHash();
+}
 async function selectProject(index){
-  clearRecords();const version=request;current=index;const p=projects[index];
-  $('#project-name').textContent=p.name;$('#project-description').textContent=projectMeta(p);setPrivacy(p);
+  /* The canvas to show: the one a link names, the one open before a reload of the same project, or the last one of this project. */
+  const keep=projects[index]&&projects[index].id===projects[current]?.id?viewState():null;
+  clearRecords();const version=request;current=index;const p=projects[index],link=linkMatches(p)?pendingLink:null;
+  const wanted=link?{canvas:link.c,node:link.n}:keep||{canvas:lastCanvas.get(p.id)||null,node:null};
+  canvasKey=wanted.canvas||'home';cameras.clear();buildCanvas();renderHeader();setPrivacy(p);renderRail();
   $$('[data-project]').forEach(b=>{const on=+b.dataset.project===index;b.classList.toggle('active',on);b.setAttribute('aria-current',on?'page':'false')});
   syncHash();document.body.dataset.state='loading';loadCanvas();
   try{
     const data=await api('/api/project?id='+p.id);if(version!==request)return;records=data.records;
-    for(const b of $$('[data-artifact]')){const r=records[b.dataset.artifact];if(!r)continue;b.disabled=false;b.classList.toggle('missing',!!r.error);const body=b.querySelector('.cardbody');if(body)body.innerHTML=previewHTML(b.dataset.artifact,r,b.classList.contains('supporter'))}
-    $('#project-description').textContent=projectMeta(p);
-    installRecordLinks();refreshGraph();document.body.dataset.state='ready';loadCanvas();
-    if(linkMatches(p)){const key=pendingLink.r;pendingLink=null;if(key&&records[key])openPeek(key,$('[data-artifact="'+key+'"]'))}
+    for(const b of recordCards){const r=records[b.dataset.artifact];if(!r)continue;b.disabled=false;b.classList.toggle('missing',!!r.error);const body=b.querySelector('.cardbody');if(body)body.innerHTML=previewHTML(b.dataset.artifact,r,b.classList.contains('supporter'))}
+    if(!hasCanvas(canvasKey)){if(link)showToast(titles[canvasKey]+' is not in this project.');canvasKey='home'}
+    lastCanvas.set(p.id,canvasKey);installRecordLinks();buildCanvas();renderHeader();renderRail();document.body.dataset.state='ready';loadCanvas();
+    if(wanted.node&&canvasKey!=='home'){
+      if(sectionSpots.has(wanted.node)){setSelection(new Set([wanted.node]));revealNode(wanted.node)}
+      else if(link)showToast('That section is not in '+titles[canvasKey]+' now. Its heading may have changed.');
+    }
+    if(link){pendingLink=null;const at=viewState().node;if(link.r&&records[link.r])openPeek(link.r,at?$('[data-artifact="'+at+'"]'):recordOpener(link.r),link.r===canvasKey?at:null)}
+    syncHash();
   }catch(e){if(version!==request)return;document.body.dataset.state='error';$('#scan-status').textContent=e.message}
 }
 /* A card shows a few key lines: the first one larger, the rest small. Supporting records show one line. */
@@ -208,10 +278,39 @@ function renderProjects(){
     const b=document.createElement('button');b.className='project';b.dataset.project=i;b.title=p.repo+(p.root?' / '+p.root:'');
     b.classList.toggle('active',i===current);b.setAttribute('aria-current',i===current?'page':'false');
     b.innerHTML='<span>'+escapeHTML(p.name)+'</span>'+(p.private?icon('lock','icon private-mark'):'')+(twins.has(p.name)?'<small>'+escapeHTML(p.repo+(p.root?' / '+p.root:''))+'</small>':'');
-    b.onclick=()=>{pendingLink=null;selectProject(i)};nav.append(b);
+    b.onclick=()=>{pendingLink=null;toggleWorkspace(false);workspaceToggle.focus();selectProject(i)};nav.append(b);
   });
-  $('#no-projects').hidden=shown!==0||!query.trim();
+  $('#no-projects').hidden=shown!==0||!query.trim();renderRail();
 }
+/* The rail: the project switcher at the top, then the canvases of the open project (Home and each record that is found). */
+const workspaceToggle=$('#workspace-toggle'),workspacePop=$('#workspace-pop');
+function renderRail(){
+  const p=projects[current],where=p?p.repo+(p.root?' / '+p.root:''):'';
+  $('#workspace-name').textContent=p?p.name:'Projects';$('#workspace-repo').textContent=where;workspaceToggle.disabled=!projects.length;
+  workspaceToggle.setAttribute('aria-label',p?'Project: '+p.name+'. Switch project':'Switch project');
+  const nav=$('#canvases'),keys=p?['home',...Object.keys(names).filter(hasCanvas)]:[];
+  if(keys.join()!==[...nav.children].map(b=>b.dataset.canvas).join()){
+    nav.replaceChildren();
+    for(const key of keys){const b=document.createElement('button');b.type='button';b.className='project canvas-link '+key;b.dataset.canvas=key;b.innerHTML=icon(key)+'<span>'+escapeHTML(key==='home'?'Home':titles[key])+'</span>';b.onclick=()=>showCanvas(key);nav.append(b)}
+  }
+  for(const b of nav.children){const on=b.dataset.canvas===canvasKey;b.classList.toggle('active',on);if(on)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')}
+  $('.canvases-nav').hidden=!keys.length;
+}
+function toggleWorkspace(open=workspacePop.hidden){
+  if(open===!workspacePop.hidden)return;
+  workspacePop.hidden=!open;workspaceToggle.setAttribute('aria-expanded',open);
+  if(open){closeMenus();renderProjects();($('.project-search').hidden?$('#projects .active')||$('#projects button'):$('#project-search'))?.focus()}
+  else if($('#project-search').value){$('#project-search').value='';renderProjects()}
+}
+workspaceToggle.onclick=()=>toggleWorkspace();
+$('.workspace').addEventListener('keydown',e=>{
+  if(workspacePop.hidden)return;
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();toggleWorkspace(false);workspaceToggle.focus();return}
+  if(e.key!=='ArrowDown'&&e.key!=='ArrowUp')return;
+  const items=$$('#projects [data-project]'),at=items.indexOf(document.activeElement),down=e.key==='ArrowDown';if(!items.length)return;
+  e.preventDefault();e.stopPropagation();items[at<0?(down?0:items.length-1):(at+(down?1:-1)+items.length)%items.length].focus();
+});
+$('.workspace').addEventListener('focusout',e=>{if(!workspacePop.hidden&&e.relatedTarget&&!e.currentTarget.contains(e.relatedTarget))toggleWorkspace(false)});
 $('#project-search').oninput=renderProjects;$('#project-search').onblur=()=>{if(!$('#project-search').value)renderProjects()};
 function receiveProjects(found){
   const selected=projects[current]?.id;
@@ -259,7 +358,7 @@ const pointers=new Map();let highestLayer=2;
 let selected=new Set(),tool='select';const expandedConnections=new Map(),baseRelations=[],loadingLinks=new Set();
 try{const saved=JSON.parse(localStorage.getItem('horsemen-local-layouts-v1')||'{}');for(const [id,layout] of Object.entries(saved)){const clean={};for(const key of Object.keys(layout)){if(!Object.hasOwn(defaults,key)&&!/^link-[a-f0-9]{24}$/.test(key))continue;const pos=layout[key];if(Array.isArray(pos)&&pos.length===2&&pos.every(n=>Number.isFinite(n)&&Math.abs(n)<1e7))clean[key]=pos}layouts[id]=clean}}catch{}
 function positions(){return layouts[projects[current]?.id || "empty"]??(layouts[projects[current]?.id || "empty"]={})}
-function position(key){return positions()[key]??defaults[key]}
+function position(key){return sectionSpots.get(key)??positions()[key]??defaults[key]}
 function saveLayout(){try{localStorage.setItem('horsemen-local-layouts-v1',JSON.stringify(layouts))}catch{}}
 const wires=document.createElementNS('http://www.w3.org/2000/svg','svg');wires.classList.add('wires');wires.setAttribute('aria-hidden','true');world.prepend(wires);
 const relations=[];
@@ -321,7 +420,7 @@ function installRecordLinks(){
 
 function refreshGraph(){
   const visible=HorsemenCanvas.visibleGraph(Object.keys(names),expandedConnections);
-  for(const node of connectionNodes.values())if(node.element)node.element.hidden=!visible.has(node.id);
+  for(const node of connectionNodes.values())if(node.element)node.element.hidden=canvasKey!=='home'||!visible.has(node.id);
   relations.length=0;
   for(const edge of baseRelations)relations.push(edge);
   for(const [parent,children] of expandedConnections){if(!visible.has(parent))continue;for(const child of children)if(child!==parent&&visible.has(child)&&!relations.some(([a,b])=>a===parent&&b===child))relations.push([parent,child,'links to'])}
@@ -345,11 +444,13 @@ function renderCamera(){const list=world.classList.contains('list');world.style.
 function zoomAt(next,x=canvas.clientWidth/2,y=canvas.clientHeight/2){next=Math.max(.15,Math.min(3.5,next));const wx=(x-camera.x)/camera.z,wy=(y-camera.y)/camera.z;camera={x:x-wx*next,y:y-wy*next,z:next};renderCamera()}
 function fitCanvas(onlySelected=false){if(world.classList.contains('list'))return;const nodes=$$('[data-artifact]').filter(e=>!e.hidden&&(!onlySelected||selected.has(e.dataset.artifact)));if(!nodes.length)return;const minX=Math.min(...nodes.map(e=>position(e.dataset.artifact)[0])),minY=Math.min(...nodes.map(e=>position(e.dataset.artifact)[1])),maxX=Math.max(...nodes.map(e=>position(e.dataset.artifact)[0]+e.offsetWidth)),maxY=Math.max(...nodes.map(e=>position(e.dataset.artifact)[1]+e.offsetHeight));const top=32,bottom=76,room=Math.max(120,canvas.clientHeight-top-bottom),z=Math.max(.15,Math.min(1,(canvas.clientWidth-60)/(maxX-minX),room/(maxY-minY)));/* Keep clear of the zoom control. */camera={x:(canvas.clientWidth-(maxX-minX)*z)/2-minX*z,y:top+(room-(maxY-minY)*z)/2-minY*z,z};renderCamera()}
 function loadCanvas(){gesture=null;pointers.clear();pinch=null;renderPositions();fitCanvas()}
-function setView(list){cancelGesture();world.classList.toggle('list',list);canvas.classList.toggle('list-mode',list);$('#canvas-view').setAttribute('aria-pressed',!list);$('#list-view').setAttribute('aria-pressed',list);renderCamera();drawWires();renderCardToggles()}
+function setView(list){cancelGesture();world.classList.toggle('list',list);canvas.classList.toggle('list-mode',list);$('#canvas-view').setAttribute('aria-pressed',!list);$('#list-view').setAttribute('aria-pressed',list);renderCamera();drawWires();renderCardToggles();if(!list&&needsFit){needsFit=false;fitCanvas()}}
 $('#list-view').onclick=()=>setView(true);$('#canvas-view').onclick=()=>setView(false);
 $('#zoom-out').onclick=()=>zoomAt(camera.z/1.2);$('#zoom-in').onclick=()=>zoomAt(camera.z*1.2);$('#fit').onclick=()=>fitCanvas();
 function resetLayout(){layouts[projects[current]?.id || "empty"]={};saveLayout();arrangeLinked(new Set());loadCanvas();showToast('Layout reset for '+(projects[current]?.name || 'workspace')+'.')}
 function openArtifact(id,button){
+  /* A section card opens the reading view of its record at that section. The card stays selected, so the link names it. */
+  if(sectionNodes.has(id)){if(selected.size!==1||!selected.has(id))setSelection(new Set([id]));return openPeek(canvasKey,button,sectionNodes.get(id).kind==='section'?id:null)}
   if(records[id])return openPeek(id,button);
   const node=connectionNodes.get(id);if(!node)return;
   opener=button;peekTrail=connectionTrail(node.parentId);openConnection(node.link,node.parentId);
@@ -396,8 +497,8 @@ function renderCardToggles(){
 function updateSelection(){
   for(const el of $$('[data-artifact]')){el.classList.toggle('canvas-selected',selected.has(el.dataset.artifact));el.setAttribute('aria-pressed',selected.has(el.dataset.artifact))}
   const id=selected.size===1?[...selected][0]:null,record=records[id]||connectionNodes.get(id)?.record;
-  $('#selection-label').textContent=selected.size===0?'':selected.size>1?selected.size+' records selected.':(record?.name||connectionNodes.get(id)?.link.title||names[id])+' selected. Press Enter to open.';
-  renderCardToggles();
+  $('#selection-label').textContent=selected.size===0?'':selected.size>1?selected.size+' cards selected.':(record?.name||connectionNodes.get(id)?.link.title||sectionNodes.get(id)?.title||names[id])+' selected. Press Enter to open.';
+  renderCardToggles();if(document.body.dataset.state==='ready')syncHash();
 }
 function setTool(next){cancelGesture();tool=next;canvas.dataset.tool=next}
 function openSelected(){const id=selected.size===1?[...selected][0]:null;if(id)openArtifact(id,$('[data-artifact="'+id+'"]'))}
@@ -425,7 +526,9 @@ canvas.addEventListener('pointerdown',e=>{
   if(pan){gesture={id:e.pointerId,kind:'pan',start:pt,camera:{...camera},moved:false};canvas.classList.add('grabbing')}
   else if(node){
     const id=node.dataset.artifact;node.style.zIndex=++highestLayer;setSelection(HorsemenCanvas.hitSelection(selected,id,e.shiftKey));
-    gesture={id:e.pointerId,kind:'move',start:pt,moved:false,origins:Object.fromEntries([...selected].map(key=>[key,[...position(key)]]))};node.focus({preventScroll:true});
+    /* Section cards have fixed places: a drag that starts on one moves the canvas. */
+    const origins=Object.fromEntries([...selected].filter(key=>!sectionSpots.has(key)).map(key=>[key,[...position(key)]]));
+    gesture=Object.keys(origins).length?{id:e.pointerId,kind:'move',start:pt,moved:false,origins}:{id:e.pointerId,kind:'pan',start:pt,camera:{...camera},moved:false};node.focus({preventScroll:true});
   }else{
     const before=e.shiftKey?new Set(selected):new Set();setSelection(before);canvas.focus({preventScroll:true});
     gesture={id:e.pointerId,kind:'marquee',start:pt,moved:false,before};
@@ -439,7 +542,7 @@ window.addEventListener('pointermove',e=>{
   if(!gesture||gesture.id!==e.pointerId)return;
   const dx=pt.x-gesture.start.x,dy=pt.y-gesture.start.y;if(Math.hypot(dx,dy)>4)gesture.moved=true;if(!gesture.moved)return;
   if(gesture.kind==='move'){for(const [id,origin] of Object.entries(gesture.origins))positions()[id]=[origin[0]+dx/camera.z,origin[1]+dy/camera.z];renderPositions()}
-  else if(gesture.kind==='pan'){camera.x=gesture.camera.x+dx;camera.y=gesture.camera.y+dy;renderCamera()}
+  else if(gesture.kind==='pan'){canvas.classList.add('grabbing');camera.x=gesture.camera.x+dx;camera.y=gesture.camera.y+dy;renderCamera()}
   else{
     const left=Math.min(pt.x,gesture.start.x),top=Math.min(pt.y,gesture.start.y),width=Math.abs(dx),height=Math.abs(dy);
     Object.assign(marquee.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});marquee.hidden=false;
@@ -464,7 +567,7 @@ canvas.addEventListener('wheel',e=>{
 },{passive:false});
 window.addEventListener('keydown',e=>{
   if(e.target.closest('dialog,input,textarea,select,[contenteditable=true]')||world.classList.contains('list'))return;
-  if(e.code==='Space'){e.preventDefault();spaceDown=true;canvas.classList.add('pan-ready');return}
+  if(e.code==='Space'){if(e.target.closest('button,a')&&!canvas.contains(e.target))return;/* Space presses a control outside the canvas. */e.preventDefault();spaceDown=true;canvas.classList.add('pan-ready');return}
   if(e.key.toLowerCase()==='h'&&!e.ctrlKey&&!e.metaKey){setTool('hand');return}
   if((e.key.toLowerCase()==='v'||e.key==='1')&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){setTool('select');return}
   if(e.shiftKey&&e.code==='KeyC'&&!e.ctrlKey&&!e.metaKey){e.preventDefault();collapseAll();return}
@@ -473,7 +576,7 @@ window.addEventListener('keydown',e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();setSelection(new Set($$('[data-artifact]').filter(b=>!b.hidden&&!b.disabled).map(b=>b.dataset.artifact)));return}
   if(e.key==='Enter'&&selected.size===1){e.preventDefault();openSelected();return}
   const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
-  if(d){e.preventDefault();const focused=e.target.closest('[data-artifact]');if(e.altKey&&focused)setSelection(new Set([focused.dataset.artifact]));if(selected.size){const step=e.altKey?20:e.shiftKey?10:1;for(const id of selected){const p=position(id);positions()[id]=[p[0]+d[0]*step,p[1]+d[1]*step]}renderPositions();saveLayout()}else{camera.x-=d[0]*60;camera.y-=d[1]*60;renderCamera()}return}
+  if(d){e.preventDefault();const focused=e.target.closest('[data-artifact]');if(e.altKey&&focused)setSelection(new Set([focused.dataset.artifact]));const movable=[...selected].filter(id=>!sectionSpots.has(id));if(movable.length){const step=e.altKey?20:e.shiftKey?10:1;for(const id of movable){const p=position(id);positions()[id]=[p[0]+d[0]*step,p[1]+d[1]*step]}renderPositions();saveLayout()}else{camera.x-=d[0]*60;camera.y-=d[1]*60;renderCamera()}return}
   if(e.shiftKey&&e.code==='Digit1'){e.preventDefault();fitCanvas();return}
   if(e.shiftKey&&e.code==='Digit2'){e.preventDefault();fitCanvas(true);return}
   if(['+','=','-','0'].includes(e.key)){e.preventDefault();if(e.key==='0')zoomAt(1);else zoomAt(camera.z*(e.key==='-'?1/1.2:1.2))}
@@ -498,8 +601,9 @@ for(const menu of [accountMenu,$('#peek-menu')])menu.addEventListener('keydown',
   else if(e.key==='Home'||e.key==='End'){e.preventDefault();e.stopPropagation();items[e.key==='Home'?0:items.length-1]?.focus()}
   else if(e.key==='Tab')toggleMenu(menu,false);
 });
-$('#menu-toggle').onclick=()=>toggleMenu(accountMenu);
+$('#menu-toggle').onclick=()=>{toggleWorkspace(false);toggleMenu(accountMenu)};
 document.addEventListener('pointerdown',e=>{
+  if(!workspacePop.hidden&&!e.target.closest('.workspace'))toggleWorkspace(false);
   if(!accountMenu.hidden&&!e.target.closest('#menu,#menu-toggle'))toggleMenu(accountMenu,false);
   if(!$('#peek-menu').hidden&&!e.target.closest('#peek-menu,#peek-more'))toggleMenu($('#peek-menu'),false);
 });
@@ -566,17 +670,18 @@ window.addEventListener('keydown',e=>{if(e.key==='?'&&!e.ctrlKey&&!e.metaKey&&!e
 const palette=$('#palette');let paletteShown=[],paletteAt=0;
 function paletteItems(){
   const items=[],leave=()=>{if($('#peek').open)$('#peek').close()},list=world.classList.contains('list'),one=selected.size===1?[...selected][0]:null;
-  for(const key of readable())items.push({group:'Records',icon:key,label:titles[key],hint:names[key],run:()=>openPeek(key,$('[data-artifact="'+key+'"]'))});
+  for(const key of readable())items.push({group:'Records',icon:key,label:titles[key],hint:names[key],run:()=>openPeek(key,recordOpener(key))});
+  if(projects[current])for(const key of ['home',...readable()])if(key!==canvasKey)items.push({group:'Canvases',icon:key,label:key==='home'?'Home canvas':titles[key]+' canvas',hint:key==='home'?'Records':'Sections',run:()=>{leave();showCanvas(key)}});
   for(const node of connectionNodes.values())if(node.element&&!node.element.hidden)items.push({group:'Linked documents',icon:kindIcon(node.link.kind),label:node.link.title,hint:node.link.path||node.link.href,run:()=>openArtifact(node.id,node.element)});
   projects.forEach((p,i)=>{if(i!==current)items.push({group:'Projects',icon:'layers',label:p.name,hint:p.repo+(p.root?' / '+p.root:''),run:()=>{leave();pendingLink=null;selectProject(i)}})});
   const canvasOnly=run=>()=>{leave();setView(false);run()};
   items.push({group:'Actions',icon:list?'canvas':'list',label:list?'Show the canvas':'Show the list',hint:'View',run:()=>{leave();setView(!list)}});
-  if(one)items.push({group:'Actions',icon:'expand',label:'Open the selected record',hint:'Enter',run:()=>{leave();openSelected()}});
+  if(one)items.push({group:'Actions',icon:'expand',label:'Open the selected card',hint:'Enter',run:()=>{leave();openSelected()}});
   items.push({group:'Actions',icon:'fit',label:'Fit all cards',hint:'Shift + 1',run:canvasOnly(()=>fitCanvas())},
     {group:'Actions',icon:'select',label:'Select tool',hint:'V',run:canvasOnly(()=>setTool('select'))},
     {group:'Actions',icon:'hand',label:'Hand tool',hint:'H',run:canvasOnly(()=>setTool('hand'))},
     {group:'Actions',icon:'collapse',label:'Collapse all linked branches',hint:'Shift + C',run:()=>{leave();collapseAll()}},
-    {group:'Actions',icon:'reset',label:'Reset layout',hint:'Canvas',run:canvasOnly(resetLayout)},
+    ...(canvasKey==='home'?[{group:'Actions',icon:'reset',label:'Reset layout',hint:'Canvas',run:canvasOnly(resetLayout)}]:[]),
     {group:'Actions',icon:'keyboard',label:'Keyboard shortcuts',hint:'?',run:openShortcuts},
     {group:'Actions',icon:'refresh',label:'Refresh GitHub',hint:'Scan again',run:()=>{leave();scan()}},
     {group:'Actions',icon:'clear',label:'Clear workspace',hint:copy('Remove the scan from memory','Remove the scan from this tab'),run:()=>{leave();clearWorkspace()}});

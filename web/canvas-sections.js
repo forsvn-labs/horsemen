@@ -34,7 +34,7 @@
   }
   const clip=line=>line.slice(0,260);
   /* A few key lines from the source: text first; a table gives its first column; a code block gives its first lines. */
-  function excerpt(body){
+  function excerpt(body,title=''){
     const tidy=P.tidy(body||''),outside=[],inside=[];let fence=false,diagram=false,drawn=false;
     for(const line of tidy.split('\n')){
       if(/^\s*```/.test(line)){fence=!fence;diagram=fence&&/^\s*```\s*mermaid\b/i.test(line);if(diagram)drawn=true;continue}
@@ -43,23 +43,25 @@
     }
     const table=P.toolsTable(outside.join('\n')),prose=P.lines(outside.filter(line=>!/^\s*\|/.test(line)).join('\n'));
     const first=table.rows.map(row=>row[0]).filter(Boolean).join(' · ');
-    const lines=prose.length?prose:first?[first]:inside.length?inside:drawn?['Diagram']:[];
+    /* A heading that only wraps later sections in a disclosure: its label, when it says more than the heading. */
+    const label=P.plain(String(body||'').match(/^<summary>(.*?)<\/summary>\s*$/m)?.[1]||'');
+    const lines=prose.length?prose:first?[first]:inside.length?inside:drawn?['Diagram']:label&&slug(label)!==slug(title)?[label]:[];
     const shape=P.shape(outside.join('\n'));
-    const meta=shape.kind==='list'?shape.count+(shape.count===1?' item':' items'):shape.kind==='table'?shape.count+(shape.count===1?' row':' rows'):'';
+    const meta=shape.count<2?'':shape.kind==='list'?shape.count+' items':shape.kind==='table'?shape.count+' rows':'';
     return {lead:clip(lines[0]||''),lines:lines.slice(1,3).map(clip),meta,empty:!lines.length};
   }
   /* The canvas of one record. A record without sections is one card for the whole record. */
   function canvas(key,markdown){
     if(!Object.hasOwn(TITLES,key))return {key,nodes:[],edges:[]};
     const text=String(markdown??''),sections=parse(text);
-    const cards=sections.length?sections.map(s=>({id:s.id,kind:'section',title:s.title,line:s.line,...excerpt(s.body)}))
+    const cards=sections.length?sections.map(s=>({id:s.id,kind:'section',title:s.title,line:s.line,...excerpt(s.body,s.title)}))
       :text.trim()?[{id:'r-'+key,kind:'record',title:TITLES[key],line:1,...excerpt(text.split('\n').filter(line=>!/^#\s/.test(line)).join('\n'))}]:[];
     const spots=layout(cards.length);
     return {key,nodes:cards.map((card,i)=>({...card,x:spots[i][0],y:spots[i][1],width:CARD.width,height:CARD.height})),edges:[]};
   }
   /* The inside of a card button. Record text is escaped; only the tags written here reach the page. */
   function cardHTML(node){
-    const body=node.empty?'<span class="card-note">'+(node.kind==='record'?'This record is empty.':'This section is empty.')+'</span>'
+    const body=node.empty?'<span class="card-note">'+(node.kind==='record'?'This record is empty.':'No text under this heading.')+'</span>'
       :'<span class="card-lead">'+esc(node.lead)+'</span>'+node.lines.map(line=>'<span class="card-line">'+esc(line)+'</span>').join('')+(node.meta?'<span class="card-meta">'+esc(node.meta)+'</span>':'');
     return '<span class="cardhead"><b>'+esc(node.title)+'</b></span><span class="cardbody">'+body+'</span>';
   }

@@ -77,7 +77,7 @@ assert.ok(!JSON.stringify(before).match(/<details|<summary|<\/details/), 'no dis
 assert.equal(node('s-shipped').lead, 'Search (2026-11-18): Search is available.');
 assert.deepEqual(node('s-shipped').lines, ['Export (2026-11-12): Boards save as PDF.']);
 assert.equal(node('s-shipped').meta, '2 items');
-assert.equal(node('s-in-progress').meta, '1 item');
+assert.equal(node('s-in-progress').meta, '', 'a count of one is not shown');
 assert.equal(node('s-upcoming-roadmap').meta, '');
 assert.ok(before.nodes.every(n => n.kind === 'section' && n.width === S.CARD.width && n.height === S.CARD.height));
 const tools = S.canvas('techstack', '# Tech stack\n## Tools\n| Tool | Purpose |\n| --- | --- |\n| Python 3.10+ | Local reader |\n| GitHub CLI | Read records |\n## Runtime\n```mermaid\nflowchart LR\n  A --> B\n```\n## Map\n```text\napp/ — workspace\ndocs/ — notes\n```\n## Empty\n\n## Screens\n![Pilot board](img/board.png)\n');
@@ -88,6 +88,11 @@ assert.equal(tools.nodes[2].lead, 'app/ — workspace', 'a code block shows its 
 assert.equal(tools.nodes[3].lead, ''); assert.equal(tools.nodes[3].empty, true, 'an empty section still has a card');
 assert.equal(tools.nodes[4].lead, 'Pilot board', 'an image shows its text');
 assert.ok(tools.nodes.every(n => n.lead.length <= 260 && n.lines.length <= 2 && n.lines.every(l => l.length <= 260)));
+
+/* A heading that only wraps the sections after it shows the label of its disclosure, when the label says more than the heading. */
+const wrapper = S.canvas('progress', '## Latest day\n\n<details open>\n<summary>Latest day · 2026-11-18</summary>\n\n## Shipped\n- One\n\n</details>\n\n## Historical ships\n\n<details>\n<summary>Historical ships</summary>\n\n### 2026-11-10\n\n</details>\n');
+assert.deepEqual([wrapper.nodes[0].lead, wrapper.nodes[0].empty], ['Latest day · 2026-11-18', false]);
+assert.deepEqual([wrapper.nodes[2].lead, wrapper.nodes[2].empty], ['', true], 'a label that repeats the heading adds nothing');
 
 /* A record without sections: one card for the whole record. A missing record: no cards. */
 const whole = S.canvas('readme', '# Pilot app\n\nA fictional app for operators.\n\nRun it with one command.');
@@ -104,7 +109,7 @@ assert.ok(!/<img|<script/.test(html), 'record text never becomes markup');
 assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;') || !html.includes('onerror=alert(1)>'), 'the title is escaped');
 assert.match(html, /class="cardhead"[^]*class="cardbody"/, 'a section card has the same parts as a record card');
 assert.match(S.cardHTML(node('s-shipped')), /<b>Shipped<\/b>[^]*class="card-lead">Search \(2026-11-18\): Search is available\.<[^]*class="card-line">Export[^]*class="card-meta">2 items</);
-assert.match(S.cardHTML(tools.nodes[3]), /class="card-note">This section is empty\.</);
+assert.match(S.cardHTML(tools.nodes[3]), /class="card-note">No text under this heading\.</);
 assert.ok(!S.cardHTML(node('s-upcoming-roadmap')).includes('card-meta'), 'no count line without a count');
 assert.equal(S.cardLabel(node('s-shipped')), 'Open section: Shipped');
 assert.equal(S.cardLabel(whole.nodes[0]), 'Open README');
