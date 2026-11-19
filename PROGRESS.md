@@ -7,7 +7,7 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Review and merge slice 1 of the canvas workspace, deploy it, then use it on three real projects for one week and record which you open first: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
+Next action: Merge and deploy slice 1 of the canvas workspace, then build slice 2a (canvas files shown in the browser). The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
 
 ## Shipped
 
@@ -61,7 +61,7 @@ Next action: Review and merge slice 1 of the canvas workspace, deploy it, then u
 
 Existing installations do not change until refreshed. The local workspace stays a source preview. The hosted viewer is read-only and stores no project data. Public view covers public repositories only; private repositories need sign-in.
 
-Canvas workspace: slice 1 is built but not merged or deployed. It is read-only: no canvas file, no new GitHub permission, and no writes. Do not start slice 2 before the owner records the result of the one-week test.
+Canvas workspace: slice 1 is built but not merged or deployed. It is read-only: no canvas file, no new GitHub permission, and no writes. The owner chose to build all slices without waiting for the one-week test.
 
 </details>
 
