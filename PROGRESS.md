@@ -80,7 +80,7 @@ Earlier personal installations are not public releases of this repository.
 <details>
 <summary>Upcoming roadmap</summary>
 
-- Use the local GitHub reader, then decide the scope for hosted sign-in and public sharing.
+- Hosted viewer at horsemen.forsvn.com: read-only, reads records from Git, and stores none of their data. A plan with GitHub App sign-in and no database waits for owner approval.
 - Gather feedback on the existing skill and CLI while developing the visual workspace.
 - Safe automatic writes remain separate future work, with no promised date.
 
