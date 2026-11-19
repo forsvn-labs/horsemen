@@ -19,7 +19,7 @@ Then use one command, with a new output directory each time:
 .venv/bin/python -B scripts/verify.py --output /tmp/horsemen-verification
 ```
 
-It runs unit tests, source CLI tests, existing hook scenarios, a wheel build,
+It needs Node.js 20 or later for the hosted viewer tests. It runs unit tests, hosted viewer tests, source CLI tests, existing hook scenarios, a wheel build,
 installed CLI tests, and hook scenarios from the unpacked skill. The result
 directory contains logs, `verification.json`, the CLI wheel, and a skill ZIP
 with a file manifest. Builds and tests use temporary projects. They do not
