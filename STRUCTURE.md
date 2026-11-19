@@ -24,9 +24,10 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   ├── REVIEW.md           Design decisions and remaining boundaries
 │   ├── references/         Templates and focused workflows
 │   └── scripts/            Compatibility hooks, provider helpers, tests
-│       └── horsemen_core/  Shared checker, CLI, local editor, and GitHub reader
+│       └── horsemen_core/  Shared checker, CLI, local editor, GitHub reader, canvas format (`canvas.py`), agent tools (`agent_tools.py`), and local MCP server (`mcp.py`)
 ├── scripts/                Build and end-to-end verification
-├── tests/                  Distribution regression tests
+├── tests/                  Distribution, GUI, canvas format, agent tool, and MCP server tests
+│   └── fixtures/canvas/    Shared canvas cases for the Python and JavaScript readers, with a fictional project
 ├── pyproject.toml          CLI packaging; version comes from shared source
 ├── CONTRIBUTING.md         Setup, verification, and release procedure
 ├── .impeccable/            Impeccable design-check settings (one intended-colour exception)
@@ -47,6 +48,10 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Hosted speed benchmark: `python3 scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench`.
 - Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
+- Canvas format cases: `python3 -B -m unittest tests.test_canvas_format`; add `HORSEMEN_SCHEMA_CHECK=1` to compare with the JSON Schema (needs `uvx`). The [case contract](tests/fixtures/canvas/README.md) is for both languages.
+- Agent tool tests: `python3 -B -m unittest tests.test_canvas_edit tests.test_canvas_read tests.test_mcp_server` and `python3 -B horsemen/scripts/test_canvas_cli.py`.
+- Read a workspace with few tokens: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core show`; edit a canvas: `... canvas apply NAME --ops FILE`; see the [canvas guide](horsemen/references/canvas.md).
+- Run the local MCP server: `python3 -B horsemen/scripts/horsemen.py mcp` (stdio). `mcp install` changes agent settings; use it only for your own setup.
 - Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.

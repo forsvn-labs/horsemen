@@ -52,7 +52,7 @@ def main():
         # Hosted viewer: reader parity with Python, and the Worker's auth and proxy rules.
         if not shutil.which("node"): raise RuntimeError("hosted-tests need Node.js 20 or later")
         run("hosted-tests", ["node", "--test", "tests/test_hosted_reader.cjs", "worker/test/worker.test.js"])
-        for suite in ("test_cli", "test_documents", "test_progress_layout", "test_techstack", "test_commands",
+        for suite in ("test_cli", "test_canvas_cli", "test_documents", "test_progress_layout", "test_techstack", "test_commands",
                       "test_brain", "test_records", "test_drive_adapter"):
             run(suite, [sys.executable, "-B", f"horsemen/scripts/{suite}.py"])
         run("source-hooks", [sys.executable, "-B", "horsemen/scripts/e2e.py", "--output", str(output / "source-hooks.json")])
@@ -75,6 +75,9 @@ def main():
             cli = temp / "venv/bin/horsemen"
             run("wheel-install", [str(python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel)])
             run("installed-cli", [sys.executable, "-B", str(ROOT / "horsemen/scripts/test_cli.py")],
+                cwd=temp, extra={"HORSEMEN_CLI": str(cli)})
+            # The wheel must hold the canvas format, the agent tools, and the MCP server.
+            run("installed-canvas-cli", [sys.executable, "-B", str(ROOT / "horsemen/scripts/test_canvas_cli.py")],
                 cwd=temp, extra={"HORSEMEN_CLI": str(cli)})
             installed_version = run("installed-version", [str(cli), "--version"], cwd=temp).strip()
             if installed_version != receipt["version"]:

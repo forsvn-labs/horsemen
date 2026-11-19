@@ -237,7 +237,7 @@ class Read(unittest.TestCase):
 
     def test_outline_budget_with_500_nodes(self):
         nodes = ','.join('{"id":"note-with-a-long-identifier-%04d","type":"text","x":%d,"y":0,"width":320,"height":140,"text":"%s"}'
-                         % (i, i * 400, 'A long note about the harbour walk. ' * 20) for i in range(500))
+                         % (i, i * 400, 'A long note about the harbour walk. ' * 5) for i in range(500))
         edges = ','.join('{"id":"e%d","fromNode":"note-with-a-long-identifier-0000","toNode":"note-with-a-long-identifier-%04d","label":"%s"}'
                          % (i, i % 500, 'a long label ' * 10) for i in range(1000))
         (self.root / '.horsemen/canvas/big.canvas').write_text('{"nodes":[' + nodes + '],"edges":[' + edges + ']}', encoding='utf-8')

@@ -49,6 +49,7 @@ A `build` input joins its parts in order:
 ## Read and check, in this order
 
 A check returns at most 20 errors. Steps 1 to 7 stop at the first error.
+Steps 10 and 11 run only when steps 1 to 9 gave no error.
 
 1. More than 524,288 bytes: `file is larger than 512 KiB`.
 2. Not UTF-8: `file is not valid UTF-8`. One byte order mark at the start is
@@ -130,7 +131,10 @@ All errors of steps 1 to 9 have the code `canvas-invalid`.
 
 The caller gives a lookup from a project path to a regular file inside the
 project: its size, and its text when it is Markdown. A folder, a missing
-file, and a link that leaves the project are all "does not exist".
+file, a path with an empty part (`a//b`, `a/`), and a link that leaves the
+project are all "does not exist". The extension of a path is the text from
+the last `.` of the file name, in lower case, when that `.` is not the first
+character of the name.
 
 For a `file` node, check `file`. For a `group` node, check `background` when
 present. The first rule that fails ends the checks for that key.

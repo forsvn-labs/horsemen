@@ -306,24 +306,24 @@
   },
   {
    "name": "valid-512-kib",
-   "note": "A file of exactly 524,288 bytes is read.",
+   "note": "A canonical file of exactly 524,288 bytes is read.",
    "input": {
     "build": [
      {
-      "text": "{\"pad\":\""
+      "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[],\n\"edges\":[],\n\"pad\":\""
      },
      {
       "repeat": "x",
-      "count": 524278
+      "count": 524225
      },
      {
-      "text": "\"}"
+      "text": "\"\n}\n"
      }
     ]
    },
    "expect": {
     "errors": [],
-    "canonical": false
+    "canonical": true
    },
    "schema": true
   },
@@ -862,6 +862,30 @@
      {
       "code": "canvas-invalid",
       "message": "node p16: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "hostile-path-line-separator",
+   "note": "Hostile: a \"..\" part after a line separator. A pattern whose \".\" stops at a line separator misses it.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"a\",\"type\":\"file\",\"x\":0,\"y\":0,\"width\":320,\"height\":160,\"file\":\"a\\u2028/../b.md\"},{\"id\":\"b\",\"type\":\"group\",\"x\":0,\"y\":0,\"width\":320,\"height\":160,\"background\":\"a\\u2029/../../b.png\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b: background must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
      }
     ]
    },
@@ -1469,14 +1493,14 @@
    "input": {
     "build": [
      {
-      "text": "{\"pad\":\""
+      "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[],\n\"edges\":[],\n\"pad\":\""
      },
      {
       "repeat": "x",
-      "count": 524279
+      "count": 524226
      },
      {
-      "text": "\"}"
+      "text": "\"\n}\n"
      }
     ]
    },

@@ -14,6 +14,7 @@ All behavior lives in one dependency-free script, `scripts/horsemen.py`
 | `horsemen.py hook session-start` | `SessionStart` hook | Compact orientation for the agent |
 | `horsemen.py hook stop` | `Stop` hook | Requests the four-record task review, with any detected drift |
 | `horsemen.py hooks install\|uninstall\|status` | People, once per machine | Installs, removes, or checks the two hooks and their script targets for Claude Code and Codex |
+| `horsemen.py show`, `canvas apply`, `mcp` | Agents and people | Short reads, canvas edits, and the local MCP server; see [canvases](canvas.md) |
 | `scripts/e2e.py --output FILE` | Maintainers | Scenario validation with a JSON receipt |
 
 ## Hook contract
@@ -223,6 +224,13 @@ covers each one marked with a test ID.
 | C5l | Pattern nodes (`*.png`, `<slug>/`, `...`) | Skipped |
 | C5m | A `mermaid` block in STRUCTURE | Not parsed as a tree |
 | C5n | A file node under a file, or a node after a description with a slash | Only the first token of each line is a path |
+| C18 | A canvas file in `.horsemen/canvas/` is valid and in canonical form | No finding; a project without canvases gets no new finding |
+| C19 | A canvas file is valid but another tool wrote it in its own layout | Warning (`canvas-not-canonical`) |
+| C20 | A canvas file is not JSON, has conflict markers, or breaks a format rule | Error (`canvas-invalid`) |
+| C21 | A card names a heading or a file that is gone, or an edge end names no node | Error (`canvas-dangling-ref`) |
+| C22 | A media file is over 1 MiB, or its content is not its type | Error (`canvas-media-too-large`, `canvas-invalid`) |
+| C23 | A canvas file has a bad name, or the project has more than 20 canvas files | Error (`canvas-invalid`) |
+| C24 | A canvas file or folder is a link out of the project | Error; the target is not read |
 | I1 | Install on a config file with mode 0600 | Mode kept; new files created 0600 |
 | I2 | Hook command and the macOS `/usr/bin/python3` stub | Use an absolute python3; never the stub |
 
@@ -258,6 +266,7 @@ temporary project. A hook count alone is not proof of a working install.
 - Structure drift covers folders at depth 1 and 2. A moved file inside an
   unchanged folder is not detected; `check` still catches its broken path in
   STRUCTURE.
+- The hooks do not read canvas files. Run `check` after a canvas edit.
 - The check does not judge meaning. A VISION that contradicts PROGRESS needs
   the agent's review, which the vision rule requests.
 

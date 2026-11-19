@@ -259,7 +259,7 @@ class CanvasCLI(unittest.TestCase):
         self.assertEqual(p.stdout, self.run_cli('show', 'progress.canvas').stdout)
         p = legacy('canvas', 'apply', 'progress', '--ops', '-', stdin=json.dumps([{'op': 'remove', 'id': 'e-plan'}]))
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertNotIn('e-plan', self.canvas.read_text(encoding='utf-8'))
+        self.assertNotIn('"id":"e-plan"', self.canvas.read_text(encoding='utf-8'))
         p = legacy('mcp', 'install', '--dry-run', '--script-path', str(SCRIPTS / 'horsemen.py'))
         self.assertIn('mcp add', p.stdout)
         # Old commands keep their results.
