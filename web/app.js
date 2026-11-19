@@ -4,7 +4,7 @@ const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structur
 let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
 /* Canvases: Home shows the records; each record has a generated canvas of its sections.
    Section cards have fixed places from HorsemenSections; nothing about them is saved. */
-let canvasKey='home',needsFit=false;const sectionSpots=new Map(),sectionNodes=new Map(),lastCanvas=new Map(),cameras=new Map();
+let canvasKey='home',needsFit=false,shownProject=null;const sectionSpots=new Map(),sectionNodes=new Map(),lastCanvas=new Map(),cameras=new Map();
 const session=$('meta[name="horsemen-session"]').content;
 const titles={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Structure',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
 const icon=(name,cls='icon')=>'<svg class="'+cls+'" aria-hidden="true"><use href="/assets/icons/'+(name.startsWith('seal-')?'seals':'icons')+'.svg#'+name+'"/></svg>';
@@ -241,8 +241,8 @@ function showCanvas(key,node=null){
 }
 async function selectProject(index){
   /* The canvas to show: the one a link names, the one open before a reload of the same project, or the last one of this project. */
-  const keep=projects[index]&&projects[index].id===projects[current]?.id?viewState():null;
-  clearRecords();const version=request;current=index;const p=projects[index],link=linkMatches(p)?pendingLink:null;
+  const keep=shownProject&&projects[index]?.id===shownProject?viewState():null;
+  clearRecords();const version=request;current=index;const p=projects[index],link=linkMatches(p)?pendingLink:null;shownProject=p.id;
   const wanted=link?{canvas:link.c,node:link.n}:keep||{canvas:lastCanvas.get(p.id)||null,node:null};
   canvasKey=wanted.canvas||'home';cameras.clear();buildCanvas();renderHeader();setPrivacy(p);renderRail();
   $$('[data-project]').forEach(b=>{const on=+b.dataset.project===index;b.classList.toggle('active',on);b.setAttribute('aria-current',on?'page':'false')});
@@ -329,7 +329,7 @@ function showStatus(state,suffix){
 }
 const scanning=on=>{document.body.dataset.scan=on?'running':'done'};
 async function scan(){
-  const run=++scanRun;clearRecords();projects=[];renderProjects();$('#connect').disabled=true;setPrivacy(null);
+  const run=++scanRun;shownProject=null;canvasKey='home';clearRecords();projects=[];renderProjects();$('#connect').disabled=true;setPrivacy(null);
   $('#project-name').textContent='Finding your projects';$('#project-description').textContent=copy('Reading default branches. Your files stay on this machine.','Reading default branches. Horsemen stores none of your project data.');
   document.body.dataset.state='scanning';scanning(true);$('#scan-status').textContent='Connecting to GitHub…';
   try{
@@ -344,7 +344,7 @@ async function scan(){
   finally{if(run===scanRun)$('#connect').disabled=false}
 }
 async function clearWorkspace(){
-  scanRun++;clearRecords();projects=[];renderProjects();await api('/api/clear','POST');scanning(false);
+  scanRun++;shownProject=null;canvasKey='home';clearRecords();projects=[];renderProjects();await api('/api/clear','POST');scanning(false);
   $('#connect').disabled=false;$('#issues').textContent='';$('#issues').hidden=true;$('#scan-summary').textContent='';setPrivacy(null);
   $('#project-name').textContent='Workspace cleared';$('#project-description').textContent='Refresh GitHub to load your projects again.';
   $('#scan-status').textContent=copy('Local memory cleared. GitHub sign-in is unchanged.','Workspace cleared from this tab. You are still signed in.');

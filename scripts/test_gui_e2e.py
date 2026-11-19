@@ -355,11 +355,11 @@ try:
     assert value(place)=='&c=progress&n=s-gates&r=progress', 'The address keeps the canvas, the card, and the open record'
     browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
     browser('screenshot',str(args.output/'canvas-reading-view.png'))
-    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-gates"')
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-gates" && !location.hash.includes("&r=")')
     assert value('JSON.stringify(location.hash.endsWith("&c=progress&n=s-gates"))') is True, 'Closing returns focus to the card and the address to the canvas'
     browser('dblclick','[data-node="s-shipped"]');browser('wait','#peek[open]')
     assert value('JSON.stringify(document.querySelector("#peek-content").dataset.mode)')=='overview' and at_section('Shipped') is True, 'A section the layout names opens in that layout'
-    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-shipped"')
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-shipped" && !location.hash.includes("&r=")')
     # Keyboard: a canvas from the rail, then a card. Enter selects; Enter again opens; Escape returns.
     browser('focus','[data-canvas="vision"]');browser('press','Enter')
     assert value('JSON.stringify([canvasKey,document.querySelector("#project-name").textContent,document.activeElement.dataset.canvas])')==['vision','Vision','vision'], 'Enter on a rail item opens its canvas and keeps focus'
@@ -370,7 +370,7 @@ try:
     assert value(shown)==['vision',['s-who-we-build-for'],False], 'Enter selects the focused card'
     browser('press','Enter');browser('wait','#peek[open]')
     assert at_section('Who we build for') is True
-    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-who-we-build-for"')
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-who-we-build-for" && !location.hash.includes("&r=")')
     browser('press','Escape')
     assert value(shown)==['vision',[],False] and value(place)=='&c=vision', 'Escape clears the selection and the address'
     # List view of a canvas: the same cards in reading order; one click opens.
@@ -379,7 +379,7 @@ try:
     assert [o[0] for o in order]==value('JSON.stringify(HorsemenSections.parse(records.vision.content).map(s=>s.id))') and [o[1] for o in order]==sorted(o[1] for o in order), 'The list shows the sections in reading order'
     browser('click','[data-node="s-why-we-exist"]');browser('wait','#peek[open]')
     assert value(place)=='&c=vision&n=s-why-we-exist&r=vision' and at_section('Why we exist') is True, 'One click in the list opens the section'
-    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-why-we-exist"');browser('click','#canvas-view')
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-why-we-exist" && !location.hash.includes("&r=")');browser('click','#canvas-view')
     assert value('JSON.stringify([...document.querySelectorAll(".section-card")].every(e=>{const r=e.getBoundingClientRect(),c=document.querySelector(".canvas").getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom}))') is True, 'A canvas first seen as a list fits the screen when it opens'
     # Links: a reload returns to the same canvas, card, and record. A link from before canvases still opens its record on Home.
     browser('click','[data-canvas="progress"]');browser('click','[data-node="s-shipped"]')
@@ -391,7 +391,7 @@ try:
     assert value(shown)==['progress',['s-shipped'],True] and at_section('Shipped') is True, 'A reload returns to the open section'
     browser('click','[data-record="brain"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Brain"')
     assert value(place)=='&c=progress&n=s-shipped&r=brain', 'Another record can open over a canvas'
-    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-shipped"')
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-shipped" && !location.hash.includes("&r=")')
     pid=value('JSON.stringify(projects[current].id)')
     def go(tail):
         browser('eval',f'location.hash="#p={pid}{tail}";location.reload()');browser('wait','--fn','document.body.dataset.state === "ready"')
