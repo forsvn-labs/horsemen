@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Canvas workspace mock · Horsemen</title>
+<style>
+:root{--paper:#f2ede3;--card:#fbf8f2;--ink:#1f1b16;--muted:#5d554a;--rule:#d6ccbb;--accent:#8a6a1f;--shade:rgba(31,27,22,.08);
+--c1:#b3402a;--c2:#b86a1e;--c3:#a8861a;--c4:#4d7a4a;--c5:#2f7f86;--c6:#6a4c93;--title:Georgia,"Times New Roman",serif;--ui:system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root{--paper:#16130f;--card:#1e1a15;--ink:#efe7d8;--muted:#b3a893;--rule:#3a332a;--accent:#d9b25a;--shade:rgba(0,0,0,.4);
+--c1:#e07a63;--c2:#e09a52;--c3:#d6b84f;--c4:#8fbf8a;--c5:#6fc1c8;--c6:#b094d6}}
+*{box-sizing:border-box}html,body{height:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.5 var(--ui);display:flex;flex-direction:column}
+button{font:inherit;color:inherit;background:none;border:1px solid var(--rule);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:36px}
+button:hover{background:var(--shade)}button[aria-pressed=true],button.primary{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+button:disabled{opacity:.45;cursor:default}:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+a{color:inherit;text-underline-offset:3px}
+.flag{background:var(--ink);color:var(--paper);font-size:13px;padding:6px 16px;text-align:center}
+.app{flex:1;min-height:0;display:grid;grid-template-columns:248px 1fr}
+.side{border-right:1px solid var(--rule);padding:14px 12px;display:flex;flex-direction:column;gap:6px;overflow:auto;position:relative}
+.ws{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 10px;background:var(--card)}
+.ws b{display:block;font:600 15px var(--ui)}.ws small{display:block;color:var(--muted);font-size:12px}.ws .chev{margin-left:auto;color:var(--muted)}
+.pop{position:absolute;left:12px;right:12px;top:66px;background:var(--card);border:1px solid var(--rule);border-radius:10px;box-shadow:0 10px 30px var(--shade);padding:6px;z-index:5}
+.pop button{display:block;width:100%;text-align:left;border:0;padding:8px 10px}.pop small{color:var(--muted)}.pop hr{border:0;border-top:1px solid var(--rule);margin:6px 0}
+.label{margin:14px 10px 4px;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:0;padding:7px 10px}
+.item[aria-current=page]{background:var(--shade);font-weight:600}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}.item .tag{margin-left:auto}
+.tag{font-size:11px;color:var(--muted);border:1px solid var(--rule);border-radius:999px;padding:0 7px;white-space:nowrap}
+.foot{margin-top:auto;padding:10px;color:var(--muted);font-size:13px}
+main{min-width:0;min-height:0;display:flex;flex-direction:column}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--rule)}
+header h1{font:400 26px/1.1 var(--title);margin:0}header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+header .actions{margin-left:auto;display:flex;flex-wrap:wrap;gap:8px;align-items:center}.seg{display:flex}.seg button:first-child{border-radius:8px 0 0 8px}.seg button:last-child{border-radius:0 8px 8px 0;border-left:0}
+.stage{flex:1;min-height:0;position:relative;overflow:hidden;cursor:grab;touch-action:none;background-image:radial-gradient(var(--rule) 1px,transparent 1px);background-size:24px 24px}
+.stage.panning{cursor:grabbing}.world{position:absolute;left:0;top:0;transform-origin:0 0}
+#wires{position:absolute;left:0;top:0;overflow:visible;pointer-events:none;z-index:2}#wires path{fill:none;stroke:var(--muted);stroke-width:1.5}
+#wires text{font:12px var(--ui);fill:var(--ink);text-anchor:middle;dominant-baseline:middle}#wires rect{fill:var(--paper)}
+.node{position:absolute;background:var(--card);border:1px solid var(--rule);border-radius:10px;box-shadow:0 1px 3px var(--shade);overflow:hidden;display:flex;flex-direction:column;--c:var(--rule)}
+.node[data-c="1"]{--c:var(--c1)}.node[data-c="2"]{--c:var(--c2)}.node[data-c="3"]{--c:var(--c3)}.node[data-c="4"]{--c:var(--c4)}.node[data-c="5"]{--c:var(--c5)}.node[data-c="6"]{--c:var(--c6)}
+.node[data-c]{border-top:4px solid var(--c)}.node{z-index:1}.node.group{z-index:0}.node.auto{border-style:dashed}.node.hit{outline:3px solid var(--accent);outline-offset:3px}
+.editing .node{cursor:move}.node.group{background:color-mix(in srgb,var(--card) 45%,transparent);border-style:dashed;box-shadow:none}
+.node.group>b{position:absolute;left:12px;top:8px;font:600 12px var(--ui);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.node.note{background:color-mix(in srgb,var(--c) 14%,var(--card))}
+.head{display:flex;align-items:center;gap:8px;padding:8px 12px 0;font-size:12px;color:var(--muted)}.head b{color:var(--ink);font:600 15px var(--ui)}.head .tag{margin-left:auto}
+.body{padding:6px 12px 10px;overflow:hidden;flex:1;min-height:0}.body p{margin:0 0 6px}.body ul{margin:0 0 6px;padding-left:18px}
+.node .more{border:0;border-top:1px solid var(--rule);border-radius:0;font-size:13px;color:var(--muted);text-align:left;padding:4px 12px;min-height:30px}
+.node img{width:100%;height:100%;object-fit:contain;display:block;flex:1;min-height:0}.cap{font-size:12px;color:var(--muted);padding:4px 12px;border-top:1px solid var(--rule)}
+.embed{flex:1;display:grid;place-items:center;text-align:center;gap:6px;padding:12px;background:color-mix(in srgb,var(--ink) 6%,var(--card))}.embed small{color:var(--muted);display:block}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{border-bottom:1px solid var(--rule);padding:3px 8px;text-align:right}th:first-child,td:first-child{text-align:left}th{color:var(--muted);font-weight:600}
+.zoom{position:absolute;right:14px;bottom:14px;display:flex;gap:6px;background:var(--card);border:1px solid var(--rule);border-radius:10px;padding:4px}.zoom button{border:0;min-width:36px}.zoom span{align-self:center;font-size:13px;min-width:44px;text-align:center}
+.list{flex:1;overflow:auto;padding:18px;max-width:760px}.list h2{font:400 20px var(--title);margin:18px 0 6px}.list li{margin:0 0 10px}.list small{color:var(--muted)}
+dialog{border:1px solid var(--rule);border-radius:14px;background:var(--card);color:var(--ink);max-width:min(680px,92vw);width:100%;padding:0}dialog::backdrop{background:rgba(0,0,0,.35)}
+dialog header{border-bottom:1px solid var(--rule)}dialog .inner{padding:16px 18px;max-height:60vh;overflow:auto}dialog .inner p{margin:0 0 10px}
+pre{margin:0;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all}.del{color:var(--c1)}.add{color:var(--c4)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;margin:0 0 12px}dt{color:var(--muted)}dd{margin:0}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:10px;max-width:90vw;z-index:9}
+@media (max-width:640px){.app{grid-template-columns:1fr;grid-template-rows:auto 1fr}.side{border-right:0;border-bottom:1px solid var(--rule);max-height:38vh}.foot{display:none}header h1{font-size:22px}}
+@media (prefers-reduced-motion:no-preference){.node.hit{transition:outline-color .3s}}
+</style>
+</head>
+<body>
+<div class="flag">Design mock for <a href="../../product/canvas-workspace.md">the canvas workspace proposal</a>. Fictional data. Nothing is saved or sent.</div>
+<div class="app">
+<aside class="side">
+<button class="ws" id="ws" aria-haspopup="true" aria-expanded="false" aria-controls="ws-pop"><span><b>Lantern Walks</b><small>example-org/lantern-walks</small></span><span class="chev" aria-hidden="true">▾</span></button>
+<div class="pop" id="ws-pop" hidden>
+<button data-ws="Lantern Walks"><b>Lantern Walks</b><br><small>example-org/lantern-walks · public</small></button>
+<button data-ws="Tide Tables"><b>Tide Tables</b><br><small>example-org/tide-tables · private</small></button>
+<button data-ws="Kiln Notes"><b>Kiln Notes</b><br><small>mock-user/kiln-notes · private</small></button>
+<hr><button data-ws="">Connect a repository…</button>
+</div>
+<nav aria-label="Artifacts in this workspace"><p class="label">Records</p><div id="records"></div><p class="label">Boards</p><div id="boards"></div></nav>
+<p class="foot">Signed in as <b>mock-user</b></p>
+</aside>
+<main>
+<header><div><h1 id="title"></h1><p id="sub"></p></div>
+<div class="actions"><button id="save" hidden class="primary">Save…</button><button id="discard" hidden>Discard</button><button id="edit" aria-pressed="false">Edit</button>
+<div class="seg" role="group" aria-label="View"><button id="as-canvas" aria-pressed="true">Canvas</button><button id="as-list" aria-pressed="false">List</button></div></div></header>
+<div class="stage" id="stage" tabindex="0" aria-label="Canvas. Drag to move. Hold Ctrl or Command and scroll to zoom."><div class="world" id="world"><svg id="wires" aria-hidden="true"><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" style="fill:var(--muted);stroke:none"/></marker></defs></svg></div>
+<div class="zoom" role="group" aria-label="Zoom"><button id="zoom-out" aria-label="Zoom out">−</button><span id="zoom-label">100%</span><button id="zoom-in" aria-label="Zoom in">+</button><button id="fit">Fit</button></div></div>
+<div class="list" id="list" hidden></div>
+</main>
+</div>
+<dialog id="read" aria-labelledby="read-title"><header><div><h1 id="read-title"></h1><p id="read-sub"></p></div><div class="actions"><button id="read-close">Close</button></div></header><div class="inner" id="read-body"></div></dialog>
+<dialog id="commit" aria-labelledby="commit-title"><header><div><h1 id="commit-title">Save as one commit</h1><p>The product sends this through the editor app. This mock sends nothing.</p></div></header>
+<div class="inner"><dl id="commit-facts"></dl><pre id="commit-diff"></pre></div>
+<header><div class="actions"><button id="commit-cancel">Cancel</button><button id="commit-go" class="primary">Commit (mock)</button></div></header></dialog>
+<div id="toast" role="status" hidden></div>
+<script src="fixture.js"></script>
+<script>
+'use strict';
+/* A mock of the layout: workspace switcher, artifact sidebar, one canvas for each artifact. Not product code. */
+const F = window.FIXTURE, $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const MOCK = {
+  'VISION.md': '# Vision\n\n## Why we exist\nA city is easier to love when someone tells you its stories.\n\n## Who we build for\nVisitors with one free evening, and locals who want to see the harbour again.\n\n## What we believe\n- Small groups hear more.\n- Guides own their stories.\n\n## What we will never become\nA bus tour.\n\n## Open questions\n- Do we run walks in winter?\n',
+  'BRAIN.md': '# Brain\n\n## Providers\n- Shared drive: route notes and guide stories.\n- Booking tool: guest list and deposits.\n\n## Save and cleanup\nSave route changes in the shared drive. Ask before you delete a story.\n',
+  'STRUCTURE.md': '# Structure\n\n## Map\n- site/: the booking page\n- routes/: one file for each route\n\n## Commands\n- Preview the site: `make preview`\n',
+  'CHANGELOG.md': '# Changelog\n\n## 2026-11-10\n- Guests can pick a date and pay a deposit.\n\n## 2026-11-06\n- Each guide has a handbook.\n',
+  'TECHSTACK.md': '# Tech stack\n\n## Tools\n- Static site: the booking page.\n- Payment link: deposits.\n',
+};
+const FILES = { ...MOCK, ...F.files };
+const ARTIFACTS = [
+  { key: 'home', name: 'Home' }, { key: 'vision', name: 'Vision', file: 'VISION.md', c: 3 }, { key: 'progress', name: 'Progress', file: 'PROGRESS.md', c: 1 },
+  { key: 'brain', name: 'Brain', file: 'BRAIN.md', c: 6 }, { key: 'structure', name: 'Structure', file: 'STRUCTURE.md', c: 4 },
+  { key: 'readme', name: 'README', file: 'README.md' }, { key: 'changelog', name: 'Changelog', file: 'CHANGELOG.md' }, { key: 'techstack', name: 'Tech stack', file: 'TECHSTACK.md' },
+  { key: 'launch-plan', name: 'Launch plan', board: true },
+];
+const byKey = key => ARTIFACTS.find(a => a.key === key), byFile = file => ARTIFACTS.find(a => a.file === file);
+const canvasPath = key => `.horsemen/canvas/${key}.canvas`;
+
+function md(text) {
+  const out = []; let list = null;
+  const flush = () => { if (list) { out.push('<ul>' + list.join('') + '</ul>'); list = null; } };
+  for (const raw of String(text).trim().split('\n')) {
+    const line = esc(raw).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+    if (/^- /.test(raw)) { (list = list || []).push('<li>' + line.slice(2) + '</li>'); continue; }
+    flush(); if (raw.trim()) out.push('<p>' + line + '</p>');
+  }
+  flush(); return out.join('');
+}
+function sections(markdown) {
+  const found = []; let current = null;
+  for (const line of markdown.split('\n')) {
+    const m = line.match(/^## (.+)$/);
+    if (m) { current = { title: m[1].trim(), body: '' }; found.push(current); } else if (current) current.body += line + '\n';
+  }
+  return found;
+}
+const section = (file, subpath) => sections(FILES[file] || '').find(s => s.title.toLowerCase() === subpath.slice(1).toLowerCase());
+const host = url => { try { return new URL(url).host.replace(/^www\./, ''); } catch { return ''; } };
+function kind(n) {
+  if (n.type === 'text') return 'note'; if (n.type === 'group') return 'group';
+  if (n.type === 'link') { const h = host(n.url); return /^(youtube\.com|youtu\.be|loom\.com|vimeo\.com)$/.test(h) ? 'video' : /^(docs\.google\.com|figma\.com)$/.test(h) ? 'embed' : 'link'; }
+  if (n.type === 'file') {
+    const f = n.file.toLowerCase();
+    if (f.endsWith('.canvas')) return 'portal'; if (/\.(png|jpe?g|gif|webp|svg)$/.test(f)) return 'image'; if (/\.(csv|tsv|xlsx)$/.test(f)) return 'sheet';
+    if (f.endsWith('.md')) return n.subpath ? 'section' : 'record';
+  }
+  return 'unknown';
+}
+
+/* A canvas = the stored file (when there is one) plus generated cards for sections that no stored element shows. */
+const docs = {};
+function build(key) {
+  const a = byKey(key), stored = F.canvases[key] ? structuredClone(F.canvases[key]) : null;
+  const doc = { key, hasFile: !!stored, nodes: stored ? stored.nodes : [], edges: stored ? stored.edges : [], derived: [] };
+  if (key === 'home') {
+    const order = ['vision', 'progress', 'brain', 'structure', 'readme', 'launch-plan', 'changelog', 'techstack'];
+    const cards = ARTIFACTS.filter(x => x.key !== 'home').sort((p, q) => order.indexOf(p.key) - order.indexOf(q.key));
+    cards.forEach((x, i) => { const core = i < 4, col = core ? i : (i - 4) % 4, row = core ? 0 : 1 + Math.floor((i - 4) / 4);
+      doc.nodes.push({ id: 'r-' + x.key, type: 'file', x: col * 360, y: row * 250, width: 320, height: core ? 200 : 150, file: x.file || canvasPath(x.key), color: x.c ? String(x.c) : undefined, auto: true }); });
+    const seen = new Set();
+    for (const [name, canvas] of Object.entries(F.canvases)) for (const n of canvas.nodes) {
+      const to = n.type !== 'file' ? null : n.file.endsWith('.canvas') ? n.file.split('/').pop().replace('.canvas', '') : byFile(n.file)?.key;
+      const own = byKey(name)?.file;
+      if (!to || to === name || n.file === own || seen.has(name + '>' + to)) continue;
+      seen.add(name + '>' + to);
+      const back = doc.derived.find(e => e.fromNode === 'r-' + to && e.toNode === 'r-' + name);
+      if (back) back.both = true; else doc.derived.push({ id: 'd-' + name + '-' + to, fromNode: 'r-' + name, toNode: 'r-' + to });
+    }
+  } else if (a.file) {
+    const shown = new Set(doc.nodes.filter(n => n.type === 'file' && n.file === a.file && n.subpath).map(n => n.subpath.slice(1).toLowerCase()));
+    const missing = sections(FILES[a.file]).filter(s => !shown.has(s.title.toLowerCase()));
+    const left = stored ? Math.min(...doc.nodes.map(n => n.x)) - 380 : 0, top = stored ? Math.min(...doc.nodes.map(n => n.y)) : 0;
+    missing.forEach((s, i) => doc.nodes.push({ id: 's-' + slug(s.title), type: 'file', x: stored ? left : (i % 3) * 360, y: stored ? top + i * 230 : Math.floor(i / 3) * 240, width: 320, height: 200, file: a.file, subpath: '#' + s.title, auto: true }));
+  }
+  return doc;
+}
+const doc = key => docs[key] || (docs[key] = build(key));
+
+/* Canonical text: one element on each line, so a moved card changes one line in Git. */
+const FIRST = { nodes: ['id', 'type', 'x', 'y', 'width', 'height'], edges: ['id', 'fromNode', 'toNode'] };
+function lines(d, storedOnly = true) {
+  const row = (o, first) => '{' + [...first.filter(k => k in o), ...Object.keys(o).filter(k => !first.includes(k) && k !== 'auto' && o[k] !== undefined).sort()].map(k => JSON.stringify(k) + ':' + JSON.stringify(o[k])).join(',') + '}';
+  const nodes = d.nodes.filter(n => !storedOnly || !n.auto).sort((a, b) => (a.type !== 'group') - (b.type !== 'group') || (a.id < b.id ? -1 : 1));
+  const edges = [...d.edges].sort((a, b) => (a.id < b.id ? -1 : 1));
+  return [...nodes.map(n => row(n, FIRST.nodes)), ...edges.map(e => row(e, FIRST.edges))];
+}
+const baseline = {};
+const saved = key => baseline[key] || (baseline[key] = lines(build(key)));
+
+/* ---------------------------------------------------------------- rendering */
+const world = $('#world'), wires = $('#wires'), stage = $('#stage');
+let current = 'progress', editing = false, camera = { x: 40, y: 40, z: 1 }, listMode = false;
+function nodeHTML(n) {
+  const k = kind(n), a = n.type === 'file' ? byFile(n.file) : null;
+  if (k === 'group') return `<b>${esc(n.label || 'Group')}</b>`;
+  if (k === 'note') return `<div class="body">${md(n.text)}</div>`;
+  if (k === 'section') { const s = section(n.file, n.subpath), other = a && a.key !== current;
+    return `<div class="head"><b>${esc(n.subpath.slice(1))}</b>${other ? `<span class="tag">from ${esc(a.name)}</span>` : ''}${n.auto ? '<span class="tag">not placed</span>' : ''}</div><div class="body">${s ? md(s.body) : '<p>Section not found. The heading changed in the record.</p>'}</div><button class="more" data-read="${esc(n.id)}">Read in ${esc(n.file)} →</button>`; }
+  if (k === 'record') { const first = sections(FILES[n.file] || '')[0];
+    return `<div class="head"><b>${esc(a ? a.name : n.file)}</b><span class="tag">record</span></div><div class="body">${first ? '<p><b>' + esc(first.title) + '</b></p>' + md(first.body) : ''}</div><button class="more" data-open="${esc(a ? a.key : '')}">Open canvas →</button>`; }
+  if (k === 'portal') { const key = n.file.split('/').pop().replace('.canvas', ''), t = byKey(key);
+    return `<div class="head"><b>${esc(t ? t.name : key)}</b><span class="tag">board</span></div><div class="body"><p>${F.canvases[key] ? F.canvases[key].nodes.length + ' elements' : ''}</p></div><button class="more" data-open="${esc(key)}">Open canvas →</button>`; }
+  if (k === 'image') return `<img alt="${esc(n.alt || '')}" src="data:image/svg+xml;charset=utf-8,${encodeURIComponent(FILES[n.file] || '')}"><div class="cap">${esc(n.alt || n.file)}</div>`;
+  if (k === 'sheet') { const rows = (FILES[n.file] || '').trim().split('\n').map(r => r.split(','));
+    return `<div class="head"><b>${esc(n.file.split('/').pop())}</b><span class="tag">table</span></div><div class="body"><table><tr>${rows[0].map(c => '<th>' + esc(c) + '</th>').join('')}</tr>${rows.slice(1).map(r => '<tr>' + r.map(c => '<td>' + esc(c) + '</td>').join('') + '</tr>').join('')}</table></div>`; }
+  if (k === 'video' || k === 'embed') return `<div class="head"><b>${esc(n.title || host(n.url))}</b><span class="tag">${k === 'video' ? 'video' : 'embed'}</span></div><div class="embed"><div><button data-embed="${esc(host(n.url))}">${k === 'video' ? '▶ Load video' : 'Load preview'}</button><small>Loads from ${esc(host(n.url))} only after you select it.</small></div></div>`;
+  if (k === 'link') return `<div class="head"><b>${esc(n.title || n.url)}</b><span class="tag">link</span></div><div class="body"><p><a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">${esc(host(n.url))} ↗</a></p></div>`;
+  return '<div class="body"><p>This element type is not supported.</p></div>';
+}
+function anchor(a, b) {
+  const ax = a.x + a.width / 2, ay = a.y + a.height / 2, bx = b.x + b.width / 2, by = b.y + b.height / 2, dx = bx - ax, dy = by - ay;
+  const side = (r, s) => s === 'left' ? [r.x, r.y + r.height / 2] : s === 'right' ? [r.x + r.width, r.y + r.height / 2] : s === 'top' ? [r.x + r.width / 2, r.y] : [r.x + r.width / 2, r.y + r.height];
+  const horizontal = Math.abs(dx) * (a.height + b.height) > Math.abs(dy) * (a.width + b.width);
+  return [horizontal ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'bottom' : 'top'), horizontal ? (dx > 0 ? 'left' : 'right') : (dy > 0 ? 'top' : 'bottom'), side];
+}
+function drawWires() {
+  const d = doc(current), at = id => d.nodes.find(n => n.id === id);
+  wires.querySelectorAll('g').forEach(g => g.remove());
+  for (const e of [...d.edges, ...d.derived]) {
+    const a = at(e.fromNode), b = at(e.toNode); if (!a || !b) continue;
+    const [sa, sb, side] = anchor(a, b), p = side(a, e.fromSide || sa), q = side(b, e.toSide || sb), mx = (p[0] + q[0]) / 2, my = (p[1] + q[1]) / 2;
+    const label = e.label ? `<rect x="${mx - e.label.length * 3.6 - 6}" y="${my - 10}" width="${e.label.length * 7.2 + 12}" height="20" rx="4"/><text x="${mx}" y="${my + 1}">${esc(e.label)}</text>` : '';
+    wires.insertAdjacentHTML('beforeend', `<g><path d="M${p[0]} ${p[1]}L${q[0]} ${q[1]}" marker-end="url(#arrow)"${e.both ? ' marker-start="url(#arrow)"' : ''}${d.derived.includes(e) ? ' stroke-dasharray="5 5"' : ''}/>${label}</g>`);
+  }
+}
+function render() {
+  const a = byKey(current), d = doc(current), count = d.nodes.filter(n => !n.auto).length;
+  $('#title').textContent = a.name;
+  $('#sub').textContent = current === 'home' ? 'Generated from the records. Dashed lines show which canvases refer to which.'
+    : d.hasFile ? `${canvasPath(current)} · ${count} elements, ${d.edges.length} connectors${d.nodes.some(n => n.auto) ? ' · dashed cards are sections that no one placed yet' : ''}`
+    : `Generated from ${a.file}. No canvas file yet; a file appears after the first saved change.`;
+  for (const el of document.querySelectorAll('.item')) el.toggleAttribute('aria-current', false), el.dataset.key === current && el.setAttribute('aria-current', 'page');
+  world.querySelectorAll('.node').forEach(n => n.remove());
+  for (const n of d.nodes) {
+    const el = document.createElement('div');
+    el.className = 'node ' + kind(n) + (n.auto && current !== 'home' ? ' auto' : ''); el.dataset.id = n.id; if (n.color) el.dataset.c = n.color;
+    Object.assign(el.style, { left: n.x + 'px', top: n.y + 'px', width: n.width + 'px', height: n.height + 'px' });
+    el.innerHTML = nodeHTML(n); world.append(el);
+  }
+  drawWires(); renderList(); syncEdit();
+  stage.hidden = listMode; $('#list').hidden = !listMode;
+  $('#as-canvas').setAttribute('aria-pressed', !listMode); $('#as-list').setAttribute('aria-pressed', listMode);
+}
+function renderList() {
+  const d = doc(current), names = n => kind(n) === 'section' ? n.subpath.slice(1) : kind(n) === 'portal' ? (byKey(n.file.split('/').pop().replace('.canvas', ''))?.name || n.file) : kind(n) === 'record' ? (byFile(n.file)?.name || n.file) : n.label || n.title || n.alt || (n.text || '').split('\n')[0].replace(/\*\*/g, '') || n.file || n.url;
+  const links = n => [...d.edges, ...d.derived].filter(e => e.fromNode === n.id).map(e => (e.label ? e.label + ' → ' : '→ ') + names(d.nodes.find(x => x.id === e.toNode) || {})).join('; ');
+  const items = d.nodes.filter(n => n.type !== 'group').sort((a, b) => a.y - b.y || a.x - b.x);
+  $('#list').innerHTML = `<h2>${esc(byKey(current).name)}, as a list</h2><p><small>The same elements in reading order, for phones, screen readers, and quick scans.</small></p><ol>${items.map(n => `<li><b>${esc(names(n))}</b> <span class="tag">${kind(n)}</span>${links(n) ? `<br><small>${esc(links(n))}</small>` : ''}</li>`).join('')}</ol>`;
+}
+function applyCamera() { world.style.transform = `translate(${camera.x}px,${camera.y}px) scale(${camera.z})`; $('#zoom-label').textContent = Math.round(camera.z * 100) + '%'; }
+function fit() {
+  const n = doc(current).nodes; if (!n.length) return;
+  const x0 = Math.min(...n.map(v => v.x)), y0 = Math.min(...n.map(v => v.y)), x1 = Math.max(...n.map(v => v.x + v.width)), y1 = Math.max(...n.map(v => v.y + v.height));
+  const z = Math.max(.2, Math.min(1, (stage.clientWidth - 80) / (x1 - x0), (stage.clientHeight - 80) / (y1 - y0)));
+  camera = { z, x: (stage.clientWidth - (x1 - x0) * z) / 2 - x0 * z, y: (stage.clientHeight - (y1 - y0) * z) / 2 - y0 * z }; applyCamera();
+}
+function zoomAt(z, x = stage.clientWidth / 2, y = stage.clientHeight / 2) { z = Math.max(.2, Math.min(2.5, z)); const wx = (x - camera.x) / camera.z, wy = (y - camera.y) / camera.z; camera = { z, x: x - wx * z, y: y - wy * z }; applyCamera(); }
+function toast(text) { const t = $('#toast'); t.textContent = text; t.hidden = false; clearTimeout(toast.timer); toast.timer = setTimeout(() => { t.hidden = true; }, 4200); }
+function open(key, nodeId) {
+  if (!byKey(key)) return;
+  if (editing && dirty()) { toast('Save or discard your changes before you open another canvas.'); return; }
+  current = key; history.replaceState(null, '', '#' + key + (nodeId ? '/' + nodeId : '')); render(); fit();
+  if (nodeId) world.querySelector(`[data-id="${CSS.escape(nodeId)}"]`)?.classList.add('hit');
+}
+
+/* ---------------------------------------------------------------- editing (mock) */
+const dirty = () => lines(doc(current)).join('\n') !== saved(current).join('\n');
+function syncEdit() {
+  document.body.classList.toggle('editing', editing); $('#edit').setAttribute('aria-pressed', editing); $('#edit').textContent = editing ? 'Editing' : 'Edit';
+  $('#save').hidden = $('#discard').hidden = !editing; $('#save').disabled = $('#discard').disabled = !dirty();
+}
+$('#edit').onclick = () => { if (editing && dirty()) return toast('Save or discard your changes first.'); editing = !editing; syncEdit(); if (editing) toast('Drag a card to move it. A dashed card becomes a saved element when you move it.'); };
+$('#discard').onclick = () => { delete docs[current]; render(); };
+$('#save').onclick = () => {
+  const before = saved(current), after = lines(doc(current)), gone = before.filter(l => !after.includes(l)), added = after.filter(l => !before.includes(l));
+  const id = l => JSON.parse(l).id, moved = added.filter(l => gone.some(g => id(g) === id(l))).length, fresh = added.length - moved;
+  const summary = [moved && `move ${moved}`, fresh && `add ${fresh}`].filter(Boolean).join(', ');
+  $('#commit-facts').innerHTML = `<dt>Repository</dt><dd>example-org/lantern-walks, default branch</dd><dt>File</dt><dd><code>${canvasPath(current)}</code>${doc(current).hasFile ? '' : ' (new file)'}</dd><dt>Message</dt><dd><code>canvas(${current}): ${summary} [skip ci]</code></dd><dt>Author</dt><dd>mock-user, through the editor app</dd><dt>Changed lines</dt><dd>${gone.length} removed, ${added.length} added. One element is one line.</dd>`;
+  const clip = l => l.length > 150 ? l.slice(0, 149) + '…' : l;
+  $('#commit-diff').innerHTML = [...gone.map(l => `<span class="del">- ${esc(clip(l))}</span>`), ...added.map(l => `<span class="add">+ ${esc(clip(l))}</span>`)].join('\n');
+  $('#commit').showModal();
+};
+$('#commit-cancel').onclick = () => $('#commit').close();
+$('#commit-go').onclick = () => { baseline[current] = lines(doc(current)); doc(current).hasFile = true; $('#commit').close(); render(); toast('Mock: the product commits this one file and shows the new commit. Nothing was sent.'); };
+
+/* ---------------------------------------------------------------- pointer, wheel, and clicks */
+let drag = null;
+stage.addEventListener('pointerdown', e => {
+  if (e.target.closest('button,a,.zoom')) return;
+  const el = e.target.closest('.node'), n = el && doc(current).nodes.find(v => v.id === el.dataset.id);
+  drag = editing && n && current !== 'home' ? { n, el, sx: e.clientX, sy: e.clientY, x: n.x, y: n.y } : { sx: e.clientX, sy: e.clientY, cx: camera.x, cy: camera.y };
+  stage.setPointerCapture(e.pointerId); stage.classList.add('panning');
+});
+stage.addEventListener('pointermove', e => {
+  if (!drag) return;
+  if (drag.n) { const snap = v => Math.round(v / 10) * 10; drag.n.x = snap(drag.x + (e.clientX - drag.sx) / camera.z); drag.n.y = snap(drag.y + (e.clientY - drag.sy) / camera.z); drag.el.style.left = drag.n.x + 'px'; drag.el.style.top = drag.n.y + 'px'; drawWires(); }
+  else { camera.x = drag.cx + e.clientX - drag.sx; camera.y = drag.cy + e.clientY - drag.sy; applyCamera(); }
+});
+const drop = () => { if (drag?.n && (drag.n.x !== drag.x || drag.n.y !== drag.y)) { delete drag.n.auto; render(); } drag = null; stage.classList.remove('panning'); };
+stage.addEventListener('pointerup', drop); stage.addEventListener('pointercancel', drop);
+stage.addEventListener('wheel', e => { e.preventDefault(); const r = stage.getBoundingClientRect(); if (e.ctrlKey || e.metaKey) zoomAt(camera.z * Math.exp(-e.deltaY * .01), e.clientX - r.x, e.clientY - r.y); else { camera.x -= e.deltaX; camera.y -= e.deltaY; applyCamera(); } }, { passive: false });
+$('#zoom-in').onclick = () => zoomAt(camera.z * 1.2); $('#zoom-out').onclick = () => zoomAt(camera.z / 1.2); $('#fit').onclick = fit;
+world.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  if (b.dataset.open) open(b.dataset.open);
+  if (b.dataset.embed) b.parentElement.innerHTML = `<small>Mock: the product loads the ${esc(b.dataset.embed)} player here, in a sandboxed frame. An address that cannot be embedded stays a link card.</small>`;
+  if (b.dataset.read) { const n = doc(current).nodes.find(v => v.id === b.dataset.read), s = section(n.file, n.subpath);
+    $('#read-title').textContent = n.subpath.slice(1); $('#read-sub').textContent = `${n.file} · the record is the source; the canvas shows this section, it does not copy it`;
+    $('#read-body').innerHTML = (s ? md(s.body) : '<p>Section not found.</p>') + `<p><small>In the product, this is the reading view of the full record, opened at this section.</small></p>`; $('#read').showModal(); }
+});
+$('#read-close').onclick = () => $('#read').close();
+$('#as-canvas').onclick = () => { listMode = false; render(); fit(); }; $('#as-list').onclick = () => { listMode = true; render(); };
+
+/* ---------------------------------------------------------------- sidebar */
+for (const a of ARTIFACTS) {
+  const b = document.createElement('button'); b.className = 'item'; b.dataset.key = a.key;
+  b.innerHTML = `<span class="dot" style="${a.c ? `background:var(--c${a.c})` : ''}"></span>${esc(a.name)}${F.canvases[a.key] ? '<span class="tag">saved</span>' : ''}`;
+  b.onclick = () => open(a.key); (a.board ? $('#boards') : $('#records')).append(b);
+}
+const pop = $('#ws-pop'), ws = $('#ws');
+ws.onclick = () => { pop.hidden = !pop.hidden; ws.setAttribute('aria-expanded', !pop.hidden); };
+pop.onclick = e => { const b = e.target.closest('button'); if (!b) return; pop.hidden = true; ws.setAttribute('aria-expanded', false);
+  toast(b.dataset.ws === 'Lantern Walks' ? 'Lantern Walks is open.' : b.dataset.ws ? `Mock: only Lantern Walks has data. The product opens ${b.dataset.ws} and its last canvas.` : 'Mock: the product opens the GitHub page where you choose repositories.'); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { pop.hidden = true; ws.setAttribute('aria-expanded', false); } });
+
+const [startKey, startNode] = location.hash.slice(1).split('/');
+listMode = window.matchMedia('(max-width:640px)').matches;
+open(byKey(startKey) ? startKey : 'progress', startNode);
+window.addEventListener('resize', () => { if (!listMode) fit(); });
+</script>
+</body>
+</html>
