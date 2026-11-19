@@ -12,8 +12,9 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in and read-only proxy
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
-├── docs/product/           GUI requirements, artifact views, icon system, design audit, and release boundaries
+├── docs/product/           GUI requirements, artifact views, icon system, design audit, release boundaries, and the canvas workspace proposal with its file schema
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
+├── docs/show-me/canvas-workspace/ Canvas workspace mock, fictional fixture, and fixture check (proposal)
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
 ├── favicon.png             Project icon
@@ -46,6 +47,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Hosted speed benchmark: `python3 scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench`.
 - Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
+- Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.
 - Browser check: `python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check`.
