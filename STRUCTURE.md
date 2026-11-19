@@ -12,7 +12,7 @@ horsemen/
 │   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in and read-only proxy
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
-├── docs/product/           GUI requirements, artifact views, icon system, and release boundaries
+├── docs/product/           GUI requirements, artifact views, icon system, design audit, and release boundaries
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
