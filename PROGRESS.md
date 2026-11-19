@@ -31,6 +31,10 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 - **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
 
+## In progress
+
+- **Public view** (started 2026-11-19): Anyone can open a public repository's canvas without signing in, for example horsemen.forsvn.com/hungv47/horsemen. Private repositories still need sign-in.
+
 ### Technical details
 
 | Item | Evidence |
@@ -38,6 +42,7 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 | Shorter records | [Pre-save edit](horsemen/references/sync.md#pre-save-edit) and the distribution regression test. The source, wheel, and packaged skill checks passed locally. |
 | Hosted viewer | Merged in [PR #6](https://github.com/hungv47/horsemen/pull/6) and deployed from main; the live files match main, `/healthz` reports ok, and the live sign-in redirect was checked. Reader parity and Worker tests passed, and the hosted browser check passed against a fake GitHub: sign-in, project load, live update, and sign-out. Full verification passed locally. See [deploy and limits](worker/README.md). The owner signed in with a real account and saw the projects load on 2026-11-19. |
 | Faster hosted loading | Benchmark with 80 repositories and 150 ms GitHub delay (`scripts/bench_hosted.py`): first project on reload 2.1 s to 0.36 s; first visit 2.2 s to 1.9 s; discovery 8.9 s to 5.9 s. Reader, Worker, and browser checks pass. Merged in [PR #9](https://github.com/hungv47/horsemen/pull/9) after CI passed; deployed from main, and the live files match main. |
+| Public view | Worker tests cover public and private repositories, app credentials only, repository routes only, cross-site requests, and the edge cache; the hosted browser check opens a public repository without sign-in. Not yet deployed. |
 | Share links | Link, Worker, and browser checks pass: a signed-out visitor returns to the shared record after sign-in; sign-in never redirects outside the app; a repository without access shows a clear message. Merged in [PR #16](https://github.com/hungv47/horsemen/pull/16) after CI passed; deployed from main, the live files match main, and a live share link keeps its target through sign-in. |
 | Publish reminder | Hook scenario S20 passes: uncommitted and unpushed record edits fire once, published edits and repositories without a remote do not. All 150 hook scenarios and full verification passed locally. Merged in [PR #14](https://github.com/hungv47/horsemen/pull/14) after CI passed. The owner's global skill now installs from this repository and matches main; the Claude Code and Codex hooks run it. |
 | Style themes | Theme tests check every theme and mode for contrast (4.5:1 for text, 7:1 in High contrast), the 12px floor, licensed fonts, and that each theme differs from the others in at least three style traits. The fixture browser check applies each theme, reloads it, checks its fonts, and checks for overflow at desktop and phone width. The hosted browser check, Worker tests, and full verification passed locally. Squash-merged in [PR #20](https://github.com/hungv47/horsemen/pull/20) after CI passed, with a fix for Terminal small-card titles; deployed from main, and the live files match main. |
@@ -104,7 +109,7 @@ Earlier personal installations are not public releases of this repository.
 <details>
 <summary>Upcoming roadmap</summary>
 
-- Hosted viewer next steps: branch and PR views. Links for people without GitHub access come later and will need stored share settings only.
+- Hosted viewer next steps: branch and PR views. Public links to private repositories would need stored share settings.
 - Gather feedback on the existing skill and CLI while developing the visual workspace.
 - Safe automatic writes remain separate future work, with no promised date.
 

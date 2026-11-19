@@ -271,3 +271,90 @@ test('the Mermaid file is a static file, and the CSP allows blob images only', a
     const r = await call(p); assert.equal(r.status, 404, p); assert.doesNotMatch(await r.text(), /Sign in to open/, p);
   }
 });
+
+/* Public view. Failure modes: a private repository leaks to an anonymous visitor;
+   a user token is used for anonymous reads; non-repository GitHub routes become
+   public; cross-site pages use the proxy; GitHub is called for every view. */
+function memoryCache() {
+  const store = new Map();
+  return { store, match: async req => store.get(new Request(req).url)?.clone(), put: async (req, res) => { store.set(new Request(req).url, res.clone()); } };
+}
+function publicGitHub({ privateRepo = false } = {}) {
+  mockFetch(async req => {
+    const u = new URL(req.url);
+    if (u.pathname === '/repos/example/open') return json({ id: 7, full_name: 'example/open', private: false, visibility: 'public', default_branch: 'main' });
+    if (u.pathname === '/repos/example/secret') return privateRepo ? json({ id: 8, full_name: 'example/secret', private: true }) : json({ message: 'Not Found' }, 404);
+    if (u.pathname.startsWith('/repos/example/open/commits/')) return req.headers.get('if-none-match') === '"c1"' ? new Response(null, { status: 304, headers: { etag: '"c1"' } }) : json({ sha: 'a'.repeat(40) }, 200, { etag: '"c1"', 'x-ratelimit-limit': '5000', 'x-ratelimit-remaining': '4999' });
+    if (u.pathname.startsWith('/repos/example/open/git/blobs/')) return json({ encoding: 'base64', content: 'IyBIaQ==' });
+    return json({ message: 'Not Found' }, 404);
+  });
+}
+// GitHub rejects GitHub App client credentials on repository reads, so public reads use a
+// dedicated public-read token when one is set, and no credentials otherwise. Never a user token.
+const anonymous = null, publicToken = 'Bearer github_pat_public_fictional';
+
+test('a signed-out visitor sees the canvas of a public repository without signing in', async () => {
+  publicGitHub(); const e = env({ CACHE: memoryCache() });
+  const res = await call('/example/open?record=progress', {}, e);
+  const html = await res.text();
+  assert.match(html, /<meta name="horsemen-mode" content="public">/); assert.doesNotMatch(html, /Sign in with GitHub<\/a>\n<small>/);
+  assert.equal(res.headers.get('set-cookie'), null, 'no cookie for public view');
+  assert.doesNotMatch(html, /__SESSION__/);
+  assert.equal(calls[0].headers.get('authorization'), anonymous, 'repository check sends no user token');
+});
+
+test('private, missing, and unreadable repositories still ask for sign-in', async () => {
+  for (const privateRepo of [true, false]) {
+    publicGitHub({ privateRepo });
+    const html = await (await call('/example/secret', {}, env({ CACHE: memoryCache() }))).text();
+    assert.match(html, /Sign in to open <b>example\/secret<\/b>/, String(privateRepo));
+  }
+  mockFetch(async () => { throw new TypeError('down'); });
+  assert.match(await (await call('/example/open', {}, env({ CACHE: memoryCache() }))).text(), /Sign in to open/);
+});
+
+test('the public proxy reads only public repositories, without user credentials', async () => {
+  publicGitHub({ privateRepo: true }); const e = env({ CACHE: memoryCache() });
+  const h = { 'sec-fetch-site': 'same-origin' };
+  const ok = await call('/pub/repos/example/open/git/blobs/' + 'b'.repeat(40), { headers: h }, e);
+  assert.equal(ok.status, 200); assert.equal((await ok.json()).encoding, 'base64');
+  assert.ok(calls.every(r => r.headers.get('authorization') === anonymous));
+  assert.equal((await call('/pub/repos/example/open', { headers: h }, e)).status, 200);
+  const before = calls.length;
+  for (const p of ['/pub/repos/example/secret/git/blobs/' + 'b'.repeat(40), '/pub/user', '/pub/user/installations', '/pub/repos/example/open/actions/secrets', '/pub/repos/example/open/contents/../x'])
+    assert.equal((await call(p, { headers: h }, e)).status, 404, p);
+  assert.ok(calls.slice(before).every(r => new URL(r.url).pathname === '/repos/example/secret'), 'denied routes never fetch content');
+  assert.equal((await call('/pub/repos/example/open', { method: 'POST', headers: h }, e)).status, 405);
+  assert.equal((await call('/pub/repos/example/open', { headers: { 'sec-fetch-site': 'cross-site' } }, e)).status, 403);
+});
+
+test('a signed-in visitor never sends a user token through the public proxy', async () => {
+  const { headers } = await signIn(); publicGitHub();
+  await call('/pub/repos/example/open/commits/main', { headers: { ...headers, 'sec-fetch-site': 'same-origin' } }, env({ CACHE: memoryCache() }));
+  assert.ok(calls.length && calls.every(r => r.headers.get('authorization') === anonymous));
+  publicGitHub();
+  await call('/pub/repos/example/open/commits/main', { headers: { ...headers, 'sec-fetch-site': 'same-origin' } }, env({ CACHE: memoryCache(), GITHUB_PUBLIC_TOKEN: 'github_pat_public_fictional' }));
+  assert.ok(calls.length && calls.every(r => r.headers.get('authorization') === publicToken), 'the public-read token when set');
+});
+
+test('public reads are cached: immutable objects once, branch heads briefly, with 304 support', async () => {
+  publicGitHub(); const cache = memoryCache(); const e = env({ CACHE: cache }); const h = { 'sec-fetch-site': 'same-origin' };
+  const blob = '/pub/repos/example/open/git/blobs/' + 'c'.repeat(40);
+  await call(blob, { headers: h }, e); const n = calls.length;
+  const again = await call(blob, { headers: h }, e);
+  assert.equal(again.status, 200); assert.equal(calls.length, n, 'a cached blob makes no GitHub call');
+  const head = await call('/pub/repos/example/open/commits/main', { headers: h }, e);
+  assert.equal(head.headers.get('etag'), '"c1"'); assert.equal(head.headers.get('x-ratelimit-limit'), '5000');
+  const same = await call('/pub/repos/example/open/commits/main', { headers: { ...h, 'if-none-match': '"c1"' } }, e);
+  assert.equal(same.status, 304);
+});
+
+test('a signed-in visitor can open the public view of a public repository', async () => {
+  const { cookie } = await signIn(); publicGitHub();
+  const html = await (await call('/example/open?view=public', { headers: { cookie } }, env({ CACHE: memoryCache() }))).text();
+  assert.match(html, /<meta name="horsemen-mode" content="public">/);
+});
+
+test('the sign-in page links to a public example', async () => {
+  assert.match(await (await call('/')).text(), /<a href="\/hungv47\/horsemen">See this project without signing in<\/a>/);
+});

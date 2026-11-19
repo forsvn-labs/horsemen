@@ -3,10 +3,13 @@
    It answers the app's /api/* calls in the browser with the reader port, which
    reads GitHub through the Worker's read-only proxy. Nothing is stored. */
 (function () {
-  if (document.querySelector('meta[name="horsemen-mode"]')?.content !== 'hosted') return;
+  const mode = document.querySelector('meta[name="horsemen-mode"]')?.content;
+  if (mode !== 'hosted' && mode !== 'public') return;
+  /* Public mode: a signed-out view of a public repository. Reads go through /pub with no session. */
+  const PUBLIC = mode === 'public', BASE = PUBLIC ? '/pub' : '/gh';
   const R = window.HorsemenReader;
   const token = document.querySelector('meta[name="horsemen-session"]').content;
-  const headers = extra => ({ 'X-Horsemen-Session': token, ...extra });
+  const headers = extra => (PUBLIC ? { ...extra } : { 'X-Horsemen-Session': token, ...extra });
   let refreshing = null, pollSeconds = 60, installURL = null;
 
   const signedOut = () => { location.assign('/'); };
@@ -19,10 +22,10 @@
   /* One GitHub read through the proxy. Expired tokens refresh once; ended sessions return to sign-in. */
   async function request(path, etag) {
     for (let attempt = 0; ; attempt++) {
-      const res = await fetch('/gh' + path, { headers: headers(etag ? { 'If-None-Match': etag } : {}), cache: 'no-store' });
+      const res = await fetch(BASE + path, { headers: headers(etag ? { 'If-None-Match': etag } : {}), cache: 'no-store' });
       if (res.status === 304) return { status: 304 };
       let data = null; try { data = await res.json(); } catch { /* handled below */ }
-      if (res.status === 401) {
+      if (res.status === 401 && !PUBLIC) {
         if (data?.code === 'expired' && attempt === 0) {
           try { await refresh(); continue; } catch { /* fall through to sign-in */ }
         }
@@ -35,6 +38,10 @@
   const gh = async path => (await request(path)).data;
 
   async function repositories() {
+    if (PUBLIC) {
+      if (!target) throw new R.ProviderError('Open a public repository link, such as /owner/repo.', 404);
+      return [await gh(`/repos/${target.repo}`)];
+    }
     const repos = new Map(), installations = [];
     for (let page = 1; page < 50; page++) {
       const found = (await gh(`/user/installations?per_page=100&page=${page}`)).installations || [];
@@ -54,13 +61,16 @@
     return R.prioritize([...repos.values()].sort((a, b) => String(b.pushed_at || '').localeCompare(String(a.pushed_at || ''))), target);
   }
 
-  const login = document.querySelector('meta[name="horsemen-login"]')?.content || null;
+  const login = PUBLIC ? 'Public view' : (document.querySelector('meta[name="horsemen-login"]')?.content || null);
   const target = R.shareTarget(new URL(location.href));
   /* Status with a clear issue when a shared link points to a project this account cannot read. */
   function status() {
     const snap = state.snapshot();
     if (target && ['ready', 'partial', 'error'].includes(snap.phase) && !snap.projects.some(p => R.matchesTarget(p, target))) {
-      snap.issues.unshift({ message: `Horsemen cannot open ${target.repo}${target.root ? ' / ' + target.root : ''}. Your GitHub account needs access to it, and the Horsemen app must be installed on it. Select Choose repositories to add it.` });
+      const where = `${target.repo}${target.root ? ' / ' + target.root : ''}`;
+      snap.issues.unshift({ message: PUBLIC
+        ? `${where} has no Horsemen records at this path. A project needs at least two of VISION, PROGRESS, BRAIN, and STRUCTURE.`
+        : `Horsemen cannot open ${where}. Your GitHub account needs access to it, and the Horsemen app must be installed on it. Select Choose repositories to add it. If the repository is public, add ?view=public to the link.` });
     }
     return snap;
   }
@@ -81,6 +91,7 @@
      each branch in the background. Sign-out and Clear workspace remove it. */
   const INDEX_KEY = 'horsemen.discovery.v1';
   function saveIndex() {
+    if (PUBLIC) return;  // A public view keeps nothing in the browser.
     const index = state.exportIndex();
     if (!index) return;
     index.heads = [...heads].slice(-2000);
@@ -88,7 +99,7 @@
   }
   function forgetIndex() { try { localStorage.removeItem(INDEX_KEY); } catch { /* Storage is optional. */ } }
   let restored = false;
-  try {
+  if (!PUBLIC) try {
     const index = JSON.parse(localStorage.getItem(INDEX_KEY) || 'null');
     restored = state.restore(index, login);
     if (restored && Array.isArray(index.heads)) for (const [path, value] of index.heads) if (value?.etag) heads.set(path, value);
@@ -155,7 +166,12 @@
       el.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#' + icon + '"/></svg><span></span>'; el.querySelector('span').textContent = label;
       return el;
     };
-    if (github && !document.getElementById('choose-repos')) {
+    if (PUBLIC && github && !document.getElementById('public-sign-in')) {
+      const signIn = item('a', 'public-sign-in', 'github', 'Sign in with GitHub');
+      signIn.href = '/auth/login?next=' + encodeURIComponent(location.pathname + location.search);
+      github.append(signIn);
+    }
+    if (!PUBLIC && github && !document.getElementById('choose-repos')) {
       const choose = item('a', 'choose-repos', 'layers', 'Choose repositories');
       choose.rel = 'noopener'; choose.target = '_blank'; choose.hidden = !installURL; if (installURL) choose.href = installURL;
       github.append(choose);
@@ -166,11 +182,11 @@
     }
     /* Copy link: the address bar always holds the readable link for the open project and record. */
     const copyLink = async () => {
-      try { await navigator.clipboard.writeText(location.href); window.showToast?.('Link copied. People who open it need GitHub access to this repository.'); }
+      try { await navigator.clipboard.writeText(location.href); window.showToast?.(PUBLIC ? 'Link copied. Anyone can open it while the repository stays public.' : 'Link copied. People who open it need GitHub access to this repository.'); }
       catch { window.showToast?.('Copy failed. Copy the link from the address bar.'); }
     };
     const shareButton = (id, label, cls) => {
-      const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = cls; b.title = 'Copy link. People who open it need GitHub access.';
+      const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = cls; b.title = PUBLIC ? 'Copy link. Anyone can open it while the repository stays public.' : 'Copy link. People who open it need GitHub access.';
       b.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#link"/></svg><span></span>'; b.querySelector('span').textContent = label;
       b.addEventListener('click', copyLink); return b;
     };
@@ -179,9 +195,9 @@
     const close = document.getElementById('close-peek');
     if (close && !document.getElementById('share-record')) { const b = shareButton('share-record', 'Copy link', 'icon-btn share-record'); b.setAttribute('aria-label', 'Copy link'); close.parentElement.prepend(b); }
     const note = document.getElementById('menu-note');
-    if (note) note.textContent = 'Read-only. Nothing stored on the server. Open projects check for new commits every minute.';
+    if (note) note.textContent = PUBLIC ? 'Public view of a public repository. Read-only. Nothing stored. Checks for new commits every minute.' : 'Read-only. Nothing stored on the server. Open projects check for new commits every minute.';
   }
-  fetch('/api/session', { headers: headers(), cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(info => {
+  if (!PUBLIC) fetch('/api/session', { headers: headers(), cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(info => {
     if (!info) return;
     pollSeconds = Math.max(5, Number(info.poll_seconds) || 60); installURL = info.install_url;
     const link = document.getElementById('choose-repos'); if (link) { link.href = installURL; link.hidden = false; }

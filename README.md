@@ -31,8 +31,10 @@ current work and shipped work by day with links to proof. Pick one of eight
 themes from the account menu.
 
 Copy a link to a project or record, such as
-`horsemen.forsvn.com/owner/repo?record=progress`. People with GitHub access to
-that repository can open it. The viewer is read-only and stores no project
+`horsemen.forsvn.com/owner/repo?record=progress`. Anyone can open a link to a
+public repository without signing in, for example
+<https://horsemen.forsvn.com/hungv47/horsemen>. A link to a private repository
+opens for people with GitHub access to it. The viewer is read-only and stores no project
 data on the server. It shows the default branch, so agents commit and push
 record changes; the skill's Stop hook reminds them.
 
@@ -113,7 +115,7 @@ batch patch application are not available. Local single-record updates are
 explicit; provider saves still require the authorized host workflow. Linux
 and macOS are the test targets; Windows planning, export and updates are unsupported.
 The hosted viewer reads only repositories where its GitHub App is installed,
-and shared links open only for people with GitHub access to the repository.
+and links to private repositories open only for people with GitHub access.
 
 - [CLI commands and examples](horsemen/CLI.md)
 - [Skill and CLI differences](horsemen/references/cli.md)
