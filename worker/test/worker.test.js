@@ -119,6 +119,16 @@ test('a successful sign-in stores tokens only in an encrypted HttpOnly cookie', 
   assert.match(page, /<meta name="horsemen-mode" content="hosted">/);
   assert.ok(page.indexOf('/hosted.js') < page.indexOf('/app.js'), 'hosted scripts load before the app');
   assert.doesNotMatch(page, /__SESSION__/);
+  assert.match(page, /<meta name="horsemen-login" content="operator">/);
+});
+
+test('the login meta is escaped', async () => {
+  const e = env();
+  mockFetch(async req => req.url.endsWith('/login/oauth/access_token') ? json({ access_token: 't' }) : json({ login: '"><script>x</script>' }));
+  const login = await call('/auth/login', {}, e); const state = new URL(login.headers.get('location')).searchParams.get('state');
+  const res = await call(`/auth/callback?code=c&state=${state}`, { headers: { cookie: cookieOf(login, '__Host-horsemen-state') } }, e);
+  const page = await (await call('/', { headers: { cookie: cookieOf(res) } }, e)).text();
+  assert.doesNotMatch(page, /<script>x/); assert.match(page, /content="&quot;&gt;&lt;script&gt;/);
 });
 
 test('tampered cookies and cookies from another key are signed out', async () => {

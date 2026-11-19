@@ -196,7 +196,7 @@ async function appPage(env, request, session) {
   const anchor = '<script src="/app.js" defer>';
   if (!html.includes('__SESSION__') || !html.includes(anchor)) return respond('App page is incompatible with hosted mode.', 500);
   html = html.replace('__SESSION__', await csrfFor(env, session))
-    .replace('<meta charset="utf-8">', '<meta charset="utf-8"><meta name="horsemen-mode" content="hosted">')
+    .replace('<meta charset="utf-8">', '<meta charset="utf-8"><meta name="horsemen-mode" content="hosted"><meta name="horsemen-login" content="' + escapeHTML(session.l || '') + '">')
     .replace(/<title>[^<]*<\/title>/, '<title>Horsemen</title>')
     .replace(anchor, '<script src="/hosted-reader.js" defer></script><script src="/hosted.js" defer></script>' + anchor);
   return respond(html, 200, { 'content-type': 'text/html; charset=utf-8' });

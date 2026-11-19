@@ -163,3 +163,56 @@ test('a new commit is detected and replaces the pinned revision', async () => {
   assert.equal(updated.revision, '9'.repeat(40)); assert.equal(s.cache.has(id), false);
   assert.equal(s.snapshot().projects[0].revision, '9'.repeat(40));
 });
+
+/* Speed: concurrency, a saved discovery index, and revalidation.
+   Failure modes: too few parallel reads; the index keeps record text; a saved
+   index from another account is used; unchanged repositories are rescanned;
+   changed, removed, or new repositories are missed; a failed check drops a project. */
+test('discovery runs reads in parallel up to the configured limit', async () => {
+  const f = fake(); f.repos = Array.from({ length: 30 }, (_, i) => ({ id: i + 1, full_name: `example/r${i}`, default_branch: 'main' }));
+  let active = 0, peak = 0; const api = f.api;
+  const slow = async p => { active++; peak = Math.max(peak, active); await new Promise(r => setTimeout(r, 5)); try { return await api(p); } finally { active--; } };
+  const s = new R.ScanState(new R.Reader(slow, f.repositories, 0), { concurrency: 10 }); await s.scanSync();
+  assert.ok(peak > 4 && peak <= 10, `peak ${peak}`); assert.equal(s.snapshot().projects.length, 30);
+});
+
+test('a known account skips the profile call', async () => {
+  const f = fake(); const reader = new R.Reader(f.api, f.repositories, 30000, 'operator');
+  const s = new R.ScanState(reader); await s.scanSync(); await s.loadProject(s.snapshot().projects[0].id);
+  assert.equal(f.calls.filter(c => c === '/user').length, 0);
+});
+
+test('the saved index has no record text and restores only for the same account', async () => {
+  const f = fake(); const s = state(f); await s.scanSync(); await s.loadProject(s.snapshot().projects[0].id);
+  const index = s.exportIndex();
+  assert.equal(JSON.stringify(index).includes('# Record'), false, 'no record content');
+  assert.equal(index.account, 'operator'); assert.equal(index.projects[0].files.vision.path, 'VISION.md');
+  const t = state(fake()); assert.equal(t.restore(index, 'someone-else'), false); assert.equal(t.snapshot().phase, 'idle');
+  assert.equal(t.restore(JSON.parse(JSON.stringify(index)), 'operator'), true);
+  const snap = t.snapshot(); assert.equal(snap.phase, 'ready'); assert.equal(snap.projects.length, 1); assert.equal(snap.account, 'operator');
+  assert.equal(t.restore({ version: 99 }, 'operator'), false, 'unknown index versions are ignored');
+});
+
+test('revalidation rescans only changed and new repositories and drops removed ones', async () => {
+  const f = fake(); f.repos = ['a', 'b', 'c'].map((n, i) => ({ id: i + 1, full_name: `example/${n}`, default_branch: 'main' }));
+  const s = state(f); await s.scanSync(); const index = JSON.parse(JSON.stringify(s.exportIndex()));
+  const g = fake(); g.repos = [f.repos[0], f.repos[1], { id: 9, full_name: 'example/new', default_branch: 'main' }];
+  const changed = new Set(['example/b']);
+  const reader = new R.Reader(g.api, g.repositories, 0);
+  reader.head = async ({ repo }) => changed.has(repo) ? '9'.repeat(40) : 'a'.repeat(40);
+  const t = new R.ScanState(reader); t.restore(index, 'operator');
+  const trees = () => g.calls.filter(c => c.includes('/git/trees/')).map(c => c.split('/')[3]);
+  await t.revalidate();
+  assert.deepEqual(trees().sort(), ['b', 'new']);
+  const repos = t.snapshot().projects.map(p => p.repo).sort();
+  assert.deepEqual(repos, ['example/a', 'example/b', 'example/new']);
+  assert.equal(t.snapshot().phase, 'ready');
+});
+
+test('a failed revalidation check keeps the saved project and reports an issue', async () => {
+  const f = fake(); const s = state(f); await s.scanSync(); const index = JSON.parse(JSON.stringify(s.exportIndex()));
+  const g = fake(); const reader = new R.Reader(g.api, g.repositories, 0);
+  reader.head = async () => { throw new R.ProviderError('GitHub denied access or reached a rate limit. Check access, then retry.', 403); };
+  const t = new R.ScanState(reader); t.restore(index, 'operator'); await t.revalidate();
+  assert.equal(t.snapshot().projects.length, 1); assert.equal(t.snapshot().phase, 'partial');
+});

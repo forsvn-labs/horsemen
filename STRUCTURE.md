@@ -41,6 +41,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Run local GUI: `python3 scripts/serve_gui.py`; see [setup and limits](web/README.md).
 - Hosted viewer tests: `node --test tests/test_hosted_reader.cjs worker/test/worker.test.js`.
 - Hosted browser check: `python3 scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check`.
+- Hosted speed benchmark: `python3 scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench`.
 - Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
 - Preview checks: `node tests/test_gui_previews.cjs`.
