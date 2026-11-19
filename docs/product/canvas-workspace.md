@@ -1,0 +1,644 @@
+# Canvas workspace design
+
+Status: proposal for the owner's approval, written 2026-11-20. Nothing on this
+page is built. The owner gave the direction and three decisions on 2026-11-19;
+this page turns them into a design and a build plan.
+
+- [Clickable mock](../show-me/canvas-workspace/index.html) with fictional data.
+- [Canvas file schema](canvas.schema.json) and a
+  [checked fixture](../show-me/canvas-workspace/fixture/).
+- Questions that need an answer before a build: [Owner questions](#owner-questions).
+
+## Summary
+
+| Topic | Proposal |
+| --- | --- |
+| Workspace | One project root in one GitHub repository. A switcher at the top of the sidebar changes workspace. |
+| Sidebar | Lists the artifacts of the workspace: Home, Vision, Progress, Brain, Structure, README, Changelog, Tech stack, then boards. |
+| Canvas for each artifact | The app generates it from the record's headings. No file is necessary. A saved canvas file adds notes, media, links, groups, and connectors. |
+| Source of truth | Markdown records stay the source of truth. A canvas refers to a record section; it does not copy the text. |
+| File format | [JSON Canvas 1.0](https://jsoncanvas.org/spec/1.0/) with limits and three optional keys, in `.horsemen/canvas/<name>.canvas`. One element on each line. |
+| Media | Images, GIFs, CSV, and XLSX up to 1 MiB each in `.horsemen/media/`. Videos and large files are links. |
+| Agents | Two tools: `read` and `canvas_edit`. Local MCP server from the Python CLI. The session hook injects a pointer of 700 characters or less. |
+| People | Edit in the browser. Each save is one commit. A second, opt-in GitHub App has the write permission. |
+| Server | Still stores no project data. The viewer app, the public view, and the local app stay read-only. |
+| First slice | Sidebar and generated canvases, read-only. It needs no file format, no new permission, and no new promise. |
+
+## What changes in the promises
+
+| Promise today | After this plan |
+| --- | --- |
+| "Stores none of your project data." | Still true. Canvas files and media live in the user's repository. The Worker has no database, key-value store, or content log. It checks a save in memory and passes it to GitHub. Unsaved drafts stay in the browser tab. |
+| "Read-only. Horsemen never writes to your repositories." | No longer true for a person who installs the editor app. It stays true for the viewer app, the public view, and the local app. The sign-in page text must change in the same pull request that ships editing. |
+| "You choose the repositories." | Still true, for each app separately. |
+
+## Where this design pushes back
+
+| Idea | Risk | Smaller path in this design |
+| --- | --- | --- |
+| "Everything stays inside the canvas." | Long text is hard to read in small cards. The calm reading column shipped on 2026-11-19 for this reason. Facts that live only on a canvas are invisible to an agent that reads Markdown. | The canvas is the surface; the records are the store. A section card opens the reading view as an overlay on the canvas. Notes on a canvas are working material. A fact that must last goes into a record. |
+| One canvas file for each artifact from day one. | Files that only repeat the record add commits and merge work, and they go stale. | The app generates the canvas. A file exists only after someone adds or moves something, and it holds only those elements. |
+| A preview card for any URL. | The server must fetch pages that users name. That is a request-forgery risk, and the server would hold third-party content. | No server fetch. A link card shows the title stored in the canvas file and the host. Known hosts get an embedded player that loads on a click. |
+| Excel files in the repository. | XLSX is a binary file. Git cannot show its changes, an agent cannot read it as text, and each edit stores a full copy. | CSV is the table format. XLSX is accepted with a simple preview in a later slice. Large or live sheets are links. |
+| A save for each change. | Each commit on the default branch can start CI and deploys. GitHub also limits content creation to 80 requests a minute and 500 an hour. | Edits collect in a draft. The person selects Save. One save is one commit with `[skip ci]`. |
+| Live co-editing. | It needs a server that holds state. That breaks the storage rule. | Commits and a merge of elements by ID. The app checks for new commits every 60 seconds, as it does today. |
+| Write access on the existing GitHub App. | Each new user would see "Read and write access to code", also users who only read. GitHub has no folder-level permission. | A second, opt-in editor app. The Worker has one narrow write route. |
+| A hosted MCP endpoint now. | It needs an OAuth server on a Worker that has no storage, and it sees only pushed commits. Agents with a checkout do not need it. | Local MCP first. Decide on a hosted endpoint after local use shows a need. |
+| Edit record text in the browser. | It needs a second copy of the record rules in JavaScript. VISION is the owner's text. | Not in this plan. A section card has an "Edit on GitHub" link. Agents and the CLI keep the existing edit contract. |
+| Freehand drawing and shapes. | Not requested. It would make the app a drawing tool. | Out of scope. Cards, frames, and connectors only. |
+
+## User jobs and the first slice
+
+| Job | Who | The canvas helps when |
+| --- | --- | --- |
+| See how the parts of a record connect. | Operator | Sections are cards; connectors show what blocks, proves, or feeds what. |
+| Put the proof beside the claim. | Operator, agent | A screenshot, recording, or table sits next to the shipped item. |
+| Think in the open. | Operator | Notes, frames, and connectors on a board; decisions move into records later. |
+| Give an agent the picture cheaply. | Agent | One short tool call returns an outline; details come on demand. |
+| Move between projects. | Operator | The switcher opens another workspace at its last canvas. |
+| Show someone one exact place. | Operator | A link opens a canvas at one element. |
+
+**First slice: generated canvases, read-only.** The sidebar lists the
+artifacts. Each artifact opens as a canvas of its sections. A section card
+opens the reading view at that section. No canvas file, no format, no write
+permission.
+
+This slice tests the largest assumption at the lowest cost: that a canvas of
+sections is more useful than the reading column alone. Proof of value: the
+owner uses it on three real projects for one week and reports which of the two
+they open first, and what they want to put next to a section. If the answer is
+"the reading view, nothing", stop and rethink before the format work.
+
+## Information architecture
+
+```text
+┌ Workspace ▾ ───────┬───────────────────────────────────────────────┐
+│ Lantern Walks      │ Progress          Edit · Canvas|List · Copy link│
+│ ────────────────── │  ┌ Shipped ───┐ ─demo─▶ ┌ video ─┐ ┌ link ─┐   │
+│ Home               │  └────────────┘         └────────┘ └───────┘   │
+│ Vision             │  ┌ In progress┐ ─route▶ ┌ image ─┐ ┌ table ┐   │
+│ Progress       •   │  └────────────┘         └────────┘ └───────┘   │
+│ Brain              │        ▲ blocks                                │
+│ Structure          │  ┌ note ──────┐                                │
+│ README             │  └────────────┘                                │
+│ Changelog          │                                                │
+│ Tech stack         │                                                │
+│ Boards             │                                                │
+│ Launch plan    •   │                                 − 100% + Fit   │
+│ ────────────────── │                                                │
+│ account ▾          │                                                │
+└────────────────────┴────────────────────────────────────────────────┘
+```
+
+| Level | What it is | Where it comes from |
+| --- | --- | --- |
+| Workspace | One project root in one repository. A monorepo can hold several. | Discovery, as today: a folder with two or more core records. |
+| Artifact | A record, a supporter, or a board. | Records and supporters: the seven files. Boards: canvas files with other names. |
+| Canvas | The view of one artifact. | Generated from the record, plus the canvas file when one exists. |
+| Element | A card, frame, or connector. | Generated (a section) or saved in the canvas file. |
+
+### How the current app maps in
+
+| Today | In the canvas workspace |
+| --- | --- |
+| Rail with the project list | Workspace switcher at the top of the sidebar. Jump (Ctrl/Cmd + K) still lists projects. |
+| Home canvas of record cards | The **Home** artifact. Same cards, same linked-document branches. |
+| Peek with a type-specific view | The reading view. It opens over the canvas from a section card, a record card, or `?record=`. |
+| Canvas or List | Kept for each canvas. A phone opens in List. List is also the accessible form of a canvas. |
+| Card positions in browser storage | Stay in browser storage until browser editing ships. Then a saved layout goes into the canvas file. |
+| `?record=progress` links | Still work. New: `?canvas=progress&node=s-shipped`. |
+
+### Generated canvas
+
+1. Read the record. Make one section card for each second-level heading.
+   The card ID is `s-` plus the heading slug (`s-in-progress`); a repeated
+   heading gets `-2`, `-3`.
+2. If a canvas file exists, draw its elements at their saved places.
+3. Place each section that no saved element shows. Use a fixed grid when
+   there is no file, or a column beside the saved elements. The same input
+   always gives the same layout. Generated cards do not overlap saved cards.
+4. A saved section card whose heading no longer exists shows "Section not
+   found" with the record link. `horsemen check` reports it.
+
+A canvas file is sparse on purpose. A record with one note beside it needs a
+file with one or two lines.
+
+### Connections between artifacts
+
+| Connection | How it is stored | How it shows |
+| --- | --- | --- |
+| Inside one canvas | An edge between two elements. | A connector with an optional label. |
+| To a section of another record | A section card that names the other record, with an edge to it. | The card has a "from Vision" tag. Opening it goes to that record. |
+| To another canvas | A card that names the other canvas file. | A portal card: "Open canvas". |
+| Between records in Markdown | A normal Markdown link in the record. | As today: linked-document branches on Home. |
+| Overview | Not stored. The app reads the workspace's canvas files (at most 20) and finds the cross-references. | Dashed lines between artifact cards on Home, and a "Referenced from" list in the reading view. |
+
+An edge never crosses files. This keeps each file valid alone and lets two
+people edit two canvases with no conflict.
+
+## Canvas file format
+
+**Decision: use JSON Canvas 1.0, with a small Horsemen profile.** Agents
+already know the format, other tools can open the files, and the design work
+is done. The profile adds limits, a fixed way to write the file, and three
+optional keys.
+
+### Location and names
+
+| Item | Rule |
+| --- | --- |
+| Folder | `<project root>/.horsemen/canvas/` |
+| File | `<name>.canvas`, name `^[a-z0-9][a-z0-9-]{0,63}$` |
+| Reserved names | `home`, `vision`, `progress`, `brain`, `structure`, `readme`, `changelog`, `techstack` belong to those artifacts. |
+| Boards | Any other name. The sidebar shows the name in title case. |
+| Limits | 512 KiB a file, 500 nodes, 1,000 edges, 20 canvas files in a workspace. |
+
+### Element types
+
+The app finds the kind of an element from the JSON Canvas type plus the file
+extension or the URL host. No extra type names are necessary.
+
+| Element | JSON Canvas | How the app knows | Keys used |
+| --- | --- | --- | --- |
+| Note or card | `text` node | type | `text` (Markdown) |
+| Record section | `file` node | `.md` file and a `subpath` | `file`, `subpath` (`#Heading` or `#Parent#Child`) |
+| Whole record or document | `file` node | `.md` file, no `subpath` | `file` |
+| Canvas portal | `file` node | `.canvas` file | `file` |
+| Image or GIF | `file` node | `.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`, `.svg` | `file`, `alt` (profile key) |
+| Sheet or table | `file` node | `.csv`, `.tsv`, `.xlsx` | `file`, `subpath` (`#Sheet name` for XLSX) |
+| Video or design embed | `link` node | host is on the embed list | `url`, `title` (profile key) |
+| Link card | `link` node | any other `http` or `https` URL | `url`, `title` |
+| Group or frame | `group` node | type | `label` |
+| Connector | edge | — | `fromNode`, `toNode`, `label`, sides, ends |
+| Unknown type | any | type is not one of the four | Shown as "not supported"; kept on save |
+
+All nodes have `id`, `type`, `x`, `y`, `width`, `height`, and an optional
+`color` (`"1"` to `"6"`, or `#RRGGBB`). The presets take the colours of the
+active theme.
+
+### Example
+
+```json
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"g-proof","type":"group","x":380,"y":-60,"width":1000,"height":360,"label":"Proof for the booking page"},
+{"id":"img-route","type":"file","x":420,"y":400,"width":400,"height":250,"alt":"Map of the harbour loop with five stops","file":".horsemen/media/route-map.svg"},
+{"id":"note-risk","type":"text","x":0,"y":660,"width":320,"height":140,"color":"1","text":"**Risk:** the old gate closes at 21:00 in winter."},
+{"id":"s-shipped","type":"file","x":0,"y":0,"width":320,"height":220,"color":"4","file":"PROGRESS.md","subpath":"#Shipped"},
+{"id":"vid-walkthrough","type":"link","x":420,"y":0,"width":480,"height":270,"title":"Booking page walkthrough (3 min)","url":"https://www.youtube.com/watch?v=EXAMPLE0000"}
+],
+"edges":[
+{"id":"e-demo","fromNode":"s-shipped","toNode":"vid-walkthrough","label":"demo"}
+]
+}
+```
+
+### Rules
+
+| Rule | Detail |
+| --- | --- |
+| Version | `horsemen.version` is an integer. A file without it is version 1. The app shows a file with a higher version read-only and does not save it. |
+| Unknown keys | Kept on save, at each level. Another tool can drop the three profile keys; nothing breaks without them. |
+| IDs | `^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$`, unique in the file across nodes and edges. An ID does not change after it is made. Agents can use words (`note-risk`). The browser makes 12 random characters. `s-` is for section cards. |
+| Paths | Relative to the project root. No leading `/`, no `.` or `..` part, no backslash. |
+| URLs | `http` or `https` only. |
+| Numbers | `x`, `y`: integers from −1,000,000 to 1,000,000. `width`, `height`: 16 to 8,192. |
+| Text | A note holds up to 20,000 characters of Markdown. The app draws it with the same safe renderer as the records. |
+| Order | Groups first, then nodes by ID, then edges by ID. JSON Canvas uses the order as the stacking order; Horsemen keeps frames at the back and does not keep a manual stacking order. |
+| Canonical text | UTF-8, line feeds, one element on each line, keys `id`, `type`, `x`, `y`, `width`, `height` first and the others in A to Z order, no spaces, a final newline. `horsemen check` reports a file that is valid but not canonical as a warning. |
+| Rules a schema cannot state | Unique IDs; each edge end names a node; each `file` exists; each `subpath` matches a heading; media type and size. The CLI, the MCP tool, and the Worker check them. |
+
+Two implementations read and write the format: Python (`horsemen_core`) for
+the CLI, MCP, and hooks, and JavaScript for the browser and the Worker.
+Shared fixture files, with the expected text and the expected error for each
+case, keep the two the same. This is the same method as the reader parity
+test today.
+
+### How a canvas links to the records
+
+- A section card stores `file` and `subpath` only. The app draws the live
+  text of that section from the Markdown file at the same commit.
+- The heading text is the anchor. Records need no added IDs or comments, so
+  they stay plain Markdown that any agent can read.
+- When a heading changes, the card shows "Section not found". `check` reports
+  `canvas-dangling-ref`, and the Stop hook asks the agent to repair the card
+  when the agent changed that heading in the session.
+- An agent that reads only Markdown misses nothing that is a project fact,
+  because facts belong in records. Canvas notes are working material. The
+  `read` tool gives an agent the notes when it wants them.
+
+### Merges and conflicts
+
+| Case | Result |
+| --- | --- |
+| Two edits to different elements, through Git | Git merges them: each element is one line, and the fixed order puts new lines in different places. |
+| Two additions at the same place, through Git | A normal Git conflict. Keep both lines. A file with conflict markers fails `check` (`canvas-invalid`), so the Stop hook reports it. |
+| Browser save when the file changed on GitHub | The Worker refuses the save (the blob SHA differs). The browser reads the new file and merges by element ID with these rules, then saves again. |
+| Same element, different keys changed | Both changes are kept. |
+| Same element, both moved or resized | The person's own position wins. |
+| Same element, same content key changed (`text`, `url`, `file`, `subpath`, `label`, `title`, `alt`, `color`) | The person chooses: mine or theirs, for each element. |
+| One side deleted, the other edited | The person chooses. |
+| A node is deleted | Its edges go with it. |
+
+## Media rules and limits
+
+| Item | Rule |
+| --- | --- |
+| Folder for uploads | `<project root>/.horsemen/media/` |
+| File name | Lower case, `^[a-z0-9][a-z0-9._-]{0,99}$`. A browser upload gets `<name>-<8 hex of its SHA-256>.<ext>`, so the same file is stored once and a name never changes its content. |
+| Types | PNG, JPEG, GIF, WebP, SVG, CSV, TSV, XLSX. The content must match the extension. |
+| Size | 1 MiB for each file. This is the size that GitHub returns in one contents call, and the limit that the image reader already uses. |
+| Budget | `check` warns when `.horsemen/media/` is over 20 MiB. It does not block. |
+| Files elsewhere in the repository | A canvas can show them by path, with the same type and size rules. Uploads go to the media folder only. |
+| Too large, or a video | The editor refuses the file and offers a link card. Videos are never committed. |
+| Tables | CSV and TSV show the first 200 rows and 30 columns. XLSX shows a file card until the preview slice. |
+| Git LFS | Not used. An LFS pointer file shows as "Stored in Git LFS; not shown". |
+| Deletion | Removing a card does not delete its file. `check` lists media that no canvas uses. Git history keeps a file after deletion, so the editor warns before an upload to a public repository. |
+
+### Embeds and link cards
+
+| Address | Shows as |
+| --- | --- |
+| YouTube, Loom, Vimeo | A card with a play button. The player loads in a sandboxed frame only after a click. |
+| Figma, Google Sheets, Google Docs, Google Slides | A card with "Load preview". The same click rule. If the provider refuses the frame or the viewer has no access, the card stays a link. |
+| Any other `http` or `https` address | A link card: the stored `title`, the host, and "Open". The server fetches nothing. An agent or a person writes the title. |
+
+The app builds the frame address itself from an ID that it reads from the
+URL. It never puts a stored URL into a frame.
+
+## Browser editing and the commit flow
+
+### GitHub permission
+
+GitHub App permissions apply to a whole repository. There is no permission for
+a folder.
+
+| Option | Permission | What GitHub enforces | Limits |
+| --- | --- | --- | --- |
+| **A. Second app, "Horsemen Editor" (proposed)** | Contents: Read and write. Metadata: Read. | Only repositories where the user installed the editor. Only what that user can do. | The Worker's write route is the only narrowing to `.horsemen/`. |
+| B. Add write to the existing app | Same, on `horsemen-viewer` | Same | Each new user sees the write request, also users who only read. Existing installations stay read-only until their owner approves the change. |
+| C. "Single file" permission | Read and write to at most 10 exact paths | GitHub limits writes to those paths | No media upload, no boards, no monorepo roots. The current GitHub permission tables do not show how it works with user tokens. Test it before use. |
+
+**Contents: Read and write means this.** With a signed-in user's token, the
+app can create, change, and delete any file, branch, and tag that the user
+can, in the repositories where the editor is installed. It cannot change
+files in `.github/workflows` (that needs the Workflows permission), and it
+cannot pass branch protection that applies to the user. Horsemen asks for no
+other permission.
+
+What keeps the risk small:
+
+- The editor is opt-in for each repository. The viewer app does not change.
+- Writes use the user's token only. The app has no private key on the server
+  (the setup script discards it), so the server cannot write without a live
+  user session. Tokens expire and refresh, as today.
+- The Worker has one write route with fixed paths (below). It is not a proxy.
+- An organization can add its own rule that limits the paths of a push, where
+  its GitHub plan has push rulesets.
+
+Self-hosting: the editor app is optional. With no editor secrets, the
+instance is a viewer, as today.
+
+### What the Worker allows
+
+| Route | Method | Today | After |
+| --- | --- | --- | --- |
+| `/gh/*` | GET | Allowlisted reads with the viewer token | No change. Canvas files and media use the blob and contents routes that are already on the list. |
+| `/pub/*` | GET | Public reads, no user token | No change. Never writes. |
+| `/auth/edit/login`, `/auth/edit/callback` | GET | — | Sign-in for the editor app. The editor token goes into the same encrypted cookie, in its own field. |
+| `/write/canvas` | POST | — | The only write route. |
+
+`POST /write/canvas` request:
+
+```json
+{
+  "repo": "example-org/lantern-walks",
+  "root": "",
+  "canvas": "progress",
+  "base": "9b1c…blob SHA, or null for a new file",
+  "text": "the canvas file",
+  "media": [{ "name": "board-1a2b3c4d.png", "data": "base64" }],
+  "summary": "add 2, move 3"
+}
+```
+
+| Check | Rule |
+| --- | --- |
+| Session | A valid cookie with an editor token. The viewer token is never used for a write. Public mode has no write. |
+| Cross-site | The `Origin` header must be this site. `Sec-Fetch-Site` must be `same-origin` when present. The session token header must match (as for reads). `Content-Type` must be `application/json`. No CORS headers. |
+| Size | `Content-Length` is required. 6 MiB at most for a request, 512 KiB for the canvas, 1 MiB for each media file, 4 media files. |
+| Names | `repo`, `root`, `canvas`, and each media name match fixed patterns. The Worker builds the paths: `<root>/.horsemen/canvas/<canvas>.canvas` and `<root>/.horsemen/media/<name>`. The browser never sends a path, a branch, or a full commit message. |
+| Content | The canvas must pass the same validator as the browser, and the Worker writes it in canonical form. Each media file must match its type. |
+| Branch | The default branch only. |
+| Commit | One commit for the canvas and its new media. The Worker reads the branch head and the current blob SHA of the canvas. A different SHA from `base` returns `409` with `code: "conflict"`. If the head moves between the read and the commit, the Worker tries again, three times at most. |
+| Reply | `{ "commit": "sha", "canvas_sha": "sha", "url": "…" }`. GitHub error text is not passed on. |
+
+GitHub call: the GraphQL `createCommitOnBranch` mutation. It makes one signed
+commit for several files, as the signed-in user, and it needs the expected
+head. A short test against a disposable repository comes first in the editing
+slice. If the test finds a problem (for example with the size of a request),
+the route uses the REST contents call for each file, with the same contract.
+
+### Flow for a person
+
+1. Select **Edit**. Without the editor app on this repository, the app
+   explains the permission and links to the install page.
+2. Move, add, connect, or delete. Changes go to a draft in the tab
+   (`sessionStorage`), with the SHA of the file that the draft started from.
+   The page warns before it closes with an unsaved draft. Sign-out clears
+   drafts.
+3. Select **Save** (Ctrl/Cmd + S). A preview shows the file, the message, and
+   the changed lines.
+4. The Worker commits. The header shows the new commit.
+5. On a conflict, the browser merges (see [Merges and conflicts](#merges-and-conflicts))
+   and saves again. While a draft is open, the 60-second check also offers
+   "Merge now" when the file changes on GitHub.
+
+| Item | Rule |
+| --- | --- |
+| Batching | One save is one commit. There is no timed save. |
+| Message | `canvas(<name>): <summary> [skip ci]`, for example `canvas(progress): add 2, move 3 [skip ci]`. The Worker writes it from counts. |
+| Author | The signed-in user. GitHub signs the commit when it can. |
+| Branch | The default branch. On a protected branch, the first version says so and offers the file as a download. A later slice commits to a `horsemen/canvas` branch and links to "Open a pull request". |
+| Who can save | A user with push access. The app reads the permission from the repository list and hides Edit for others. GitHub enforces it. |
+| Public repository | The editor shows "This repository is public. Anyone can see this canvas and its files." |
+
+## Workspace switching and repository connection
+
+| Step | Behaviour |
+| --- | --- |
+| Connect GitHub | Sign in with the viewer app, as today. |
+| Pick repositories | "Choose repositories" opens the GitHub install page, as today. The switcher gets a "Connect a repository" entry that opens the same page. |
+| Find workspaces | Discovery, as today. The tree that discovery already reads also lists canvas files, so finding them costs no extra request. The saved index keeps canvas paths and SHAs, never content. |
+| Repository without records | Listed under "No records yet" with one line: ask your agent to "Use Horsemen to initialize this project". The browser does not create records. |
+| Switch | The switcher lists workspaces, most recent first, with search and a lock for private ones. It opens the last canvas of that workspace. The browser keeps only IDs for this. |
+| Unsaved draft | A switch asks: save, keep the draft, or discard. |
+| Links | `/owner/repo?root=apps%2Fweb&canvas=progress&node=s-shipped`. The sign-in return path keeps `canvas` and `node`. |
+
+## Agent access: tools, CLI, and hooks
+
+### Transport
+
+| Option | Decision | Reason |
+| --- | --- | --- |
+| Local stdio server: `horsemen mcp` | **Build.** | It reads the working tree, so it sees edits that are not pushed. No network, no token, no dependency: JSON-RPC lines on standard input and output, with the Python standard library. |
+| Same functions in the CLI: `horsemen show`, `horsemen canvas apply` | **Build.** | One implementation, three interfaces. An agent with a shell needs no tool schema in its context. |
+| Remote endpoint on the Worker | **Later.** | See [push back](#where-this-design-pushes-back). A first step could serve public repositories read-only. |
+
+The installed skill starts the server (`python3 <skill>/scripts/horsemen.py mcp`),
+so it works without the wheel. `horsemen.py mcp install` registers it through
+the host's own command (`claude mcp add`, `codex mcp add`); it does not edit
+host files.
+
+### Tools
+
+Two tools. All output is plain text, because it costs fewer tokens than JSON.
+
+```json
+[
+  {
+    "name": "read",
+    "description": "Read a Horsemen workspace. target: \"\" = index. \"progress\" = headings of a record. \"progress#Shipped\" = one section. \"progress.canvas\" = canvas outline. \"progress.canvas#id\" = one element.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "target": { "type": "string" },
+        "max_chars": { "type": "integer", "minimum": 200, "maximum": 8000 },
+        "offset": { "type": "integer", "minimum": 0 },
+        "if_rev": { "type": "string" }
+      },
+      "required": ["target"]
+    }
+  },
+  {
+    "name": "canvas_edit",
+    "description": "Change elements of one canvas file in .horsemen/canvas. Checks, formats, and writes the file. Does not commit.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "canvas": { "type": "string" },
+        "ops": {
+          "type": "array",
+          "maxItems": 50,
+          "items": {
+            "type": "object",
+            "properties": {
+              "op": { "enum": ["add", "update", "remove"] },
+              "id": { "type": "string" },
+              "node": { "type": "object" },
+              "edge": { "type": "object" },
+              "near": { "type": "string" },
+              "side": { "enum": ["right", "left", "below", "above"] }
+            },
+            "required": ["op"]
+          }
+        },
+        "base_rev": { "type": "string" },
+        "dry_run": { "type": "boolean" }
+      },
+      "required": ["canvas", "ops"]
+    }
+  }
+]
+```
+
+`read` examples:
+
+```text
+> read {"target": ""}
+workspace lantern-walks @ main 3f2a91c, 1 commit not pushed
+records: VISION 5 sections · PROGRESS 5 · BRAIN 2 · STRUCTURE 2 · README · CHANGELOG · TECHSTACK
+canvases: progress 11 nodes 7 edges · launch-plan 9 nodes 4 edges
+next: Send the autumn route to the ten pilot guests.
+
+> read {"target": "progress.canvas"}
+progress.canvas rev=3fa9c1d2 11 nodes 7 edges
+g-proof group "Proof for the booking page" @380,-60 1000x360
+s-shipped section PROGRESS.md#Shipped @0,0 320x220
+vid-walkthrough video youtube "Booking page walkthrough (3 min)" @420,0 480x270
+img-route image .horsemen/media/route-map.svg "Map of the harbour loop…" @420,400 400x250
+note-risk note "Risk: the old gate closes at 21:00 in winter…" @0,660 320x140
+…
+edges: s-shipped>vid-walkthrough "demo"; note-risk>s-in-progress "blocks"; …
+not placed: #Latest day, #Up next, #Gates
+```
+
+`canvas_edit` behaviour:
+
+| Item | Rule |
+| --- | --- |
+| `add` | `node` or `edge`. The tool makes the ID when there is none. `near` (an element ID or `#Heading`) with `side` puts the node in free space beside that element, so an agent needs no coordinates. |
+| `update` | `id` plus the keys to change in `node` or `edge`. |
+| `remove` | `id`. Edges of a removed node go too. |
+| Section cards | An op that names `#Heading` saves that section card first, with its `s-` ID. |
+| All or nothing | One bad op means nothing is written. The reply names the op and the rule. |
+| `base_rev` | When given and the file differs, nothing is written. |
+| Media | The agent copies a file into `.horsemen/media/` with its own tools, then adds a node. The tool checks type and size. No binary data goes through MCP. |
+| Reply | `ok rev=5e0c77aa added=note-7 updated=1 removed=0`, plus at most five warnings. |
+| Commit | The agent commits and pushes. The Stop hook's Publish rule covers `.horsemen/`. |
+
+### Budget for each call
+
+| Item | Limit | About |
+| --- | --- | --- |
+| Both tool definitions, as compact JSON | 1,200 characters (1,047 in this draft) | 300 tokens, once for a session |
+| `read ""` (index) | 800 characters | 200 tokens |
+| Record headings | 1,200 characters | 300 tokens |
+| One section, default | 2,000 characters; then `more: offset=2000` | 500 tokens |
+| Canvas outline | 2,000 characters; one line of 100 characters for each node | 500 tokens |
+| Any `read` | 8,000 characters with `max_chars` | 2,000 tokens |
+| `canvas_edit` reply | 400 characters | 100 tokens |
+
+Tests fail when a limit is exceeded.
+
+### Caching
+
+- The server keeps parsed files in memory by path, size, and change time.
+- Each reply starts with `rev=`, the first eight characters of the content
+  hash. `read` with `if_rev` returns `unchanged rev=…` (about 20 characters)
+  when nothing changed.
+- No cache is written to disk.
+
+### Hooks
+
+No new hook events. The two hooks change like this:
+
+| Hook | Today | Proposed |
+| --- | --- | --- |
+| SessionStart | Injects the PROGRESS snapshot: up to 60 lines and 3,000 characters, plus STRUCTURE's reading list and health lines. | **Pointer mode:** 700 characters at most. Root and records; the canvas names; the Next action line; the gates in full when they fit in 300 characters, or else "read progress#Gates before you act"; up to three health lines; one line that names the `read` tool and `horsemen show`. |
+| Stop | Asks for the four-record review; adds drift details. | The same, plus: an invalid canvas file (Lint); a section card whose heading the session changed; `.horsemen/` files in the Publish rule. |
+
+Pointer mode is a choice at install time (`hooks install --pointer`). Without
+it, the hooks work as they do today, so existing installations do not change.
+Gates stay in the pointer because the snapshot's purpose is "respect the
+gates before you act".
+
+The skill tells agents when to change a canvas: when the user asks, when a
+section card broke, and when new proof exists for a shipped item. A hook does
+not ask for canvas edits at each stop.
+
+## Security and privacy
+
+| Topic | Rule |
+| --- | --- |
+| Canvas files are untrusted input | A collaborator, or the owner of a public repository, can write anything. The app validates each file, skips bad elements with a visible count, and never fails the page. Limits: file size, node and edge counts, number ranges, string lengths. |
+| Markup | Notes go through the existing Markdown renderer: all HTML is text; links are `http` or `https` only. |
+| Colours | A preset or `#RRGGBB` only, so a colour cannot carry CSS. |
+| Paths | Checked on read and write. A canvas cannot name a file outside the repository. |
+| SVG | Only as an `<img>` from a `blob:` address, never inline or in a frame, as the image reader does. A test opens the blob address as a page and checks that its script does not run. Browser upload of SVG stays off until that test passes. |
+| Private repositories | Canvas files and media go through the same proxy with the user's token. The server keeps nothing. The saved index holds paths and SHAs only. A draft stays in the tab. |
+| Public repositories | Anyone can read canvases and media through the public view, with the same edge cache as today (60 seconds for heads, one day for objects by SHA). The public view cannot write. |
+| Rate limits | Reads: one request for each canvas file, one for each image, loaded when visible and cached by SHA; 100 media cards at most on a canvas. A user has 5,000 requests an hour. Writes: one or two GraphQL calls for a save; GitHub allows 80 content requests a minute and 500 an hour. |
+| Frames | `frame-src` gets a fixed list of embed hosts. A frame loads after a click, with `sandbox="allow-scripts allow-same-origin allow-presentation"`. |
+| Referrer | The page keeps `no-referrer`. A YouTube frame needs `referrerpolicy="strict-origin-when-cross-origin"`, or the player fails with error 153. It sends the site origin only, never the repository path. |
+| Third parties | Before a click, the browser contacts no embed host. After a click, the provider sees the viewer's IP address and the site origin. |
+| Tokens | The editor token is in the same encrypted, HttpOnly cookie. Sign-out revokes both tokens. |
+| Logs | Request logs stay off. |
+
+Content Security Policy change (slice 2b); every other directive stays:
+
+```text
+frame-src https://www.youtube-nocookie.com https://www.loom.com
+          https://player.vimeo.com https://www.figma.com https://docs.google.com
+```
+
+The exact hosts are confirmed with a live check for each provider in that
+slice. `frame-ancestors 'none'` stays: no other site can frame Horsemen.
+
+## Risks
+
+| Risk | Effect | Answer |
+| --- | --- | --- |
+| A canvas of sections is not better than the reading column. | The direction does not pay back. | Slice 1 tests it before the format work. |
+| Facts live only on canvases. | Agents and the records disagree. | Section cards refer, never copy. The skill rule: facts go into records. `read` shows notes on demand. |
+| Canvas commits start CI or deploys. | Cost and noise in the user's repository. | Explicit Save; `[skip ci]`. GitHub Actions obeys it; other systems differ. |
+| Media makes the repository heavy. | Slow clones, also for agents. | 1 MiB a file, a 20 MiB warning, links for video. |
+| The write permission scares users or is misused. | Lost trust. | Opt-in editor app, one write route, user tokens only, clear text at sign-in. |
+| Python and JavaScript read the format differently. | A file that one accepts and the other refuses. | Shared fixtures with expected text and errors; the schema as the neutral description. |
+| An agent writes bad JSON by hand. | A canvas that does not open. | `canvas_edit` and `canvas apply` validate; `check` and the Stop hook report; the app falls back to the generated canvas. |
+| A provider blocks its embed. | An empty frame. | The link card is always there. |
+| Large canvases are slow. | A poor first impression. | 500 nodes at most; images load when visible; List view. |
+| The pointer hook hides a gate from an agent. | An agent acts against a gate. | Gates stay in the pointer; opt-in first; hook scenarios test it. |
+| Another JSON Canvas tool saves the file in its own order. | A large diff once. | `check` warns; `canvas apply` with no ops writes the canonical form. |
+
+## Owner questions
+
+Each question has a proposed answer. "Yes to all" is a valid reply.
+
+| # | Question | Proposed answer | Blocks |
+| --- | --- | --- | --- |
+| 1 | Is slice 1 (sidebar and generated canvases, read-only) the right first step, with the one-week test? | Yes. | Slice 1 |
+| 2 | May the reading view open over the canvas, or must all reading happen in cards? | The reading view stays, as an overlay. | Slice 1 |
+| 3 | JSON Canvas 1.0 as the base format, in `.horsemen/canvas/*.canvas`? | Yes. A hidden folder keeps tool files out of the way. Say so if Obsidian must show the canvases; then the folder needs a visible name. | Slice 2 |
+| 4 | Media limit: 1 MiB a file, warning at 20 MiB, GIFs included? | Yes. Larger GIFs become video links. | Slice 2 |
+| 5 | CSV as the table format, XLSX preview later? | Yes. | Slice 2 |
+| 6 | Pointer mode for the session hook: opt-in first, default later? | Opt-in first. | Slice 3 |
+| 7 | Local MCP only for now; the hosted endpoint later? | Yes. | Slice 3 |
+| 8 | Write permission: a second, opt-in editor app with Contents: Read and write? | Yes (option A). | Slice 4 |
+| 9 | Browser editing covers canvases only; record text stays with agents and GitHub? | Yes. | Slice 4 |
+| 10 | Saves go to the default branch with `[skip ci]`; protected branches wait for a later slice? | Yes. | Slice 4 |
+| 11 | Notes have no author field; Git history shows who wrote what. Is that enough for "canvas discussion"? | Yes for now. Threads with names need a new decision. | Slice 4 |
+
+## Build plan
+
+Each slice is one pull request that merges and deploys alone. Each starts with
+its failure list and tests, as CONTRIBUTING.md requires.
+
+| Slice | Contents | Tests | Done when |
+| --- | --- | --- | --- |
+| **1. Generated canvases** | Sidebar with the switcher and the artifact list. A generated canvas for each artifact. Section cards open the reading view at the section. List view for each canvas. `?canvas=` and `?node=` links. | Rule tests: the layout is the same for the same record, no overlap, stable IDs, repeated headings. View tests. Browser checks, local and hosted, at desktop and phone width, with the keyboard. Worker test: sign-in keeps `canvas` and `node`. | Merged and deployed; the live files match main. Each artifact of a real project opens as a canvas. The owner's one-week answer is recorded in PROGRESS. |
+| **2a. Canvas files, read-only** | Format modules in Python and JavaScript. Drawing of notes, section cards, portals, images, link cards, groups, and connectors. Both readers load `.horsemen/canvas/`. `check` rules: `canvas-invalid`, `canvas-not-canonical`, `canvas-dangling-ref`, `canvas-media-too-large`. | Shared fixtures: valid and invalid cases with the expected text and error, run by both languages. The schema accepts and refuses the same cases. Hostile cases: script text, `javascript:` address, CSS in a colour, 5,000 nodes, a 2 MiB file, a path with `..`. The SVG blob test. Browser checks. | An agent writes a canvas file by hand in a real repository and pushes; the hosted viewer shows it. An invalid file shows a message and the generated canvas. |
+| **2b. Embeds and tables** | Click-to-load players, the `frame-src` list, CSV and TSV tables. | Worker test for the header. Unit tests: each provider's address to its frame address; unknown hosts stay link cards. Browser check against a local fake player. One live check for each provider. | A real video, a real sheet, and a CSV show on a deployed canvas. |
+| **3a. Agent tools** | `horsemen_core` canvas functions. `horsemen show`, `horsemen canvas apply`. The stdio server with `read` and `canvas_edit`. `mcp install` and `mcp status`. Skill text for canvases. | Unit tests: each op, all-or-nothing, placement with `near`, `base_rev`. Server tests through a subprocess: start, list, call, bad JSON, unknown method, output limits. Budget tests. Wheel and skill ZIP checks include the new files. | In Claude Code and in Codex, a new session in a temporary project calls both tools. The receipts are saved with the verification output. |
+| **3b. Hooks** | Pointer mode. Stop rules for canvases. Publish covers `.horsemen/`. | New hook scenarios: the pointer is 700 characters or less; gates stay; no canvas line without canvases; legacy mode is byte-for-byte the same; a broken card is reported once. All existing scenarios pass. | The owner's installed skill runs pointer mode in one real project for a week with no missed gate. |
+| **4a. Browser editing** | A test of the GitHub commit call on a disposable repository. The editor app and its sign-in. `/write/canvas`. Edit mode: move, add a note, connect, delete, save. Conflict detection with a simple merge. New sign-in page text. | Worker tests: no session, viewer token only, public mode, wrong origin, wrong content type, size, each bad name, an invalid canvas, a conflict, a moved head. Merge unit tests for each row of the conflict table. Browser check against a fake GitHub: edit, save, a commit from outside, merge. A live check on a disposable repository with before and after recordings. | The owner edits a canvas on the hosted site and sees the commit on GitHub. A viewer-only user sees no new permission request. |
+| **4b. Media and links in the browser** | Drop or paste an image, GIF, CSV, or address. The public-repository warning. The choice dialog for conflicts. | Worker tests: type checks, size, four files. Browser checks. | A dropped image shows on the canvas after one commit. |
+| **4c. Protected branches** | Save to a `horsemen/canvas` branch with a pull request link. | Worker and browser tests with a fake protected branch. | A save on a protected repository ends in an open pull request page. |
+| Later, not planned in detail | Hosted MCP for public repositories. XLSX preview. Record text editing. Branch views. Threads with names. | — | A new decision by the owner. |
+
+## Design checks in this pull request
+
+```sh
+python3 docs/show-me/canvas-workspace/check.py --schema
+```
+
+```text
+PASS: 2 canvases, 11 invalid cases (canonical form, references, limits, mock data, JSON Schema)
+```
+
+The check covers the two fixture canvases (canonical text, one element on
+each line, references, limits), eleven invalid cases (seven that the schema
+must refuse and four that only the reference rules can catch), and that the
+mock shows the same fixture files. `--schema` runs `check-jsonschema` through
+`uvx`. The fixture has one record on purpose, so the viewer does not list it
+as a project.
+
+The mock was checked in an isolated browser at 1440 and 390 pixels wide: each
+artifact opens, a section opens the reading view, a moved card gives a
+one-line change in the commit preview, the List view works, and the page has
+no script errors and no sideways scroll on a phone.
+
+## Sources
+
+- [JSON Canvas 1.0](https://jsoncanvas.org/spec/1.0/): node and edge types;
+  no version field; order is the stacking order.
+- [Choosing permissions for a GitHub App](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/choosing-permissions-for-a-github-app):
+  minimum permissions; a user token is limited by the app and the user; a
+  permission change needs approval for each installation.
+- [Permissions required for GitHub Apps](https://docs.github.com/en/rest/authentication/permissions-required-for-github-apps):
+  the contents write call needs Contents: write and accepts user tokens.
+- [Repository contents API](https://docs.github.com/en/rest/repos/contents):
+  the default branch when no branch is given; `sha` for an update; 1 MB for a
+  full read; the workflow scope for `.github/workflows`.
+- [GraphQL commits reference](https://docs.github.com/en/graphql/reference/commits):
+  `createCommitOnBranch`, `expectedHeadOid`, signed commits.
+- [REST API rate limits](https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api):
+  5,000 requests an hour for a user; 80 content requests a minute and 500 an
+  hour.
+- [GitHub Apps API updates, 2020-10-26](https://github.blog/changelog/2020-10-26-github-apps-api-updates-now-ga):
+  the single file permission and its ten paths.
+- [MCP transports](https://modelcontextprotocol.io/specification/2025-06-18/basic/transports):
+  stdio messages are JSON-RPC, one on each line.
+- [YouTube error 153 notes](https://til.simonwillison.net/youtube/fixing-153-embed):
+  the player needs a referrer.
