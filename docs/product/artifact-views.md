@@ -26,6 +26,10 @@ record view shows.
   `https` links, and never run content.
 - When a record does not follow its template, the peek shows the rendered
   document. The list layout always works.
+- A section card on a record canvas opens the view at its section. The view
+  uses the layout of the record when the layout has a part with the name of
+  the section. If not, it opens the full document at that heading. See
+  [record canvases](../../web/README.md#record-canvases).
 - The Progress, Changelog, and Techstack layouts show up to 300 items. A list
   shows up to 500 rows. The page states how many more items are in the full
   document.

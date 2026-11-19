@@ -34,11 +34,15 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   last project, then checks every branch in the background. Only changed or
   new repositories are scanned again. Sign-out and Clear workspace remove the
   index. Discovery reads up to 12 repositories in parallel.
-- **Share links.** Every project and record has a readable link, such as
-  `https://horsemen.forsvn.com/owner/repo?record=progress`. A project in a
-  subfolder adds `root=apps%2Fweb`. The address bar always shows the link for
-  the open project and record; **Copy link** in the header and in the record
-  copies it. A signed-out visitor signs in and returns to the same link. The
+- **Share links.** Every project, canvas, section card, and record has a
+  readable link. `https://horsemen.forsvn.com/owner/repo?record=progress`
+  opens a record. `?canvas=progress` opens the canvas of a record, and
+  `?canvas=progress&node=s-shipped` opens it with one section card selected.
+  A project in a subfolder adds `root=apps%2Fweb`. The address bar always
+  shows the link for the open project, canvas, card, and record; **Copy
+  link** in the header and in the record copies it. A signed-out visitor
+  signs in and returns to the same link: sign-in keeps `root`, `canvas`,
+  `node`, and `record`, checks the form of each value, and drops other keys. The
   link carries no data: the visitor needs GitHub access to the repository, and
   the app must be installed on it. Otherwise the page says so. Agents can write
   these links in reports without any API.

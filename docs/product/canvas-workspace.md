@@ -1,8 +1,11 @@
 # Canvas workspace design
 
-Status: proposal for the owner's approval, written 2026-11-19. Nothing on this
-page is built. The owner gave the direction and three decisions on 2026-11-19;
-this page turns them into a design and a build plan.
+Status: the owner approved this design and all eleven proposed answers on
+2026-11-19. Slice 1 (the sidebar and generated canvases, read-only) is built
+and waits for review; it is not deployed. See
+[slice 1 as built](#slice-1-as-built). Nothing else on this page is built.
+The owner gave the direction and three decisions on 2026-11-19; this page
+turns them into a design and a build plan.
 
 - [Clickable mock](../show-me/canvas-workspace/index.html) with fictional data.
 - [Canvas file schema](canvas.schema.json) and a
@@ -122,6 +125,28 @@ they open first, and what they want to put next to a section. If the answer is
 
 A canvas file is sparse on purpose. A record with one note beside it needs a
 file with one or two lines.
+
+### Slice 1 as built
+
+Slice 1 has step 1 and the fixed grid of step 3. The rules are in
+`web/canvas-sections.js`; `tests/test_canvas_sections.cjs` checks them.
+
+| Item | Rule in the code |
+| --- | --- |
+| Heading | A line that starts with `## `, outside code blocks and comments. These are the headings that the reading view shows. |
+| Slug | The heading as plain text, with accents folded to plain letters, in lower case; each run of other characters becomes one hyphen; 56 characters at most. A heading without letters or digits gets `section`. |
+| ID | `s-` and the slug. The second heading with the same slug gets `-2`. If that ID is taken (a heading named "Shipped 2"), the number goes up until the ID is free. An ID is 64 characters or less. |
+| Record without sections | One card for the whole record, with the ID `r-` and the record name, such as `r-readme`. |
+| Grid | Three columns, in reading order. Cards are 320 by 196; columns are 360 apart and rows 248 apart. A new last section does not move the cards before it. |
+| Card text | The heading, a few source lines (two on the canvas, three in the list), and a count for two or more list items or table rows. A table gives its first column. A diagram block gives the word "Diagram". |
+| Connectors | None on a record canvas: an edge exists only in a canvas file (slice 2a). Home keeps its connectors between records and linked documents. |
+| Moving cards | Not possible. The app saves nothing about a record canvas. Home card positions stay in browser storage, as before. |
+| Reading view | A card opens the reading view at its section: in the layout of the record when the layout names the section, else in the full document. |
+| Links | `?canvas=<record>&node=<id>`, with `&record=<record>` while the reading view is open. The local app uses `#p=<project>&c=<record>&n=<id>&r=<record>`. `?record=` links work as before. Sign-in keeps `canvas` and `node`. |
+| Switcher | Lists the projects in name order, with search for long lists and a lock for private ones. A project opens on its last canvas until the page reloads. Hosted mode adds Connect a repository. |
+
+Not in slice 1: the order by most recent use, a saved last canvas across
+reloads, "No records yet" entries, and all that needs a canvas file.
 
 ### Connections between artifacts
 

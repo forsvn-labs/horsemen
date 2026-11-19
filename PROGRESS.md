@@ -7,7 +7,7 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Build slice 1 of the canvas workspace: a sidebar of records and a read-only canvas for each record, then test it for one week. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
+Next action: Review and merge slice 1 of the canvas workspace, deploy it, then use it on three real projects for one week and record which you open first: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
 
 ## Shipped
 
@@ -37,7 +37,7 @@ Next action: Build slice 1 of the canvas workspace: a sidebar of records and a r
 
 ## In progress
 
-- **Canvas workspace design** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19; slice 1 is being built. Each project becomes a workspace with a sidebar of its records, a canvas for each record, editing by people and agents, and tools for agents. Nothing is built yet.
+- **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 is built and waits for review: the sidebar has a project switcher and a list of canvases, each record opens as a read-only canvas with one card for each section, a card opens the reading view at that section, and a link can open one canvas at one card. It is not merged or deployed. Later slices add canvas files, editing by people and agents, and tools for agents.
 
 ### Technical details
 
@@ -55,13 +55,13 @@ Next action: Build slice 1 of the canvas workspace: a sidebar of records and a r
 | Readable type and design audit | [Design audit](docs/product/design-audit.md). Theme and type tests, canvas rule tests, Worker tests, the fixture browser check, and the hosted browser check passed locally. Squash-merged in [PR #10](https://github.com/hungv47/horsemen/pull/10) after CI passed; deployed from main, and the live files match main. |
 | Views for each record type | [Artifact views](docs/product/artifact-views.md). View tests (`node tests/test_gui_views.cjs`) and the fixture browser check passed locally at desktop and phone width; full repository verification passed locally. Merged in [PR #7](https://github.com/hungv47/horsemen/pull/7) after CI passed on Linux and macOS; deployed from main, and the live files match main. |
 | Visual workspace | [Prototype](docs/show-me/product-gui/prototype.html), [canvas options](docs/show-me/product-gui/index.html), and [GUI requirements](docs/product/gui-requirements.md). Demo checks passed at desktop, tablet, and phone sizes; full repository verification passed locally. Run [the demo checks](docs/show-me/product-gui/verify.py) or the verification command in CONTRIBUTING.md. The owner chose a private local app first. Run `python3 scripts/serve_gui.py`; [setup and limits](web/README.md). Reader tests and fixture browser checks passed for discovery, source views, missing records, access failures, saved layouts, and clearing old content. Full source, wheel, and packaged-skill verification passed locally. Search and preview tests passed, including selection during an active scan. Live timing checks confirmed faster repeat loads; no private records were saved as test output. Linked-document tests cover source-authorized reads, nested navigation, external links, and visual overviews. Canvas rule and browser checks cover selection, group movement, drag cancellation, zoom, and shared branch collapse. Card controls passed mouse, keyboard, and list-view checks without selecting, dragging, or opening the card. Arrangement rule tests and browser checks found no overlap for nested and parallel branches. Browser checks passed in the light and dark themes; see [the icon system](docs/product/icon-system.md). Markdown, theme contrast, peek navigation, and reload checks passed locally. Merged in [PR #5](https://github.com/hungv47/horsemen/pull/5); CI passed on Linux and macOS. |
-| Canvas workspace design | [Design](docs/product/canvas-workspace.md) with its [owner questions](docs/product/canvas-workspace.md#owner-questions), a [canvas file schema](docs/product/canvas.schema.json), and a [clickable mock](docs/show-me/canvas-workspace/index.html) with fictional data. The fixture check passed locally with a JSON Schema validator (`python3 docs/show-me/canvas-workspace/check.py --schema`), and the mock passed browser checks at desktop and phone width. VISION holds the proposed direction text. The owner approved the design, the VISION text, and all eleven proposed answers in [PR #29](https://github.com/hungv47/horsemen/pull/29). Nothing is built or deployed. |
+| Canvas workspace | [Design](docs/product/canvas-workspace.md) with its [owner questions](docs/product/canvas-workspace.md#owner-questions), a [canvas file schema](docs/product/canvas.schema.json), and a [clickable mock](docs/show-me/canvas-workspace/index.html) with fictional data. The fixture check passed locally with a JSON Schema validator (`python3 docs/show-me/canvas-workspace/check.py --schema`), and the mock passed browser checks at desktop and phone width. VISION holds the proposed direction text. The owner approved the design, the VISION text, and all eleven proposed answers in [PR #29](https://github.com/hungv47/horsemen/pull/29). Slice 1 (generated canvases, read-only): [as built](docs/product/canvas-workspace.md#slice-1-as-built). Rule tests cover the same layout for the same record, no overlap, stable IDs, repeated headings, card text, and links (`node tests/test_canvas_sections.cjs`). Reader and Worker tests cover `canvas` and `node` in share links and through sign-in. The fixture and hosted browser checks open each canvas, open the reading view at a section, reload a link, and use the keyboard, at desktop and phone width and in each theme; full verification passed locally. Not merged or deployed. |
 
 ### Gates
 
 Existing installations do not change until refreshed. The local workspace stays a source preview. The hosted viewer is read-only and stores no project data. Public view covers public repositories only; private repositories need sign-in.
 
-Canvas workspace: design only. Do not build it before the owner approves the design and answers its questions.
+Canvas workspace: slice 1 is built but not merged or deployed. It is read-only: no canvas file, no new GitHub permission, and no writes. Do not start slice 2 before the owner records the result of the one-week test.
 
 </details>
 
