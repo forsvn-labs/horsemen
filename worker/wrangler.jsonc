@@ -1,0 +1,16 @@
+// Horsemen hosted viewer. Secrets (set with `wrangler secret put`):
+// GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_APP_SLUG, SESSION_KEY.
+// Self-hosting: change `name` and the custom domain. See README.md.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "horsemen",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "../web", "binding": "ASSETS", "run_worker_first": true },
+  "routes": [{ "pattern": "horsemen.forsvn.com", "custom_domain": true }],
+  "workers_dev": false,
+  "preview_urls": false,
+  // No request logs: URLs can name private repositories.
+  "observability": { "enabled": false },
+  "vars": { "POLL_SECONDS": "60" }
+}

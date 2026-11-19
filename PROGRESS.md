@@ -7,7 +7,7 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Use the local workspace on real projects and note what to improve. Refresh existing skill installations before the next project update.
+Next action: Sign in at horsemen.forsvn.com, install the Horsemen Viewer app on your repositories, and confirm that your projects load. Refresh existing skill installations before the next project update.
 
 ## Shipped
 
@@ -15,16 +15,21 @@ Next action: Use the local workspace on real projects and note what to improve. 
 
 - **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
 
+## In progress
+
+- **Hosted viewer** (started 2026-11-19): horsemen.forsvn.com is live. People sign in with GitHub, choose repositories, and read their projects. Nothing is stored. An open project updates when a new commit lands. It waits for the owner's first real sign-in and the PR merge.
+
 ### Technical details
 
 | Item | Evidence |
 | --- | --- |
 | Shorter records | [Pre-save edit](horsemen/references/sync.md#pre-save-edit) and the distribution regression test. The source, wheel, and packaged skill checks passed locally. |
+| Hosted viewer | Deployed to horsemen.forsvn.com from the `hosted-viewer` branch; `/healthz` reports ok and the live sign-in redirect was checked. Reader parity and Worker tests passed, and the hosted browser check passed against a fake GitHub: sign-in, project load, live update, and sign-out. Full verification passed locally. See [deploy and limits](worker/README.md) and [PR #6](https://github.com/hungv47/horsemen/pull/6). Not yet confirmed with a real account. |
 | Visual workspace | [Prototype](docs/show-me/product-gui/prototype.html), [canvas options](docs/show-me/product-gui/index.html), and [GUI requirements](docs/product/gui-requirements.md). Demo checks passed at desktop, tablet, and phone sizes; full repository verification passed locally. Run [the demo checks](docs/show-me/product-gui/verify.py) or the verification command in CONTRIBUTING.md. The owner chose a private local app first. Run `python3 scripts/serve_gui.py`; [setup and limits](web/README.md). Reader tests and fixture browser checks passed for discovery, source views, missing records, access failures, saved layouts, and clearing old content. Full source, wheel, and packaged-skill verification passed locally. Search and preview tests passed, including selection during an active scan. Live timing checks confirmed faster repeat loads; no private records were saved as test output. Linked-document tests cover source-authorized reads, nested navigation, external links, and visual overviews. Canvas rule and browser checks cover selection, group movement, drag cancellation, zoom, and shared branch collapse. Card controls passed mouse, keyboard, and list-view checks without selecting, dragging, or opening the card. Arrangement rule tests and browser checks found no overlap for nested and parallel branches. Browser checks passed in the light and dark themes; see [the icon system](docs/product/icon-system.md). Markdown, theme contrast, peek navigation, and reload checks passed locally. Merged in [PR #5](https://github.com/hungv47/horsemen/pull/5); CI passed on Linux and macOS. |
 
 ### Gates
 
-Existing installations do not change until refreshed. The visual workspace is a local source preview. Public sharing and hosted sign-in are not built.
+Existing installations do not change until refreshed. The local workspace stays a source preview. The hosted viewer is read-only and stores no project data. Public sharing is not built.
 
 </details>
 
@@ -80,7 +85,7 @@ Earlier personal installations are not public releases of this repository.
 <details>
 <summary>Upcoming roadmap</summary>
 
-- Use the local GitHub reader, then decide the scope for hosted sign-in and public sharing.
+- Hosted viewer next steps: branch and PR views, and a Stop hook warning when record edits are not pushed. Public share links come later and will need stored share metadata only.
 - Gather feedback on the existing skill and CLI while developing the visual workspace.
 - Safe automatic writes remain separate future work, with no promised date.
 

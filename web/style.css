@@ -480,3 +480,7 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
   .blocks.rows .block-head{position:static;flex-direction:row;align-items:baseline;flex-wrap:wrap}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Hosted mode: repository choice and sign-out under the account line. */
+.hosted-controls{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px}
+.hosted-controls .btn{flex:1 1 auto;justify-content:center;text-decoration:none;color:inherit}

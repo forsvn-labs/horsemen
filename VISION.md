@@ -42,7 +42,6 @@ A tool that treats a plan as permission or invents the owner's direction.
 ## Open questions
 
 - Who should the first release serve best?
-- Should the first release support reading only or edits through pull requests?
 - Should public canvases use reviewed snapshots or live updates?
 - Adoption targets and funding remain undecided.
 
@@ -50,3 +49,5 @@ A tool that treats a plan as permission or invents the owner's direction.
 
 - 2026-11-18: Hung expanded the skill-and-CLI scope to include a visual,
   self-hosted product with GitHub project discovery and public canvas sharing.
+- 2026-11-19: Hung limited the hosted product to linking Git projects and
+  viewing them. It reads records from Git and does not store their data.
