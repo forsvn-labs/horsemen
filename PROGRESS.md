@@ -1,17 +1,17 @@
 # Progress
 
-Updated: 2026-11-18 · Stage: live · Health: On track
+Updated: 2026-11-19 · Stage: live · Health: On track
 
 ## Latest day
 
 <details open>
 <summary>Latest day</summary>
 
-Next action: Use the local GitHub workspace and review project discovery and record reading.
+Next action: Review the visual workspace pull request. Then refresh existing skill installations before the next project update.
 
 ## Shipped
 
-- Nothing shipped on this update day.
+- **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
 
 ## In progress
 
@@ -21,11 +21,12 @@ Next action: Use the local GitHub workspace and review project discovery and rec
 
 | Item | Evidence |
 | --- | --- |
+| Shorter records | [Pre-save edit](horsemen/references/sync.md#pre-save-edit) and the distribution regression test. The source, wheel, and packaged skill checks passed locally. |
 | Visual workspace | [Prototype](docs/show-me/product-gui/prototype.html), [canvas options](docs/show-me/product-gui/index.html), and [GUI requirements](docs/product/gui-requirements.md). Demo checks passed at desktop, tablet, and phone sizes; full repository verification passed locally. Run [the demo checks](docs/show-me/product-gui/verify.py) or the verification command in CONTRIBUTING.md. The owner chose a private local app first. Run `python3 scripts/serve_gui.py`; [setup and limits](web/README.md). Reader tests and fixture browser checks passed for discovery, source views, missing records, access failures, saved layouts, and clearing old content. Full source, wheel, and packaged-skill verification passed locally. Search and preview tests passed, including selection during an active scan. Live timing checks confirmed faster repeat loads; no private records were saved as test output. Linked-document tests cover source-authorized reads, nested navigation, external links, and visual overviews. Canvas rule and browser checks cover selection, group movement, drag cancellation, zoom, and shared branch collapse. Card controls passed mouse, keyboard, and list-view checks without selecting, dragging, or opening the card. Arrangement rule tests and browser checks found no overlap for nested and parallel branches. Browser checks passed in the light and dark themes; see [the icon system](docs/product/icon-system.md). Markdown, theme contrast, peek navigation, and reload checks passed locally. No public GUI release has been made. |
 
 ### Gates
 
-CI, publication, and installation are still pending.
+Existing installations do not change until refreshed. The visual workspace is a local source preview in review; it has no public GUI release.
 
 </details>
 

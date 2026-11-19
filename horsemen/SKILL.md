@@ -125,6 +125,13 @@ section unless the user asks for that report. Silence does not waive a needed
 permission question or hide an actionable blocker or unsaved result. Mention
 only the concrete consequence for the task, not the skill's internal steps.
 
+## Before every prose write
+
+Before saving any prose Horsemen drafts or changes, local or in a provider,
+run the [pre-save edit](references/sync.md#pre-save-edit). Use `no-ai-slop`
+when installed; otherwise use the bundled checklist. Edit only the changed
+text. This is the agent's job; the CLI and hooks do not edit prose.
+
 ## Before finishing each task
 
 Review all four records against what the task changed. This applies to code,

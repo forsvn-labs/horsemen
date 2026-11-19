@@ -1,5 +1,5 @@
 Fonts in this folder: Cleft, Gravure, Halden, Signal, Vellum (variable, weights 100 to 900).
 Source: https://fontzz.vercel.app
-The source site states that all its families are free under the SIL Open Font License 1.1.
-These files are unmodified. Keep this notice with the fonts.
-Before a public release, add the full OFL text and the copyright line from the source.
+Each file states its copyright and the SIL Open Font License 1.1 in its name table.
+The copyright lines and the full licence text are in OFL.txt in this folder.
+These files are unmodified. Keep this notice and OFL.txt with the fonts.

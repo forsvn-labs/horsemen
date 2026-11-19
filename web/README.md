@@ -80,7 +80,7 @@ system asks for reduced motion.
 
 Fonts come from [fontzz](https://fontzz.vercel.app) and are served locally:
 Cleft (titles), Gravure (labels), Halden (interface), Vellum (reading), and
-Signal (code). See [the font notice](assets/fonts/NOTICE.txt). Icons, seals,
+Signal (code). See [the font notice](assets/fonts/NOTICE.txt) and [their licence](assets/fonts/OFL.txt). Icons, seals,
 and the app icon are original; see [the icon system](../docs/product/icon-system.md).
 
 ## Boundaries
