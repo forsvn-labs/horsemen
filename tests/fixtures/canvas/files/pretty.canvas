@@ -1,0 +1,13 @@
+{
+  "edges": [
+    { "toNode": "note-b", "label": "then", "fromNode": "note-a", "id": "e-2", "toSide": "left", "fromSide": "right" },
+    { "id": "e-1", "fromNode": "note-b", "toNode": "g-frame" }
+  ],
+  "nodes": [
+    { "text": "Second note.", "height": 140, "width": 320, "y": 0, "x": 400, "type": "text", "id": "note-b" },
+    { "id": "note-a", "type": "text", "x": 0, "y": 0, "width": 320, "height": 140, "text": "First note.", "color": "3" },
+    { "label": "Frame", "id": "g-frame", "type": "group", "x": -40, "y": -60, "width": 800, "height": 260 },
+    { "id": "Z-upper", "type": "text", "x": 0, "y": 300, "width": 320, "height": 140, "text": "Upper case sorts before lower case." },
+    { "id": "a-group", "type": "group", "x": -40, "y": 260, "width": 400, "height": 220 }
+  ]
+}

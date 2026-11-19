@@ -1,0 +1,2273 @@
+{
+ "version": 1,
+ "about": "Shared canvas format cases for the Python and JavaScript readers. See README.md in this folder.",
+ "cases": [
+  {
+   "name": "valid-progress",
+   "note": "Design fixture. Canonical. All references exist.",
+   "input": {
+    "file": "workspace/.horsemen/canvas/progress.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "valid-launch-plan",
+   "note": "Design fixture. Canonical.",
+   "input": {
+    "file": "workspace/.horsemen/canvas/launch-plan.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "valid-empty-object",
+   "note": "The smallest valid file. Writing adds the version and both lists.",
+   "input": {
+    "build": [
+     {
+      "text": "{}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[],\n\"edges\":[]\n}\n"
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-empty-lists",
+   "note": "The canonical empty canvas.",
+   "input": {
+    "build": [
+     {
+      "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[],\n\"edges\":[]\n}\n"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-pretty-printed",
+   "note": "Another tool wrote indented JSON in its own order. Groups go first, then nodes by id; upper case sorts before lower case.",
+   "input": {
+    "file": "files/pretty.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": {
+     "file": "expected/pretty.canvas"
+    }
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-unknown-keys",
+   "note": "Unknown keys at each level and an unknown node type are kept. Keys of nested objects are sorted.",
+   "input": {
+    "file": "files/unknown-keys.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": {
+     "file": "expected/unknown-keys.canvas"
+    }
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-numbers",
+   "note": "Whole numbers in any spelling become integers. Other numbers use the JavaScript number text.",
+   "input": {
+    "file": "files/numbers.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": {
+     "file": "expected/numbers.canvas"
+    }
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-bom-crlf",
+   "note": "A byte order mark and CRLF line ends are read. Writing removes them.",
+   "input": {
+    "build": [
+     {
+      "hex": "efbbbf"
+     },
+     {
+      "text": "{\r\n\"nodes\":[],\r\n\"edges\":[]\r\n}\r\n"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[],\n\"edges\":[]\n}\n"
+   }
+  },
+  {
+   "name": "valid-script-text",
+   "note": "Hostile: script text in a note, label, title, alt, and edge label is plain text. The format keeps it; the renderer must show it as text.",
+   "input": {
+    "file": "files/script-text.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "valid-proto-keys",
+   "note": "Hostile: keys such as __proto__ and constructor are plain data and are kept.",
+   "input": {
+    "file": "files/proto-keys.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": {
+     "file": "expected/proto-keys.canvas"
+    }
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-unicode",
+   "note": "Escapes are read. Writing uses the character itself, except for the quote, the backslash, and control characters below U+0020.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"caf\\u00e9 \\ud83d\\ude00 \\u2028 \\u0001 \\/ \\u007f tab\\t \\\"q\\\" \\\\\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[\n{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"caf\u00e9 \ud83d\ude00 \u2028 \\u0001 / \u007f tab\\t \\\"q\\\" \\\\\"}\n],\n\"edges\":[]\n}\n"
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-text-20000-astral",
+   "note": "A note holds 20,000 characters. A character outside the basic plane counts as one.",
+   "input": {
+    "build": [
+     {
+      "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[\n{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\""
+     },
+     {
+      "repeat": "\ud83d\ude00",
+      "count": 20000
+     },
+     {
+      "text": "\"}\n],\n\"edges\":[]\n}\n"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-limits-at",
+   "note": "Each string is at its longest allowed length.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\""
+     },
+     {
+      "repeat": "a",
+      "count": 64
+     },
+     {
+      "text": "\",\"type\":\""
+     },
+     {
+      "repeat": "t",
+      "count": 32
+     },
+     {
+      "text": "\",\"x\":0,\"y\":0,\"width\":16,\"height\":16},{\"id\":\"f\",\"type\":\"file\",\"x\":0,\"y\":0,\"width\":16,\"height\":16,\"file\":\""
+     },
+     {
+      "repeat": "p",
+      "count": 1024
+     },
+     {
+      "text": "\",\"subpath\":\"#"
+     },
+     {
+      "repeat": "s",
+      "count": 300
+     },
+     {
+      "text": "\",\"alt\":\""
+     },
+     {
+      "repeat": "a",
+      "count": 500
+     },
+     {
+      "text": "\"},{\"id\":\"l\",\"type\":\"link\",\"x\":0,\"y\":0,\"width\":16,\"height\":16,\"url\":\"https://"
+     },
+     {
+      "repeat": "u",
+      "count": 2040
+     },
+     {
+      "text": "\",\"title\":\""
+     },
+     {
+      "repeat": "t",
+      "count": 200
+     },
+     {
+      "text": "\"},{\"id\":\"g\",\"type\":\"group\",\"x\":0,\"y\":0,\"width\":16,\"height\":16,\"label\":\""
+     },
+     {
+      "repeat": "l",
+      "count": 200
+     },
+     {
+      "text": "\"}],\"edges\":[{\"id\":\"e\",\"fromNode\":\"g\",\"toNode\":\"l\",\"label\":\""
+     },
+     {
+      "repeat": "l",
+      "count": 200
+     },
+     {
+      "text": "\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-500-nodes-1000-edges",
+   "note": "The largest allowed counts.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":["
+     },
+     {
+      "repeat": "{\"id\":\"n{i}\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\"}",
+      "count": 500,
+      "join": ","
+     },
+     {
+      "text": "],\"edges\":["
+     },
+     {
+      "repeat": "{\"id\":\"e{i}\",\"fromNode\":\"n0\",\"toNode\":\"n1\"}",
+      "count": 1000,
+      "join": ","
+     },
+     {
+      "text": "]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-512-kib",
+   "note": "A file of exactly 524,288 bytes is read.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"pad\":\""
+     },
+     {
+      "repeat": "x",
+      "count": 524278
+     },
+     {
+      "text": "\"}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-nested-32",
+   "note": "Unknown data can nest to 32 levels. The top object is level 1.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"x\":"
+     },
+     {
+      "repeat": "[",
+      "count": 31
+     },
+     {
+      "repeat": "]",
+      "count": 31
+     },
+     {
+      "text": "}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-version-2",
+   "note": "A newer profile version is read with the version 1 rules and marked read-only. Tools do not save it.",
+   "input": {
+    "file": "files/version-2.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true,
+    "read_only": true
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-sides-ends",
+   "note": "Each side and end value, both colour forms, the size and position limits, and an edge from a node to itself.",
+   "input": {
+    "file": "files/sides-ends.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-group-background",
+   "note": "A group background, a canvas portal, a whole record, and a section in another letter case.",
+   "input": {
+    "file": "files/group-background.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "valid-urls",
+   "note": "Addresses that the rule accepts. A script in the query is text in a link card.",
+   "input": {
+    "file": "files/urls-accepted.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-dotted-paths",
+   "note": "Paths that look odd but have no \".\" or \"..\" part. The format accepts them; the reference rules then look for the file.",
+   "input": {
+    "file": "files/dotted-paths.canvas"
+   },
+   "expect": {
+    "errors": [],
+    "canonical": true
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-duplicate-key-last-wins",
+   "note": "A repeated key keeps its last value, as JSON readers do.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"first\",\"id\":\"last\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"a\",\"text\":\"b\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false,
+    "text": "{\n\"horsemen\":{\"version\":1},\n\"nodes\":[\n{\"id\":\"last\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"b\"}\n],\n\"edges\":[]\n}\n"
+   },
+   "schema": true
+  },
+  {
+   "name": "valid-media-at-limit",
+   "note": "A media file of exactly 1,048,576 bytes is allowed.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"m\",\"type\":\"file\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"file\":\".horsemen/media/limit.png\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [],
+    "canonical": false
+   },
+   "workspace": "workspace",
+   "schema": true,
+   "virtual": {
+    ".horsemen/media/notes.txt": {
+     "size": 10
+    },
+    ".horsemen/media/big.png": {
+     "size": 1048577
+    },
+    ".horsemen/media/limit.png": {
+     "size": 1048576
+    },
+    "docs/big-table.CSV": {
+     "size": 2000000
+    },
+    "docs/big-notes.md": {
+     "size": 2000000
+    }
+   }
+  },
+  {
+   "name": "schema-absolute-path",
+   "note": "Design fixture.",
+   "input": {
+    "file": "files/schema-absolute-path.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "schema-bad-colour",
+   "note": "Design fixture. Hostile: CSS in a colour.",
+   "input": {
+    "file": "files/schema-bad-colour.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: color must be \"1\" to \"6\" or #RRGGBB"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "schema-bad-id",
+   "note": "Design fixture. A node with a bad id is named by its position, from 1.",
+   "input": {
+    "file": "files/schema-bad-id.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 1: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "schema-fraction",
+   "note": "Design fixture.",
+   "input": {
+    "file": "files/schema-fraction.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: x must be a whole number from -1,000,000 to 1,000,000"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "schema-missing-size",
+   "note": "Design fixture. Each missing key is one error.",
+   "input": {
+    "file": "files/schema-missing-size.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: width must be a whole number from 16 to 8,192"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node a: height must be a whole number from 16 to 8,192"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "schema-path-escape",
+   "note": "Design fixture. Hostile: a path with \"..\".",
+   "input": {
+    "file": "files/schema-path-escape.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "schema-script-url",
+   "note": "Design fixture. Hostile: a javascript: address.",
+   "input": {
+    "file": "files/schema-script-url.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node a: url must be an http or https address of 2,048 characters or less"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "semantic-dangling-edge",
+   "note": "Design fixture.",
+   "input": {
+    "file": "files/semantic-dangling-edge.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-dangling-ref",
+      "message": "edge e: toNode ghost is not a node"
+     }
+    ]
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "semantic-duplicate-id",
+   "note": "Design fixture.",
+   "input": {
+    "file": "files/semantic-duplicate-id.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "duplicate id a"
+     }
+    ]
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "semantic-missing-file",
+   "note": "Design fixture.",
+   "input": {
+    "file": "files/semantic-missing-file.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node a: file .horsemen/media/not-there.png does not exist"
+     }
+    ]
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "semantic-missing-heading",
+   "note": "Design fixture.",
+   "input": {
+    "file": "files/semantic-missing-heading.json"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node a: heading #Renamed heading is not in PROGRESS.md"
+     }
+    ]
+   },
+   "workspace": "workspace",
+   "schema": true
+  },
+  {
+   "name": "hostile-urls",
+   "note": "Hostile: addresses that are not plain http or https. Upper case schemes, leading spaces, and white space inside are refused.",
+   "input": {
+    "file": "files/hostile-urls.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node u1: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u2: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u3: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u4: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u5: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u6: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u7: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u8: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u9: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u10: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u11: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u12: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u13: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u14: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u15: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node u16: url must be an http or https address of 2,048 characters or less"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "hostile-colours",
+   "note": "Hostile: a colour is a preset or #RRGGBB only, so it cannot carry CSS. A line feed after a valid value is refused.",
+   "input": {
+    "file": "files/hostile-colours.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node c1: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c2: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c3: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c4: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c5: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c6: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c7: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c8: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c9: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c10: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c11: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node c12: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e1: color must be \"1\" to \"6\" or #RRGGBB"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "hostile-paths",
+   "note": "Hostile: paths that leave the project or use a backslash or a control character.",
+   "input": {
+    "file": "files/hostile-paths.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node p1: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p2: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p3: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p4: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p5: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p6: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p7: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p8: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p9: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p10: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p11: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p12: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p13: background must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p14: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p15: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node p16: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "hostile-5000-nodes",
+   "note": "Hostile: 5,000 nodes. Elements are not checked one by one when a count is over its limit.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":["
+     },
+     {
+      "repeat": "{\"id\":\"n{i}\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\"}",
+      "count": 5000,
+      "join": ","
+     },
+     {
+      "text": "]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "more than 500 nodes"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "hostile-2-mib",
+   "note": "Hostile: a file of 2 MiB. The size is checked before the file is parsed.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"pad\":\""
+     },
+     {
+      "repeat": "x",
+      "count": 2097142
+     },
+     {
+      "text": "\"}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is larger than 512 KiB"
+     }
+    ]
+   },
+   "schema": true
+  },
+  {
+   "name": "hostile-deep-nesting",
+   "note": "Hostile: 100,000 nested lists. A parser that runs out of stack gives the same error.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"x\":"
+     },
+     {
+      "repeat": "[",
+      "count": 100000
+     },
+     {
+      "repeat": "]",
+      "count": 100000
+     },
+     {
+      "text": "}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is nested deeper than 32 levels"
+     }
+    ]
+   }
+  },
+  {
+   "name": "hostile-lone-surrogate",
+   "note": "Hostile: half of a surrogate pair cannot be written as UTF-8.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"\\ud800\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file has text that is not valid Unicode"
+     }
+    ]
+   }
+  },
+  {
+   "name": "hostile-lone-surrogate-key",
+   "note": "Hostile: the same in a key.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\",\"\\udfff\":1}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file has text that is not valid Unicode"
+     }
+    ]
+   }
+  },
+  {
+   "name": "hostile-huge-number",
+   "note": "Hostile: a number too large for a JavaScript number.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\",\"zoom\":1e400}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file has a number that is too large"
+     }
+    ]
+   }
+  },
+  {
+   "name": "hostile-huge-integer",
+   "note": "Hostile: an integer of 5,001 digits.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"n\":1"
+     },
+     {
+      "repeat": "0",
+      "count": 5000
+     },
+     {
+      "text": "}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file has a number that is too large"
+     }
+    ]
+   }
+  },
+  {
+   "name": "hostile-many-errors",
+   "note": "Hostile: many bad elements. A report holds the first 20 errors.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":["
+     },
+     {
+      "repeat": "{\"id\":\"b{i}\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\",\"color\":\"red\"}",
+      "count": 30,
+      "join": ","
+     },
+     {
+      "text": "]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node b0: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b1: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b2: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b3: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b4: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b5: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b6: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b7: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b8: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b9: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b10: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b11: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b12: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b13: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b14: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b15: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b16: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b17: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b18: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node b19: color must be \"1\" to \"6\" or #RRGGBB"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-not-json",
+   "note": "Parser messages differ by language, so the error text is fixed.",
+   "input": {
+    "build": [
+     {
+      "text": "not json"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is not valid JSON"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-empty-file",
+   "note": "An empty file.",
+   "input": {
+    "build": [
+     {
+      "text": ""
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is not valid JSON"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-trailing-text",
+   "note": "Text after the object.",
+   "input": {
+    "build": [
+     {
+      "text": "{} x"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is not valid JSON"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-nan",
+   "note": "NaN and Infinity are not JSON.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[],\"zoom\":NaN}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is not valid JSON"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-single-quotes",
+   "note": "Single quotes are not JSON.",
+   "input": {
+    "build": [
+     {
+      "text": "{'nodes':[]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is not valid JSON"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-conflict-markers",
+   "note": "A Git conflict: keep both lines and remove the markers.",
+   "input": {
+    "file": "files/conflict-markers.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file has Git conflict markers"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-not-utf8",
+   "note": "Bytes that are not UTF-8.",
+   "input": {
+    "build": [
+     {
+      "hex": "fffe7b7d"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is not valid UTF-8"
+     }
+    ]
+   }
+  },
+  {
+   "name": "invalid-top-list",
+   "note": "The top level is an object.",
+   "input": {
+    "build": [
+     {
+      "text": "[]"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file must be a JSON object"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-top-string",
+   "note": "The top level is an object.",
+   "input": {
+    "build": [
+     {
+      "text": "\"canvas\""
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file must be a JSON object"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-nodes-object",
+   "note": "Both lists are checked.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":{},\"edges\":\"x\"}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "nodes must be a list"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edges must be a list"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-version-zero",
+   "note": "The version starts at 1.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"horsemen\":{\"version\":0}}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "horsemen must be an object with a whole-number version of 1 or more"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-version-string",
+   "note": "The version is a number.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"horsemen\":{\"version\":\"1\"}}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "horsemen must be an object with a whole-number version of 1 or more"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-version-fraction",
+   "note": "The version is a whole number.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"horsemen\":{\"version\":1.5}}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "horsemen must be an object with a whole-number version of 1 or more"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-version-missing",
+   "note": "A horsemen object needs a version.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"horsemen\":{}}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "horsemen must be an object with a whole-number version of 1 or more"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-horsemen-list",
+   "note": "The horsemen key holds an object.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"horsemen\":[]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "horsemen must be an object with a whole-number version of 1 or more"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-nested-33",
+   "note": "One level too deep.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"x\":"
+     },
+     {
+      "repeat": "[",
+      "count": 32
+     },
+     {
+      "repeat": "]",
+      "count": 32
+     },
+     {
+      "text": "}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is nested deeper than 32 levels"
+     }
+    ]
+   },
+   "schema": true
+  },
+  {
+   "name": "invalid-512-kib-plus-1",
+   "note": "One byte over the size limit.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"pad\":\""
+     },
+     {
+      "repeat": "x",
+      "count": 524279
+     },
+     {
+      "text": "\"}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "file is larger than 512 KiB"
+     }
+    ]
+   },
+   "schema": true
+  },
+  {
+   "name": "invalid-501-nodes",
+   "note": "One node over the limit.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":["
+     },
+     {
+      "repeat": "{\"id\":\"n{i}\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\"}",
+      "count": 501,
+      "join": ","
+     },
+     {
+      "text": "]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "more than 500 nodes"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-1001-edges",
+   "note": "One edge over the limit.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\"x\"}],\"edges\":["
+     },
+     {
+      "repeat": "{\"id\":\"e{i}\",\"fromNode\":\"n\",\"toNode\":\"n\"}",
+      "count": 1001,
+      "join": ","
+     },
+     {
+      "text": "]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "more than 1,000 edges"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-text-20001",
+   "note": "One character over the note limit.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"n\",\"type\":\"text\",\"x\":0,\"y\":0,\"width\":320,\"height\":140,\"text\":\""
+     },
+     {
+      "repeat": "x",
+      "count": 20001
+     },
+     {
+      "text": "\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node n: text must be a string of 20,000 characters or less"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-limits-over",
+   "note": "Each string is one character too long.",
+   "input": {
+    "build": [
+     {
+      "text": "{\"nodes\":[{\"id\":\"f\",\"type\":\"file\",\"x\":0,\"y\":0,\"width\":16,\"height\":16,\"file\":\""
+     },
+     {
+      "repeat": "p",
+      "count": 1025
+     },
+     {
+      "text": "\",\"subpath\":\"#"
+     },
+     {
+      "repeat": "s",
+      "count": 301
+     },
+     {
+      "text": "\",\"alt\":\""
+     },
+     {
+      "repeat": "a",
+      "count": 501
+     },
+     {
+      "text": "\"},{\"id\":\"l\",\"type\":\"link\",\"x\":0,\"y\":0,\"width\":16,\"height\":16,\"url\":\"https://"
+     },
+     {
+      "repeat": "u",
+      "count": 2041
+     },
+     {
+      "text": "\",\"title\":\""
+     },
+     {
+      "repeat": "t",
+      "count": 201
+     },
+     {
+      "text": "\"},{\"id\":\"g\",\"type\":\"group\",\"x\":0,\"y\":0,\"width\":16,\"height\":16,\"label\":\""
+     },
+     {
+      "repeat": "l",
+      "count": 201
+     },
+     {
+      "text": "\"}],\"edges\":[{\"id\":\"e\",\"fromNode\":\"g\",\"toNode\":\"l\",\"label\":\""
+     },
+     {
+      "repeat": "l",
+      "count": 201
+     },
+     {
+      "text": "\"}]}"
+     }
+    ]
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node f: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node f: subpath must start with \"#\" and have 1 to 300 more characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node f: alt must be a string of 500 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node l: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node l: title must be a string of 200 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node g: label must be a string of 200 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e: label must be a string of 200 characters or less"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-types",
+   "note": "Wrong types and values for the keys that each node has.",
+   "input": {
+    "file": "files/invalid-types.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node t1: x must be a whole number from -1,000,000 to 1,000,000"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t2: y must be a whole number from -1,000,000 to 1,000,000"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t3: width must be a whole number from 16 to 8,192"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t4: height must be a whole number from 16 to 8,192"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t5: x must be a whole number from -1,000,000 to 1,000,000"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t6: y must be a whole number from -1,000,000 to 1,000,000"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t7: type must be a string of 1 to 32 characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t8: type must be a string of 1 to 32 characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t9: type must be a string of 1 to 32 characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t10: x must be a whole number from -1,000,000 to 1,000,000"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node t11: width must be a whole number from 16 to 8,192"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 12: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 13: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 14: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 15: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 16: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 17: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 18: must be an object"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node at position 19: must be an object"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-kinds",
+   "note": "Rules for the keys of each node type.",
+   "input": {
+    "file": "files/invalid-kinds.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "node k1: text must be a string of 20,000 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k2: text must be a string of 20,000 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k3: url must be an http or https address of 2,048 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k4: file must be a path inside the project (no leading \"/\", no \".\" or \"..\" part, no backslash)"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k5: subpath must start with \"#\" and have 1 to 300 more characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k6: subpath must start with \"#\" and have 1 to 300 more characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k7: subpath must start with \"#\" and have 1 to 300 more characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k8: subpath must start with \"#\" and have 1 to 300 more characters"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k9: alt must be a string of 500 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k10: title must be a string of 200 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k11: label must be a string of 200 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k12: backgroundStyle must be \"cover\", \"ratio\", or \"repeat\""
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node k13: text must be a string of 20,000 characters or less"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-edges",
+   "note": "Rules for edges. An edge with a bad end is not also reported as dangling.",
+   "input": {
+    "file": "files/invalid-edges.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "edge at position 1: must be an object"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e2: fromNode must be an id"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e3: toNode must be an id"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e4: fromSide must be \"top\", \"right\", \"bottom\", or \"left\""
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e5: toEnd must be \"none\" or \"arrow\""
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e6: label must be a string of 200 characters or less"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge at position 7: id must be 1 to 64 letters, digits, \"_\" or \"-\", and start with a letter or digit"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e8: color must be \"1\" to \"6\" or #RRGGBB"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e9: toSide must be \"top\", \"right\", \"bottom\", or \"left\""
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e10: fromEnd must be \"none\" or \"arrow\""
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "edge e11: fromNode must be an id"
+     }
+    ]
+   },
+   "schema": false
+  },
+  {
+   "name": "invalid-edge-to-edge",
+   "note": "An edge end must name a node, not an edge. Each missing end is one error.",
+   "input": {
+    "file": "files/edge-to-edge.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-dangling-ref",
+      "message": "edge e2: fromNode e1 is not a node"
+     },
+     {
+      "code": "canvas-dangling-ref",
+      "message": "edge e3: fromNode ghost is not a node"
+     },
+     {
+      "code": "canvas-dangling-ref",
+      "message": "edge e3: toNode phantom is not a node"
+     }
+    ]
+   },
+   "schema": true
+  },
+  {
+   "name": "invalid-duplicate-ids",
+   "note": "IDs are unique across nodes and edges. Each repeated id is reported once.",
+   "input": {
+    "file": "files/duplicate-ids.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-invalid",
+      "message": "duplicate id a"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "duplicate id b"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "duplicate id e"
+     }
+    ]
+   },
+   "schema": true
+  },
+  {
+   "name": "invalid-references",
+   "note": "Reference rules need the project files: a folder is not a file, media has a type and a 1 MiB limit, a heading must exist.",
+   "input": {
+    "file": "files/refs.canvas"
+   },
+   "expect": {
+    "errors": [
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node r1: file .horsemen/media does not exist"
+     },
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node r2: file .horsemen/canvas/none.canvas does not exist"
+     },
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node r3: heading #In progress#Missing child is not in PROGRESS.md"
+     },
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node r4: background .horsemen/media/none.png does not exist"
+     },
+     {
+      "code": "canvas-invalid",
+      "message": "node r5: file .horsemen/media/notes.txt is not a supported media type"
+     },
+     {
+      "code": "canvas-media-too-large",
+      "message": "node r6: file .horsemen/media/big.png is larger than 1 MiB"
+     },
+     {
+      "code": "canvas-media-too-large",
+      "message": "node r8: file docs/big-table.CSV is larger than 1 MiB"
+     },
+     {
+      "code": "canvas-media-too-large",
+      "message": "node r9: background .horsemen/media/big.png is larger than 1 MiB"
+     },
+     {
+      "code": "canvas-dangling-ref",
+      "message": "node r10: file %2e%2e/x.md does not exist"
+     }
+    ]
+   },
+   "workspace": "workspace",
+   "schema": true,
+   "virtual": {
+    ".horsemen/media/notes.txt": {
+     "size": 10
+    },
+    ".horsemen/media/big.png": {
+     "size": 1048577
+    },
+    ".horsemen/media/limit.png": {
+     "size": 1048576
+    },
+    "docs/big-table.CSV": {
+     "size": 2000000
+    },
+    "docs/big-notes.md": {
+     "size": 2000000
+    }
+   }
+  }
+ ],
+ "slugs": [
+  {
+   "heading": "In progress",
+   "slug": "in-progress"
+  },
+  {
+   "heading": "Up next",
+   "slug": "up-next"
+  },
+  {
+   "heading": "Latest day",
+   "slug": "latest-day"
+  },
+  {
+   "heading": "  Spaces   and\ttabs  ",
+   "slug": "spaces-and-tabs"
+  },
+  {
+   "heading": "C# and F#",
+   "slug": "c-and-f"
+  },
+  {
+   "heading": "\u00c9mile Zola",
+   "slug": "mile-zola"
+  },
+  {
+   "heading": "\u00dcber-Gr\u00f6\u00dfe",
+   "slug": "ber-gr-e"
+  },
+  {
+   "heading": "\u65e5\u672c\u8a9e",
+   "slug": ""
+  },
+  {
+   "heading": "---",
+   "slug": ""
+  },
+  {
+   "heading": "\u0130stanbul",
+   "slug": "i-stanbul"
+  },
+  {
+   "heading": "2026-11-19",
+   "slug": "2026-11-19"
+  },
+  {
+   "heading": "What we will never become",
+   "slug": "what-we-will-never-become"
+  },
+  {
+   "heading": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+   "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "heading": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b c",
+   "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  {
+   "heading": "UPPER lower 123",
+   "slug": "upper-lower-123"
+  }
+ ],
+ "sections": [
+  {
+   "note": "Generated section cards: one for each second-level heading, in order. A repeated id gets -2, -3; an empty slug is \"section\".",
+   "markdown": "# P\n\nintro\n\n## Latest day\n\ntext\n\n## Shipped\n\n### Technical details\n\n## In progress\n## Shipped\n## Shipped 2\n## \u65e5\u672c\u8a9e\n## ---\n## Shipped\n",
+   "sections": [
+    {
+     "title": "Latest day",
+     "id": "s-latest-day"
+    },
+    {
+     "title": "Shipped",
+     "id": "s-shipped"
+    },
+    {
+     "title": "In progress",
+     "id": "s-in-progress"
+    },
+    {
+     "title": "Shipped",
+     "id": "s-shipped-2"
+    },
+    {
+     "title": "Shipped 2",
+     "id": "s-shipped-2-2"
+    },
+    {
+     "title": "\u65e5\u672c\u8a9e",
+     "id": "s-section"
+    },
+    {
+     "title": "---",
+     "id": "s-section-2"
+    },
+    {
+     "title": "Shipped",
+     "id": "s-shipped-3"
+    }
+   ]
+  },
+  {
+   "note": "Headings in fenced code are not sections. Closing hashes are removed. CRLF works.",
+   "markdown": "## Real\r\n```\r\n## In fence\r\n```\r\n~~~\n## In tilde\n~~~\n## Closed ##\n## C#\n##NoSpace\n ## Indented\n### Deeper\n##\tTabbed\n## \n",
+   "sections": [
+    {
+     "title": "Real",
+     "id": "s-real"
+    },
+    {
+     "title": "Closed",
+     "id": "s-closed"
+    },
+    {
+     "title": "C#",
+     "id": "s-c"
+    },
+    {
+     "title": "Tabbed",
+     "id": "s-tabbed"
+    }
+   ]
+  },
+  {
+   "note": "No headings.",
+   "markdown": "plain text\n",
+   "sections": []
+  }
+ ],
+ "headings": [
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#Shipped",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#shipped",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#SHIPPED ",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "# Shipped",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#Detail",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#Shipped#Detail",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#Next#Detail",
+   "found": false
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#T#Next",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#T#Detail",
+   "found": true
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#Detail#Shipped",
+   "found": false
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#Missing",
+   "found": false
+  },
+  {
+   "markdown": "# T\n\n## Shipped\ntext\n\n### Detail\n\n## Next\n",
+   "subpath": "#text",
+   "found": false
+  },
+  {
+   "markdown": "## Real\n```\n## In fence\n```\n~~~\n## In tilde\n~~~\n## After\n",
+   "subpath": "#Real",
+   "found": true
+  },
+  {
+   "markdown": "## Real\n```\n## In fence\n```\n~~~\n## In tilde\n~~~\n## After\n",
+   "subpath": "#In fence",
+   "found": false
+  },
+  {
+   "markdown": "## Real\n```\n## In fence\n```\n~~~\n## In tilde\n~~~\n## After\n",
+   "subpath": "#In tilde",
+   "found": false
+  },
+  {
+   "markdown": "## Real\n```\n## In fence\n```\n~~~\n## In tilde\n~~~\n## After\n",
+   "subpath": "#After",
+   "found": true
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#Title",
+   "found": true
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#C",
+   "found": false
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#Trailing",
+   "found": true
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#Seven",
+   "found": false
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#NoSpace",
+   "found": false
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#Indented",
+   "found": false
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#Tabbed",
+   "found": true
+  },
+  {
+   "markdown": "## Title ##\n## C#\n## Trailing   \n####### Seven\n##NoSpace\n  ## Indented\n#\tTabbed\n## Win\r\ntext\r\n",
+   "subpath": "#Win",
+   "found": true
+  },
+  {
+   "markdown": "## A\n### X\n## B\n### Y\n",
+   "subpath": "#A#X",
+   "found": true
+  },
+  {
+   "markdown": "## A\n### X\n## B\n### Y\n",
+   "subpath": "#A#Y",
+   "found": false
+  },
+  {
+   "markdown": "## A\n### X\n## B\n### Y\n",
+   "subpath": "#B#Y",
+   "found": true
+  },
+  {
+   "markdown": "## A\n### X\n## B\n### Y\n",
+   "subpath": "#B#X",
+   "found": false
+  },
+  {
+   "markdown": "## A\n### X\n## A\n### Y\n",
+   "subpath": "#A#X",
+   "found": true
+  },
+  {
+   "markdown": "## A\n### X\n## A\n### Y\n",
+   "subpath": "#A#Y",
+   "found": false
+  }
+ ]
+}
