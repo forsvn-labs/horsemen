@@ -5,12 +5,12 @@
 {"id":"g-route","type":"group","x":380,"y":340,"width":1000,"height":360,"label":"Autumn route"},
 {"id":"img-route","type":"file","x":420,"y":400,"width":400,"height":250,"alt":"Map of the harbour loop with five stops","file":".horsemen/media/route-map.svg"},
 {"id":"link-survey","type":"link","x":940,"y":0,"width":400,"height":120,"title":"Guest survey results, October","url":"https://example.com/lantern-walks/guest-survey"},
-{"id":"note-risk","type":"text","x":0,"y":660,"width":320,"height":140,"color":"1","text":"**Risk:** the old gate closes at 21:00 in winter.\n\nAsk the guides for a second end point."},
-{"id":"ref-start","type":"file","x":940,"y":150,"width":400,"height":120,"file":"README.md","subpath":"#Get started"},
+{"id":"note-risk","type":"text","x":-380,"y":430,"width":320,"height":140,"color":"1","text":"**Risk:** the old gate closes at 21:00 in winter.\n\nAsk the guides for a second end point."},
+{"id":"ref-start","type":"file","x":0,"y":-180,"width":320,"height":130,"file":"README.md","subpath":"#Get started"},
 {"id":"s-in-progress","type":"file","x":0,"y":400,"width":320,"height":200,"color":"2","file":"PROGRESS.md","subpath":"#In progress"},
 {"id":"s-shipped","type":"file","x":0,"y":0,"width":320,"height":220,"color":"4","file":"PROGRESS.md","subpath":"#Shipped"},
 {"id":"sheet-signups","type":"file","x":860,"y":400,"width":480,"height":250,"file":".horsemen/media/pilot-signups.csv"},
-{"id":"to-launch","type":"file","x":0,"y":860,"width":320,"height":100,"file":".horsemen/canvas/launch-plan.canvas"},
+{"id":"to-launch","type":"file","x":0,"y":660,"width":320,"height":100,"file":".horsemen/canvas/launch-plan.canvas"},
 {"id":"vid-walkthrough","type":"link","x":420,"y":0,"width":480,"height":270,"title":"Booking page walkthrough (3 min)","url":"https://www.youtube.com/watch?v=EXAMPLE0000"}
 ],
 "edges":[
@@ -18,8 +18,8 @@
 {"id":"e-launch","fromNode":"s-in-progress","toNode":"to-launch","label":"feeds"},
 {"id":"e-risk","fromNode":"note-risk","toNode":"s-in-progress","label":"blocks"},
 {"id":"e-route","fromNode":"s-in-progress","toNode":"img-route","label":"route"},
-{"id":"e-signups","fromNode":"sheet-signups","toNode":"s-in-progress","label":"demand"},
+{"id":"e-signups","fromNode":"img-route","toNode":"sheet-signups","label":"demand"},
 {"id":"e-start","fromNode":"s-shipped","toNode":"ref-start","label":"explained in"},
-{"id":"e-survey","fromNode":"s-shipped","toNode":"link-survey","label":"feedback"}
+{"id":"e-survey","fromNode":"vid-walkthrough","toNode":"link-survey","label":"feedback"}
 ]
 }

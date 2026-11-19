@@ -184,7 +184,7 @@ active theme.
 "nodes":[
 {"id":"g-proof","type":"group","x":380,"y":-60,"width":1000,"height":360,"label":"Proof for the booking page"},
 {"id":"img-route","type":"file","x":420,"y":400,"width":400,"height":250,"alt":"Map of the harbour loop with five stops","file":".horsemen/media/route-map.svg"},
-{"id":"note-risk","type":"text","x":0,"y":660,"width":320,"height":140,"color":"1","text":"**Risk:** the old gate closes at 21:00 in winter."},
+{"id":"note-risk","type":"text","x":-380,"y":430,"width":320,"height":140,"color":"1","text":"**Risk:** the old gate closes at 21:00 in winter."},
 {"id":"s-shipped","type":"file","x":0,"y":0,"width":320,"height":220,"color":"4","file":"PROGRESS.md","subpath":"#Shipped"},
 {"id":"vid-walkthrough","type":"link","x":420,"y":0,"width":480,"height":270,"title":"Booking page walkthrough (3 min)","url":"https://www.youtube.com/watch?v=EXAMPLE0000"}
 ],
@@ -458,7 +458,7 @@ g-proof group "Proof for the booking page" @380,-60 1000x360
 s-shipped section PROGRESS.md#Shipped @0,0 320x220
 vid-walkthrough video youtube "Booking page walkthrough (3 min)" @420,0 480x270
 img-route image .horsemen/media/route-map.svg "Map of the harbour loop…" @420,400 400x250
-note-risk note "Risk: the old gate closes at 21:00 in winter…" @0,660 320x140
+note-risk note "Risk: the old gate closes at 21:00 in winter…" @-380,430 320x140
 …
 edges: s-shipped>vid-walkthrough "demo"; note-risk>s-in-progress "blocks"; …
 not placed: #Latest day, #Up next, #Gates
