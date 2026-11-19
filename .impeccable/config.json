@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "web/index.html"
+        ],
+        "createdAt": "2026-11-19T08:40:13.940Z",
+        "reason": "owner brief (via parent task): keep Engraved bone and ink as the default look; bone paper predates this change"
+      }
+    ]
+  }
+}
