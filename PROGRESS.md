@@ -11,7 +11,7 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 ## Shipped
 
-- **Calm workspace** (2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Waits for owner review in [PR #18](https://github.com/hungv47/horsemen/pull/18); not merged or deployed. Live on horsemen.forsvn.com.
+- **Calm workspace** (2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Live on horsemen.forsvn.com.
 
 - **Share links** (2026-11-19): Each project and record on horsemen.forsvn.com has a readable link, such as `/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository open the same record after sign-in. Live on horsemen.forsvn.com.
 
