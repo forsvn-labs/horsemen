@@ -23,7 +23,7 @@ jobs:
       - name: Build prerequisites
         run: python -m pip install 'setuptools==77.0.3' wheel
       - name: Verify both interfaces
-        run: python -B scripts/verify.py --output "$RUNNER_TEMP/horsemen-verification"
+        run: python -B scripts/verify.py --jobs 2 --output "$RUNNER_TEMP/horsemen-verification"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

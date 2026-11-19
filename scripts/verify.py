@@ -1,5 +1,6 @@
 """Verify source, built CLI, and packaged skill; leave a repeatable receipt."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import hashlib
 import json
 import os
@@ -17,9 +18,31 @@ from distribution import build_skill, version
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def run_phases(phases, jobs):
+    """Run every parallel phase and surface all errors before failing."""
+    if jobs == 1:
+        for phase in phases:
+            phase()
+        return
+    errors = []
+    with ThreadPoolExecutor(max_workers=jobs) as pool:
+        futures = [pool.submit(phase) for phase in phases]
+        for future in futures:
+            try:
+                future.result()
+            except Exception as error:
+                errors.append(error)
+    if len(errors) == 1:
+        raise errors[0]
+    if errors:
+        raise RuntimeError("; ".join(str(error) for error in errors))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path, help="New output directory outside checkout")
+    parser.add_argument("--jobs", type=int, choices=(1, 2), default=1,
+                        help="Run source and package verification concurrently (default: 1)")
     args = parser.parse_args()
     output = args.output.resolve()
     if output.is_relative_to(ROOT):
@@ -31,23 +54,23 @@ def main():
     receipt = {"version": version(ROOT), "python": platform.python_version(),
                "platform": platform.system(), "status": "running", "checks": []}
 
-    def run(label, command, cwd=ROOT, extra=None):
+    def run(label, command, cwd=ROOT, extra=None, checks=None):
         print(label, flush=True)
         started = time.monotonic()
         result = subprocess.run(command, cwd=cwd, env=dict(env, **(extra or {})),
                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         (output / f"{label}.log").write_text(result.stdout)
-        receipt["checks"].append({"name": label, "command": command,
-                                  "exit_code": result.returncode,
-                                  "seconds": round(time.monotonic() - started, 2)})
+        if checks is None:
+            checks = receipt["checks"]
+        checks.append({"name": label, "command": command,
+                       "exit_code": result.returncode,
+                       "seconds": round(time.monotonic() - started, 2)})
         if result.returncode:
             print(result.stdout[-5000:], file=sys.stderr)
             raise RuntimeError(f"{label} failed; see its log")
         return result.stdout
 
-    try:
-        receipt["commit"] = run("revision", ["git", "rev-parse", "HEAD"]).strip()
-        receipt["source_dirty"] = bool(run("source-status", ["git", "status", "--porcelain"]).strip())
+    def source_checks(run, _temp):
         run("distribution-tests", [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"])
         # Hosted viewer: reader parity with Python, and the Worker's auth and proxy rules.
         if not shutil.which("node"): raise RuntimeError("hosted-tests need Node.js 20 or later")
@@ -56,33 +79,57 @@ def main():
                       "test_brain", "test_records", "test_drive_adapter"):
             run(suite, [sys.executable, "-B", f"horsemen/scripts/{suite}.py"])
         run("source-hooks", [sys.executable, "-B", "horsemen/scripts/e2e.py", "--output", str(output / "source-hooks.json")])
+
+
+    def package_checks(run, temp):
         archive = build_skill(ROOT, output / "skill")
+        # Build from the same clean copy distributed as the skill. No build debris enters source.
+        with zipfile.ZipFile(archive) as package:
+            package.extractall(temp / "source")
+        for name in ("pyproject.toml", "README.md"):
+            shutil.copy2(ROOT / name, temp / "source" / name)
+        if (ROOT / "LICENSE").exists():
+            shutil.copy2(ROOT / "LICENSE", temp / "source/LICENSE")
+        wheels = output / "wheels"
+        run("wheel-build", [sys.executable, "-m", "pip", "wheel", str(temp / "source"),
+                            "--no-deps", "--no-build-isolation", "--wheel-dir", str(wheels)])
+        wheel, = wheels.glob("*.whl")
+        venv.EnvBuilder(with_pip=True).create(temp / "venv")
+        python = temp / "venv/bin/python"
+        cli = temp / "venv/bin/horsemen"
+        run("wheel-install", [str(python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel)])
+        run("installed-cli", [sys.executable, "-B", str(ROOT / "horsemen/scripts/test_cli.py")],
+            cwd=temp, extra={"HORSEMEN_CLI": str(cli)})
+        installed_version = run("installed-version", [str(cli), "--version"], cwd=temp).strip()
+        if installed_version != receipt["version"]:
+            raise RuntimeError("CLI and skill versions differ")
+        run("packaged-hooks", [sys.executable, "-B", str(temp / "source/horsemen/scripts/e2e.py"),
+                               "--output", str(output / "packaged-hooks.json")], cwd=temp)
+        receipt["artifacts"] = [{"file": str(p.relative_to(output)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
+                                for p in (archive, wheel)]
+
+    def isolated(phase, checks):
         with tempfile.TemporaryDirectory(prefix="horsemen-verify-") as temporary:
             temp = Path(temporary)
-            # Build from the same clean copy distributed as the skill. No build debris enters source.
-            with zipfile.ZipFile(archive) as package:
-                package.extractall(temp / "source")
-            for name in ("pyproject.toml", "README.md"):
-                shutil.copy2(ROOT / name, temp / "source" / name)
-            if (ROOT / "LICENSE").exists():
-                shutil.copy2(ROOT / "LICENSE", temp / "source/LICENSE")
-            wheels = output / "wheels"
-            run("wheel-build", [sys.executable, "-m", "pip", "wheel", str(temp / "source"),
-                                "--no-deps", "--no-build-isolation", "--wheel-dir", str(wheels)])
-            wheel, = wheels.glob("*.whl")
-            venv.EnvBuilder(with_pip=True).create(temp / "venv")
-            python = temp / "venv/bin/python"
-            cli = temp / "venv/bin/horsemen"
-            run("wheel-install", [str(python), "-m", "pip", "install", "--no-index", "--no-deps", str(wheel)])
-            run("installed-cli", [sys.executable, "-B", str(ROOT / "horsemen/scripts/test_cli.py")],
-                cwd=temp, extra={"HORSEMEN_CLI": str(cli)})
-            installed_version = run("installed-version", [str(cli), "--version"], cwd=temp).strip()
-            if installed_version != receipt["version"]:
-                raise RuntimeError("CLI and skill versions differ")
-            run("packaged-hooks", [sys.executable, "-B", str(temp / "source/horsemen/scripts/e2e.py"),
-                                   "--output", str(output / "packaged-hooks.json")], cwd=temp)
-            receipt["artifacts"] = [{"file": str(p.relative_to(output)), "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
-                                    for p in (archive, wheel)]
+            scratch = temp / "tmp"
+            scratch.mkdir()
+            temp_env = dict.fromkeys(("TMPDIR", "TMP", "TEMP"), str(scratch))
+
+            def phase_run(label, command, cwd=ROOT, extra=None):
+                return run(label, command, cwd, {**temp_env, **(extra or {})}, checks)
+
+            phase(phase_run, temp)
+
+    try:
+        receipt["commit"] = run("revision", ["git", "rev-parse", "HEAD"]).strip()
+        receipt["source_dirty"] = bool(run("source-status", ["git", "status", "--porcelain"]).strip())
+        source_receipt, package_receipt = [], []
+        try:
+            run_phases((lambda: isolated(source_checks, source_receipt),
+                        lambda: isolated(package_checks, package_receipt)),
+                       args.jobs)
+        finally:
+            receipt["checks"].extend(source_receipt + package_receipt)
         receipt["status"] = "passed"
         return 0
     except Exception as error:
