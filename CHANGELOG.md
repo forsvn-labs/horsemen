@@ -2,6 +2,8 @@
 
 ## 2026-11-19
 
+- Added share links to the hosted viewer. Each project and record has a readable link, such as `horsemen.forsvn.com/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository sign in and open the same record. Links carry no data. [PR #16](https://github.com/hungv47/horsemen/pull/16).
+
 - The Stop hook now reminds an agent to commit and push a record it changed when the change has not reached the remote default branch, so the hosted viewer shows it. Refresh your installation to get it: `npx skills add hungv47/horsemen --skill horsemen`. [Hooks](horsemen/references/hooks.md). [PR #14](https://github.com/hungv47/horsemen/pull/14).
 
 - Added type sets for easier reading: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Fixed the Impeccable design audit findings for small text, focus, and phone layout. [Design audit](docs/product/design-audit.md). [PR #10](https://github.com/hungv47/horsemen/pull/10).
