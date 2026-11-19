@@ -14,12 +14,19 @@ import threading
 import time
 from urllib.parse import parse_qs, quote, urlsplit
 from .legacy import sections
-from .gui_links import connections
+from .gui_links import canvas_links, connections
 
 FILES = {'vision': 'VISION.md', 'progress': 'PROGRESS.md', 'brain': 'BRAIN.md',
          'structure': 'STRUCTURE.md', 'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'techstack': 'TECHSTACK.md'}
 EXCLUDED = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor'}
 MAX_FILE = 512 * 1024
+
+# Canvas files: <project root>/.horsemen/canvas/<name>.canvas. The browser checks and draws the text.
+CANVAS_DIR = '.horsemen/canvas'
+CANVAS_NAME = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
+MAX_CANVASES = 20
+CANVAS_TOO_LARGE = 'The canvas file is larger than 512 KiB.'
+CANVAS_UNREADABLE = 'The canvas file could not be decoded as UTF-8 text.'
 
 # Repository images: GitHub's contents API returns inline base64 only for files up to 1 MB, so 1 MiB is the limit.
 IMAGE_TYPES = {'.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif', '.webp':'image/webp', '.svg':'image/svg+xml'}
@@ -97,6 +104,23 @@ def discover_roots(entries):
             if len(set(files) & {'vision','progress','brain','structure'}) >= 2
             and ('vision' in files or 'progress' in files)}
 
+def discover_canvases(entries, roots):
+    """Canvas files of each project root, by name. At most 20 for a root, in name order."""
+    found = {root:{} for root in roots}
+    for entry in entries:
+        if entry.get('type') != 'blob' or entry.get('mode') not in ('100644', '100755'): continue
+        folder, _, filename = str(entry['path']).rpartition('/')
+        if not filename.endswith('.canvas') or not CANVAS_NAME.fullmatch(filename[:-7]): continue
+        if folder == CANVAS_DIR: root = ''
+        elif folder.endswith('/' + CANVAS_DIR): root = folder[:-len(CANVAS_DIR) - 1]
+        else: continue
+        if root in found: found[root][filename[:-7]] = {k:entry.get(k) for k in ('path','sha','size')}
+    return {root:dict(sorted(files.items())[:MAX_CANVASES]) for root,files in found.items()}
+
+def public(project):
+    """A project without its file lists, for the project list and a loaded project."""
+    return {k:v for k,v in project.items() if k not in ('files','canvases')}
+
 def credential_identity():
     """Detect local account/token switches without a network round trip."""
     try:
@@ -132,18 +156,40 @@ class GitHubReader:
         if tree.get('truncated'):
             raise ProviderError('Repository tree is too large for a complete scan. Use a smaller repository or a future explicit-root import.', 422)
         output = []
-        for root, files in discover_roots(tree.get('tree', [] )).items():
+        roots = discover_roots(tree.get('tree', [] ))
+        canvases = discover_canvases(tree.get('tree', []), roots)
+        for root, files in roots.items():
             key = hashlib.sha256(f'{repo["id"]}:{root}'.encode()).hexdigest()[:24]
             output.append({'id':key, 'repo':name, 'root':root, 'name':root.split('/')[-1] if root else name.split('/')[-1],
                            'private':bool(repo.get('private')), 'archived':bool(repo.get('archived')), 'branch':branch,
-                           'revision':revision, 'files':files, 'missing':[k for k in ('vision','progress','brain','structure') if k not in files], 'scanned_at':now()})
+                           'revision':revision, 'files':files, 'canvases':canvases.get(root, {}), 'missing':[k for k in ('vision','progress','brain','structure') if k not in files], 'scanned_at':now()})
         return output
     def load(self, project):
         # Network latency dominates: read independent immutable blobs in parallel.
         with ThreadPoolExecutor(max_workers=4) as pool:
             jobs = {key:pool.submit(self.load_record, project, key, default) for key,default in FILES.items()}
+            drawings = {name:pool.submit(self.load_canvas, project, name) for name in project.get('canvases', {})}
             records = {key:job.result() for key,job in jobs.items()}
-        return {'project':{k:v for k,v in project.items() if k!='files'}, 'records':records, 'loaded_at':now()}
+            canvases = {name:job.result() for name,job in drawings.items()}
+        return {'project':public(project), 'records':records, 'canvases':canvases, 'loaded_at':now()}
+    def load_canvas(self, project, name):
+        """The text of one canvas file and the files that it names. A failure stays with this canvas."""
+        file = project['canvases'][name]; path = file['path']
+        rec = {'name':name, 'path':path, 'url':f'https://github.com/{project["repo"]}/blob/{project["revision"]}/{quote(path, safe="/")}', 'blob':file['sha']}
+        try:
+            size = file.get('size')
+            if not isinstance(size, int) or isinstance(size, bool) or size > MAX_FILE: raise ProviderError(CANVAS_TOO_LARGE, 413)
+            blob = self.api(f'/repos/{project["repo"]}/git/blobs/{file["sha"]}')
+            if blob.get('encoding') != 'base64': raise ProviderError('Unsupported canvas encoding.')
+            encoded = re.sub(r'\s', '', blob['content'])
+            if len(encoded) > MAX_FILE * 2: raise ProviderError(CANVAS_TOO_LARGE, 413)
+            content = base64.b64decode(encoded, validate=True)
+            if len(content) > MAX_FILE: raise ProviderError(CANVAS_TOO_LARGE, 413)
+            text = content.decode('utf-8-sig')
+            rec.update(content=text, connections=canvas_links(text, path, project['root'], project['repo'], project['revision']))
+        except ProviderError as error: rec['error'] = str(error)
+        except (ValueError, UnicodeError, KeyError, TypeError, AttributeError): rec['error'] = CANVAS_UNREADABLE
+        return rec
     def load_record(self, project, key, default, blob=None):
         file = project['files'].get(key)
         if not file:
@@ -230,7 +276,7 @@ class ScanState:
                         for project in found:self.projects[project['id']]=project
                         if issue:self.data['issues'].append(issue)
                         self.data['completed']+=1
-                        self.data['projects']=[{k:v for k,v in p.items() if k!='files'} for p in self.projects.values()]
+                        self.data['projects']=[public(p) for p in self.projects.values()]
             with self.lock:
                 if generation==self.generation:self.data.update(phase='partial' if self.data['issues'] else 'ready',finished_at=now())
         except Exception as error:
@@ -246,9 +292,9 @@ class ScanState:
         result=self.reader.load(project)
         with self.lock:
             if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
-            self.register_links(key,result['records'].values())
-            # Bound memory to 16 projects; never cache transient record failures.
-            if all('content' in result['records'][key] for key in project['files']):
+            self.register_links(key,[*result['records'].values(),*result['canvases'].values()])
+            # Bound memory to 16 projects; never cache transient record or canvas failures.
+            if all('content' in result['records'][key] for key in project['files']) and all('content' in canvas for canvas in result['canvases'].values()):
                 if len(self.cache)>=16:self.cache.pop(next(iter(self.cache)))
                 self.cache[key]=copy.deepcopy(result)
         return result
@@ -343,7 +389,7 @@ class Handler(BaseHTTPRequestHandler):
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/canvas-sections.js':('canvas-sections.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/canvas-sections.js':('canvas-sections.js','text/javascript; charset=utf-8'),'/canvas-format.js':('canvas-format.js','text/javascript; charset=utf-8'),'/canvas-view.js':('canvas-view.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
             if path.startswith('/assets/'):
                 # Bundled fonts and icons only: plain names, known types, no traversal or links.
                 parts=path[len('/assets/'):].split('/')
