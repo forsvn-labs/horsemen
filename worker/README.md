@@ -34,6 +34,14 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   last project, then checks every branch in the background. Only changed or
   new repositories are scanned again. Sign-out and Clear workspace remove the
   index. Discovery reads up to 12 repositories in parallel.
+- **Share links.** Every project and record has a readable link, such as
+  `https://horsemen.forsvn.com/owner/repo?record=progress`. A project in a
+  subfolder adds `root=apps%2Fweb`. The address bar always shows the link for
+  the open project and record; **Copy link** in the header and in the record
+  copies it. A signed-out visitor signs in and returns to the same link. The
+  link carries no data: the visitor needs GitHub access to the repository, and
+  the app must be installed on it. Otherwise the page says so. Agents can write
+  these links in reports without any API.
 - **Agents.** Agents update records the normal way: edit, commit, and push.
   The viewer shows the default branch, so unpushed edits do not appear. The
   Horsemen Stop hook reminds the agent when a record it changed has not
@@ -89,8 +97,8 @@ opens a fictional project, detects a new commit, and signs out. It needs
   A reload makes one branch check for each repository; unchanged branches
   return 304 and do not count against the GitHub rate limit (5,000 requests
   an hour).
-- Public share links are not built. They will need stored share metadata,
-  not stored records.
+- Links work only for people with GitHub access to the repository. Public
+  links for anyone would need stored share settings, not stored records.
 - Private PR image attachments open on GitHub; the viewer does not load them.
 - Cloudflare's free plan allows 100,000 Worker requests a day. Each GitHub
   read is one request.

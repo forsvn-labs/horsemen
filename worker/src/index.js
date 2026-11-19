@@ -120,16 +120,18 @@ ul{margin:18px 0 26px;padding:0;list-style:none;border-top:1px solid var(--rule)
 :focus-visible{outline:3px solid var(--gilt);outline-offset:3px}small{display:block;margin-top:18px;color:var(--muted);font-size:14px}a{color:inherit;text-underline-offset:3px}
 ::selection{background:color-mix(in srgb,var(--gilt) 30%,transparent)}
 @media (max-width:480px){main{padding:28px 20px}}
+.share-target{margin:20px 0 0;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;font:15px/1.5 var(--ui);color:var(--muted)}.share-target b{color:var(--ink);font-weight:600}
 </style></head><body><main><div class="brand"><img src="/assets/icons/app-icon.svg" width="36" height="36" alt="">Horsemen</div>${body}</main></body></html>`;
   return respond(html, status, { 'content-type': 'text/html; charset=utf-8', ...headers });
 }
-const signInPage = (headers = {}) => page('Horsemen · Sign in', `
+const signInPage = (headers = {}, target = null, next = null) => page('Horsemen · Sign in', `
+${target ? `<p class="share-target">Sign in to open <b>${escapeHTML(target)}</b>. You need GitHub access to this repository.</p>` : ''}
 <h1>Your project records, in plain sight.</h1>
 <p>Open each Horsemen project as a canvas of its Vision, Progress, Brain, and Structure. Agents keep the records current; you read them here.</p>
 <ul><li><b>Read-only.</b> Horsemen never writes to your repositories.</li>
 <li><b>Stores none of your project data.</b> Records go from GitHub to this browser when you open them.</li>
 <li><b>You choose the repositories.</b> Install the GitHub App on only the ones you want to see.</li></ul>
-<a class="btn" href="/auth/login">Sign in with GitHub</a>
+<a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
 <small>Open source: <a href="https://github.com/hungv47/horsemen">github.com/hungv47/horsemen</a></small>`, 200, headers);
 const errorPage = (status, message, headers = {}) => page('Horsemen', `<h1>${escapeHTML(message)}</h1><p><a class="btn" href="/auth/login">Sign in again</a></p>`, status, headers);
 
@@ -189,6 +191,25 @@ async function proxy(env, request, session, path) {
 }
 
 /* ---------------------------------------------------------------- app */
+/* Share links: /owner/repo with an optional ?root=&record= query. They carry no data. */
+const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'healthz']);
+const SHARE_PATH = /^\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9_.-]{1,100})\/?$/;
+function shareRepo(path) {
+  const m = path.match(SHARE_PATH);
+  if (!m || RESERVED.has(m[1].toLowerCase()) || m[2] === '.' || m[2] === '..') return null;
+  return `${m[1]}/${m[2]}`;
+}
+/* The page to return to after sign-in: the home page or a share link, never another site or app route. */
+function safeNext(next) {
+  if (typeof next !== 'string' || next.length > 300 || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/';
+  let u; try { u = new URL(next, 'https://horsemen.invalid'); } catch { return '/'; }
+  if (u.origin !== 'https://horsemen.invalid' || (u.pathname !== '/' && !shareRepo(u.pathname))) return '/';
+  const query = new URLSearchParams();
+  for (const key of ['root', 'record']) { const v = u.searchParams.get(key); if (v && v.length <= 200) query.set(key, v); }
+  const qs = query.toString();
+  return u.pathname + (qs ? '?' + qs : '');
+}
+
 async function appPage(env, request, session) {
   const res = await env.ASSETS.fetch(new Request(new URL('/', request.url)));
   if (!res.ok) return respond('App files are missing.', 500);
@@ -231,7 +252,8 @@ async function handle(request, env) {
     to.searchParams.set('client_id', env.GITHUB_CLIENT_ID);
     to.searchParams.set('redirect_uri', url.origin + '/auth/callback');
     to.searchParams.set('state', state);
-    return redirect(to.toString(), { 'set-cookie': cookieHeader(STATE, await seal(env, STATE, { s: state, x: Date.now() + 600000 }), 600) });
+    const next = safeNext(url.searchParams.get('next'));
+    return redirect(to.toString(), { 'set-cookie': cookieHeader(STATE, await seal(env, STATE, { s: state, x: Date.now() + 600000, n: next }), 600) });
   }
   if (path === '/auth/callback') {
     const p = url.searchParams, clear = { 'set-cookie': clearCookie(STATE) };
@@ -247,7 +269,7 @@ async function handle(request, env) {
       if (!user.ok) throw new Error('profile failed');
       session.l = String((await user.json()).login || '');
     } catch { return errorPage(502, 'GitHub sign-in failed. Try again.', clear); }
-    const headers = new Headers({ location: '/' });
+    const headers = new Headers({ location: safeNext(saved.n) });
     headers.append('set-cookie', clearCookie(STATE));
     headers.append('set-cookie', await writeSession(env, session));
     return new Response(null, { status: 302, headers: withSecurity(headers) });
@@ -255,6 +277,8 @@ async function handle(request, env) {
 
   const session = await readSession(env, request);
   if (path === '/' || path === '/index.html') return session ? appPage(env, request, session) : signInPage();
+  const shared = shareRepo(path);
+  if (shared) return session ? appPage(env, request, session) : signInPage({}, shared, path + url.search);
 
   const guarded = path.startsWith('/api/') || path.startsWith('/gh/') || path === '/auth/refresh' || path === '/auth/logout';
   if (!guarded) return staticFile(env, request, path);

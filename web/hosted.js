@@ -50,10 +50,20 @@
       }
     }));
     if (!repos.size) throw new R.ProviderError('Horsemen cannot see any repositories yet. Select Choose repositories, then install the GitHub App on the projects you want to read.', 404);
-    return [...repos.values()].sort((a, b) => String(b.pushed_at || '').localeCompare(String(a.pushed_at || '')));
+    // A shared link's repository goes first, so its project opens as soon as possible.
+    return R.prioritize([...repos.values()].sort((a, b) => String(b.pushed_at || '').localeCompare(String(a.pushed_at || ''))), target);
   }
 
   const login = document.querySelector('meta[name="horsemen-login"]')?.content || null;
+  const target = R.shareTarget(new URL(location.href));
+  /* Status with a clear issue when a shared link points to a project this account cannot read. */
+  function status() {
+    const snap = state.snapshot();
+    if (target && ['ready', 'partial', 'error'].includes(snap.phase) && !snap.projects.some(p => R.matchesTarget(p, target))) {
+      snap.issues.unshift({ message: `Horsemen cannot open ${target.repo}${target.root ? ' / ' + target.root : ''}. Your GitHub account needs access to it, and the Horsemen app must be installed on it. Select Choose repositories to add it.` });
+    }
+    return snap;
+  }
   const reader = new R.Reader(gh, repositories, 30000, login);
   /* Head checks use ETags: an unchanged branch returns 304 and does not use rate limit. */
   const heads = new Map();
@@ -88,7 +98,7 @@
   function revalidate() {
     revalidation = revalidation || state.revalidate().then(() => {
       saveIndex();
-      document.dispatchEvent(new CustomEvent('horsemen:projects', { detail: state.snapshot() }));
+      document.dispatchEvent(new CustomEvent('horsemen:projects', { detail: status() }));
     }).finally(() => { revalidation = null; });
     return revalidation;
   }
@@ -112,7 +122,7 @@
     const url = new URL(path, location.origin), q = k => url.searchParams.get(k) || '';
     try {
       switch (url.pathname) {
-        case '/api/status': return state.snapshot();
+        case '/api/status': return status();
         case '/api/scan': {
           if (method !== 'POST') break;
           watched = null; clearTimeout(revalidateTimer);
@@ -145,6 +155,20 @@
       out.addEventListener('click', signOut);
       box.append(choose, out); rail.after(box);
     }
+    /* Copy link: the address bar always holds the readable link for the open project and record. */
+    const copyLink = async () => {
+      try { await navigator.clipboard.writeText(location.href); window.showToast?.('Link copied. People who open it need GitHub access to this repository.'); }
+      catch { window.showToast?.('Copy failed. Copy the link from the address bar.'); }
+    };
+    const shareButton = (id, label, cls) => {
+      const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = cls; b.title = 'Copy a link to share. People who open it need GitHub access.';
+      b.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#link"/></svg><span></span>'; b.querySelector('span').textContent = label;
+      b.addEventListener('click', copyLink); return b;
+    };
+    const actions = document.querySelector('.heading-actions');
+    if (actions && !document.getElementById('share-link')) actions.prepend(shareButton('share-link', 'Copy link', 'btn share-link'));
+    const close = document.getElementById('close-peek');
+    if (close && !document.getElementById('share-record')) close.before(shareButton('share-record', 'Copy link', 'btn share-record'));
     const tag = document.querySelector('.demo');
     if (tag?.parentElement) tag.parentElement.replaceChildren(Object.assign(document.createElement('span'), { className: 'demo', textContent: 'Read-only viewer' }), 'Nothing stored. Open source. Self-hostable.');
     const notice = document.querySelector('.notice p:last-child');
@@ -158,5 +182,5 @@
   }).catch(() => {});
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decorate); else decorate();
 
-  window.HorsemenHosted = { api, signOut, state, check };
+  window.HorsemenHosted = { api, signOut, state, check, target, shareURL: (project, record) => R.shareURL(location.origin, project, record) };
 })();

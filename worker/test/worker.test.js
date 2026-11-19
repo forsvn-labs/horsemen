@@ -224,3 +224,35 @@ test('static files exclude Markdown and dotfiles and carry security headers', as
   const js = await call('/app.js'); assert.equal(js.status, 200);
   assert.equal(js.headers.get('x-content-type-options'), 'nosniff'); assert.match(js.headers.get('content-security-policy'), /frame-ancestors 'none'/);
 });
+
+/* Share links. Failure modes: a shared path loses its target through sign-in;
+   an open redirect through `next`; reserved app paths served as projects. */
+test('a shared project path opens the app, or sign-in that returns to the same link', async () => {
+  const signedOut = await call('/example/alpha?record=progress');
+  assert.equal(signedOut.status, 200); const html = await signedOut.text();
+  assert.match(html, /Sign in to open <b>example\/alpha<\/b>/);
+  assert.match(html, /href="\/auth\/login\?next=%2Fexample%2Falpha%3Frecord%3Dprogress"/);
+  const login = await call('/auth/login?next=' + encodeURIComponent('/example/alpha?record=progress'));
+  const state = new URL(login.headers.get('location')).searchParams.get('state');
+  mockFetch(async req => req.url.endsWith('/login/oauth/access_token') ? json({ access_token: 't' }) : json({ login: 'operator' }));
+  const back = await call(`/auth/callback?code=c&state=${state}`, { headers: { cookie: cookieOf(login, '__Host-horsemen-state') } });
+  assert.equal(back.status, 302); assert.equal(back.headers.get('location'), '/example/alpha?record=progress');
+  const app = await call('/example/alpha?record=progress', { headers: { cookie: cookieOf(back) } });
+  assert.match(await app.text(), /<meta name="horsemen-mode" content="hosted">/);
+});
+
+test('sign-in never redirects outside the app', async () => {
+  for (const next of ['//evil.example/x', 'https://evil.example', '/\\evil.example', '/auth/logout', '/gh/user', 'javascript:alert(1)', '/' + 'a'.repeat(400), '/a/b/c']) {
+    const login = await call('/auth/login?next=' + encodeURIComponent(next));
+    const state = new URL(login.headers.get('location')).searchParams.get('state');
+    mockFetch(async req => req.url.endsWith('/login/oauth/access_token') ? json({ access_token: 't' }) : json({ login: 'operator' }));
+    const back = await call(`/auth/callback?code=c&state=${state}`, { headers: { cookie: cookieOf(login, '__Host-horsemen-state') } });
+    assert.equal(back.headers.get('location'), '/', next);
+  }
+});
+
+test('reserved paths are not project links', async () => {
+  for (const p of ['/assets/icons', '/api/x', '/gh/x', '/auth/x', '/a/b/c']) {
+    const res = await call(p); assert.doesNotMatch(await res.text(), /Sign in to open/, p);
+  }
+});

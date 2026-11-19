@@ -382,6 +382,31 @@
     },
   });
 
-  const api = { FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
+  /* Share links: readable hosted URLs such as /owner/repo?root=apps%2Fweb&record=progress.
+     They carry no data; the recipient needs GitHub access to the repository. */
+  const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'healthz']);
+  const OWNER = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/, REPO_NAME = /^[A-Za-z0-9_.-]{1,100}$/;
+  function shareTarget(url) {
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length !== 2) return null;
+    let owner, repo;
+    try { owner = decodeURIComponent(parts[0]); repo = decodeURIComponent(parts[1]); } catch { return null; }
+    if (!OWNER.test(owner) || !REPO_NAME.test(repo) || repo === '.' || repo === '..' || RESERVED.has(owner.toLowerCase())) return null;
+    const record = url.searchParams.get('record');
+    return { repo: `${owner}/${repo}`, root: url.searchParams.get('root') || '', record: Object.hasOwn(FILES, record || '') ? record : null };
+  }
+  function shareURL(origin, project, record = null) {
+    const query = new URLSearchParams();
+    if (project.root) query.set('root', project.root);
+    if (record && Object.hasOwn(FILES, record)) query.set('record', record);
+    const qs = query.toString();
+    return `${origin}/${project.repo.split('/').map(encodeURIComponent).join('/')}${qs ? '?' + qs : ''}`;
+  }
+  const matchesTarget = (project, target) => !!target && project.repo.toLowerCase() === target.repo.toLowerCase() && (project.root || '') === (target.root || '');
+  const prioritize = (repos, target) => target
+    ? [...repos.filter(r => r.full_name.toLowerCase() === target.repo.toLowerCase()), ...repos.filter(r => r.full_name.toLowerCase() !== target.repo.toLowerCase())]
+    : repos;
+
+  const api = { shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenReader = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
