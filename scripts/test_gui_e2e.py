@@ -13,16 +13,34 @@ from horsemen_core.gui import GitHubReader, ScanState, make_server
 parser=argparse.ArgumentParser();parser.add_argument('--output',required=True,type=Path);args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1]
 release_scan=threading.Event()
+def png(width,height,rgb):
+    """A small solid PNG, built here so the fixture needs no binary file."""
+    import struct,zlib
+    chunk=lambda kind,data:struct.pack('>I',len(data))+kind+data+struct.pack('>I',zlib.crc32(kind+data)&0xffffffff)
+    rows=b''.join(b'\x00'+bytes(rgb)*width for _ in range(height))
+    return b'\x89PNG\r\n\x1a\n'+chunk(b'IHDR',struct.pack('>IIBBBBB',width,height,8,2,0,0,0))+chunk(b'IDAT',zlib.compress(rows))+chunk(b'IEND',b'')
+# Fictional visuals: two diagrams and a chart that draw, one diagram with a syntax error, a PNG, an SVG with a script, and a missing image.
+VISUALS=('\n## Runtime connections\n```mermaid\nflowchart LR\n  Operator --> App[Pilot app]\n  App -->|read only| Records[Project records]\n  App --> Board[Pilot board]\n'
+         '  click App "javascript:window.pwned=1"\n```\n## Pilot usage\n```mermaid\npie title Pilot usage\n  "Search" : 5\n  "Export" : 3\n  "Saved views" : 2\n```\n'
+         '## Sign-in\n```mermaid\nsequenceDiagram\n  Operator->>App: <img src=x onerror="window.pwned=1"> Open the board\n  App-->>Operator: Records\n```\n'
+         '## Draft\n```mermaid\nflowchart LR\n  A[Open --> B\n```\n## Screens\n![Pilot board](img/board.png) ![Pilot logo](img/logo.svg)\n\n![Old screen](img/missing.png)')
+BOARD=png(48,24,(51,64,122))
+LOGO=b'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" onload="window.pwned=1"><script>window.pwned=1</script><circle cx="20" cy="20" r="18" fill="#a8301d"/></svg>'
 class ProgressiveFake(Fake):
     sources={
         'vision':'# Record\n\nOwner: A fictional team · Confirmed: 2026-11-02\n\nActual source.\n## Why we exist\nHelp small teams keep decisions close to their work.\n## Who we build for\nIndependent builders and project operators.\n## The world we are building\nA clear view of every active project.\n## How we get there\n- Now: Prove the pilot with three operators.\n- Next: Shared team spaces.\n- Later: Every project has a clear next step.\n## Open questions\n- Pricing for teams? The owner decides.\n## Direction changes\n- 2026-11-02: Narrowed the pilot to operators. Previous: all builders.',
         'progress':'# Progress\n\nUpdated: 2026-11-18 · Stage: pilot · Health: On track\n\nNext action: Invite three operators to the pilot.\n\n## Latest day\n\n<details open>\n<summary>Latest day · 2026-11-18</summary>\n\n## Shipped\n\n- **Search** (2026-11-18): Search is available to the pilot group.\n\n## In progress\n\n- **Export** (started 2026-11-12): Operators can save a board as a PDF.\n\n## Up next\n\n- **Saved views** (target December 2026): Keep a filter between visits.\n\n## Gates\n\n- Review the pilot feedback before wider access.\n\n### Technical details\n\n| Item | Evidence |\n| --- | --- |\n| Search | [PR #12](https://github.com/example/alpha/pull/12) and the [release note](https://example.com/notes/search). |\n\n</details>\n\n## Historical ships\n\n<details>\n<summary>Historical ships · newest first</summary>\n\n### 2026-11-10\n\n- **Walkthrough** (2026-11-10): The first walkthrough reached two operators.\n\n#### Technical details\n\n| Item | Evidence |\n| --- | --- |\n| Walkthrough | [PR #9](https://github.com/example/alpha/pull/9), commit [a1b2c3d](https://github.com/example/alpha/commit/a1b2c3d4e5f6a7b8c9d0a1b2c3d4e5f6a7b8c9d0). |\n\n</details>\n\n## Upcoming roadmap\n\n<details>\n<summary>Upcoming roadmap</summary>\n\n- Next: Shared team spaces.\n- Later: A hosted reader.\n\n</details>',
         'brain':'# Brain\n## Providers\n- [Research notebook](docs/research.md): interviews and decisions.\n- [External reference](https://example.com/reference)\n## Access\nRead originals within existing permissions.\n## Save and cleanup\nKeep owner decisions with their source.',
-        'techstack':'# Tech stack\n## Tools\n| Tool | Purpose | Needs |\n| --- | --- | --- |\n| Python 3.10+ | Local reader | Python 3.10+ |\n| GitHub CLI | Read project records | Existing sign-in |',
+        'techstack':'# Tech stack\n## Tools\n| Tool | Purpose | Needs |\n| --- | --- | --- |\n| Python 3.10+ | Local reader | Python 3.10+ |\n| GitHub CLI | Read project records | Existing sign-in |'+VISUALS,
         'changelog':'# Changelog\n## 2026-11-18\n- Search reached the fictional pilot. [PR #12](https://github.com/example/alpha/pull/12)\n## 2026-11-10\nFirst walkthrough delivered.',
         'structure':'# Structure\n## Map\n```text\napp/ — operator workspace (start here)\ndocs/ — decisions and references\ntests/ — verification\n```\n## Read before changing\nStart with the current progress snapshot.\n## Commands\npython3 scripts/serve_gui.py'
     }
     def __call__(self,path,paginate=False):
+        for name,data in [('img/board.png',BOARD),('img/logo.svg',LOGO)]:
+            if f'/contents/{name}?' in path:return {'type':'file','sha':'2'*40,'size':len(data),'encoding':'base64','content':base64.b64encode(data).decode()}
+        if '/contents/img/' in path:
+            from horsemen_core.gui import ProviderError
+            raise ProviderError('Repository or record is no longer accessible.',404)
         if '/contents/docs/research.md?' in path:
             return {'type':'file','sha':'e'*40,'size':100,'encoding':'base64','content':base64.b64encode(b'# Research notebook\n## Findings\nOperators need a clear next step.\n[Decision](decision.md)').decode()}
         if '/contents/docs/decision.md?' in path:
@@ -63,6 +81,8 @@ try:
     browser('open',f'http://127.0.0.1:{server.server_port}')
     browser('wait','--fn','document.body.dataset.state === "ready"')
     assert server.state.snapshot()['phase']=='scanning', 'First project must open before discovery completes'
+    assert value('JSON.stringify([!!window.mermaid,!!document.querySelector("script[src*=mermaid]")])')==[False,False], 'Mermaid does not load before a page needs it'
+    browser('eval','window.__csp=[];document.addEventListener("securitypolicyviolation",e=>window.__csp.push(e.violatedDirective+" "+e.blockedURI))')
     assert 'alpha' in browser('get','text','#project-name')
     release_scan.set()
     browser('wait','--fn','projects.length === 2')
@@ -195,6 +215,49 @@ try:
         browser('screenshot',str(args.output/(key+'-peek.png')))
         if key=='techstack':assert browser('eval','document.querySelectorAll(".tool-row").length').strip()=='2', 'Tech stack is a compact table'
         browser('press','Escape')
+    # Diagrams and images: Mermaid loads only for a page with a diagram, draws under the CSP, and falls back to code.
+    browser('eval','applyTheme({style:"engraved",theme:"bone"})')
+    browser('dblclick','[data-artifact="techstack"]');browser('wait','#peek[open]')
+    browser('wait','--fn','document.querySelectorAll("figure.diagram[data-state=drawn]").length === 3 && document.querySelectorAll("figure.diagram[data-state=error]").length === 1')
+    assert value('JSON.stringify([...document.querySelectorAll(".md-image")].map(s=>s.dataset.state))')==['waiting']*3, 'Images below the fold wait until they come near the view'
+    browser('eval','document.querySelector(".md-image").scrollIntoView({block:"center"})')
+    browser('wait','--fn','document.querySelectorAll(".md-image[data-state=shown]").length === 2 && document.querySelectorAll(".md-image[data-state=error]").length === 1')
+    labels=value('JSON.stringify([...document.querySelectorAll("figure.diagram .diagram-canvas")].map(c=>[c.getAttribute("role"),c.getAttribute("aria-label"),c.tabIndex,!!c.querySelector("svg")]))')
+    assert labels[:3]==[['img','Flowchart',0,True],['img','Pie chart: Pilot usage',0,True],['img','Sequence diagram',0,True]], labels
+    assert value('JSON.stringify(document.querySelector("figure.diagram[data-state=drawn] .diagram-source").hidden)') is True, 'A drawn diagram hides its code'
+    browser('focus','figure.diagram[data-state=drawn] .diagram-toggle');browser('press','Enter')
+    assert value('JSON.stringify((f=>[f.querySelector(".diagram-source").hidden,f.querySelector(".diagram-canvas").hidden,f.querySelector(".diagram-toggle").textContent,f.querySelector(".diagram-toggle").getAttribute("aria-expanded")])(document.querySelector("figure.diagram")))')==[False,True,'View diagram','true'], 'View code shows the code'
+    browser('press','Enter')
+    assert value('JSON.stringify((f=>[f.querySelector(".diagram-source").hidden,f.querySelector(".diagram-canvas").hidden,f.querySelector(".diagram-toggle").textContent])(document.querySelector("figure.diagram")))')==[True,False,'View code'], 'The toggle returns to the diagram'
+    broken=value('JSON.stringify((f=>[f.querySelector(".diagram-error").textContent,f.querySelector(".diagram-source").hidden,f.querySelector(".diagram-toggle").hidden,f.querySelector(".diagram-source").textContent.includes("A[Open")])(document.querySelector("figure.diagram[data-state=error]")))')
+    assert broken[0].startswith('This diagram could not be drawn.') and len(broken[0])<220 and broken[1:]==[False,True,True], broken
+    assert value('JSON.stringify(document.querySelectorAll("body > svg, body > div[id^=dhorsemen]").length)')==0, 'Mermaid leaves no error element on the page'
+    images=value('JSON.stringify([...document.querySelectorAll(".md-image[data-state=shown] img")].map(i=>[i.alt,i.src.startsWith("blob:"),i.naturalWidth>0]))')
+    assert images==[['Pilot board',True,True],['Pilot logo',True,True]], images
+    missing=value('JSON.stringify((s=>[s.querySelector("a").textContent,s.querySelector("a").href.endsWith("/img/missing.png"),s.querySelector(".md-image-note").textContent,!!s.querySelector("img")])(document.querySelector(".md-image[data-state=error]")))')
+    assert missing[0]=='Image: Old screen' and missing[1] and missing[2].startswith('Image not shown:') and missing[3] is False, missing
+    assert value('JSON.stringify([window.pwned,window.__csp])')==[None,[]], 'No script ran from diagram or SVG source, and nothing broke the CSP'
+    scroll=value('JSON.stringify((f=>{const c=f.querySelector(".diagram-canvas");return c.scrollWidth<=c.clientWidth||getComputedStyle(c).overflowX==="auto"})(document.querySelector("figure.diagram")))')
+    assert scroll is True, 'A wide diagram scrolls inside the column'
+    browser('eval','document.querySelector("figure.diagram").scrollIntoView({block:"start"})')
+    browser('screenshot',str(args.output/'after-diagrams-bone.png'))
+    browser('eval','document.querySelector(".md-image").scrollIntoView({block:"center"})')
+    browser('screenshot',str(args.output/'after-images-bone.png'))
+    # A theme change draws the diagrams again in the new colours.
+    fill='JSON.stringify(getComputedStyle(document.querySelector("figure.diagram .diagram-canvas svg .node rect, figure.diagram .diagram-canvas svg .node path")).fill)'
+    before_fill=value(fill);first_svg=value('JSON.stringify(document.querySelector("figure.diagram svg").id)')
+    browser('eval','applyTheme({style:"engraved",theme:"ember"})')
+    browser('wait','--fn',f'document.querySelector("figure.diagram svg")?.id !== {json.dumps(first_svg)} && document.querySelectorAll("figure.diagram[data-state=drawn]").length === 3')
+    assert value(fill)!=before_fill, 'Diagram colours follow the theme'
+    browser('eval','document.querySelector("figure.diagram").scrollIntoView({block:"start"})')
+    browser('screenshot',str(args.output/'after-diagrams-ember.png'))
+    first_svg=value('JSON.stringify(document.querySelector("figure.diagram svg").id)')
+    browser('eval','applyTheme({style:"modern",mode:"dark"})')
+    browser('wait','--fn',f'[...document.querySelectorAll("figure.diagram svg")].every(s=>s.id !== {json.dumps(first_svg)}) && document.querySelectorAll("figure.diagram[data-state=drawn]").length === 3')
+    browser('eval','document.querySelector("figure.diagram").scrollIntoView({block:"start"})')
+    browser('screenshot',str(args.output/'after-diagrams-modern-dark.png'))
+    browser('eval','localStorage.removeItem("horsemen-style");localStorage.removeItem("horsemen-theme");localStorage.removeItem("horsemen-mode");applyTheme()')
+    browser('press','Escape')
     # Artifact views: status board, proof links, exact dates, source lines, and a saved list choice.
     browser('dblclick','[data-artifact="progress"]');browser('wait','#peek[open]')
     order=value('JSON.stringify([...document.querySelectorAll("#peek-content .lead, #peek-content .part-title")].map(e=>e.textContent.replace(/L[0-9]+$/,"").trim().slice(0,12)))')

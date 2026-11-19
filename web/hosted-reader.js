@@ -151,6 +151,43 @@
     try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new ProviderError('Record could not be decoded as UTF-8 Markdown.'); }
   }
 
+  /* Repository images. Same rules and messages as decode_image in horsemen_core.gui. GitHub's contents API
+     returns inline base64 only for files up to 1 MB, so 1 MiB is the limit. */
+  const IMAGE_TYPES = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.svg': 'image/svg+xml' };
+  const MAX_IMAGE = 1024 * 1024;
+  const IMAGE_TOO_LARGE = 'Image is larger than 1 MiB. Open it on GitHub.';
+  const IMAGE_MISSING = 'The image is not in the repository at this commit.';
+  function imageType(path) {
+    const name = String(path || '').split('/').pop(), dot = name.lastIndexOf('.');
+    return dot > 0 ? IMAGE_TYPES[name.slice(dot).toLowerCase()] || null : null;
+  }
+  function imageMatches(kind, b) {
+    const starts = bytes => bytes.every((x, i) => b[i] === x), text = (from, to) => String.fromCharCode(...b.subarray(from, to));
+    if (kind === 'image/png') return starts([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    if (kind === 'image/jpeg') return starts([0xff, 0xd8, 0xff]);
+    if (kind === 'image/gif') return ['GIF87a', 'GIF89a'].includes(text(0, 6));
+    if (kind === 'image/webp') return text(0, 4) === 'RIFF' && text(8, 12) === 'WEBP';
+    let head = ''; for (const x of b.subarray(0, 4096)) head += String.fromCharCode(x >= 65 && x <= 90 ? x + 32 : x);
+    return head.includes('<svg');
+  }
+  function decodeImage(blob, path) {
+    const kind = imageType(path);
+    if (!blob || typeof blob !== 'object' || Array.isArray(blob) || blob.type !== 'file') throw new ProviderError('The linked path is not a readable file.', 422);
+    if (!kind) throw new ProviderError('The file is not a supported image type.', 415);
+    const size = blob.size;
+    if (typeof size !== 'number' || !Number.isInteger(size) || size < 0) throw new ProviderError('The linked path is not a readable file.', 422);
+    if (size > MAX_IMAGE || blob.encoding === 'none') throw new ProviderError(IMAGE_TOO_LARGE, 413);
+    if (blob.encoding !== 'base64' || typeof blob.content !== 'string') throw new ProviderError('Unsupported image encoding.');
+    const encoded = blob.content.replace(/\s/g, '');
+    if (encoded.length > MAX_IMAGE * 2) throw new ProviderError(IMAGE_TOO_LARGE, 413);
+    if (encoded.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new ProviderError('The image could not be decoded.');
+    let bytes;
+    try { bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0)); } catch { throw new ProviderError('The image could not be decoded.'); }
+    if (bytes.length > MAX_IMAGE) throw new ProviderError(IMAGE_TOO_LARGE, 413);
+    if (!imageMatches(kind, bytes)) throw new ProviderError('The file does not match its image type.', 415);
+    return { type: kind, bytes };
+  }
+
   const without = (obj, key) => Object.fromEntries(Object.entries(obj).filter(([k]) => k !== key));
   const clone = value => structuredClone(value);
 
@@ -203,6 +240,15 @@
       if (!blob || typeof blob !== 'object' || Array.isArray(blob) || blob.type !== 'file') throw new ProviderError('The linked path is not a readable file.', 422);
       const nested = { ...project, files: { document: { path, size: blob.size, sha: blob.sha } } };
       return this.loadRecord(nested, 'document', path.split('/').pop(), blob);
+    }
+    async loadImage(project, link) {
+      const path = link.path;
+      if (!imageType(path)) throw new ProviderError('The file is not a supported image type.', 415);
+      let blob;
+      try { blob = await this.api(`/repos/${project.repo}/contents/${quote(path, '/')}?ref=${project.revision}`); }
+      catch (error) { if (error instanceof ProviderError && error.status === 404) throw new ProviderError(IMAGE_MISSING, 404); throw error; }
+      const { type, bytes } = decodeImage(blob, path);
+      return { type, bytes, size: bytes.length };
     }
     async pullRequest(project, number) {
       if (!/^[1-9][0-9]{0,8}$/.test(String(number))) throw new ProviderError('Invalid PR number.', 400);
@@ -294,6 +340,16 @@
       this.registerLinks(key, [record]);
       return record;
     }
+    /* Bytes of an image that a loaded record links to, in the same repository at the scanned revision. */
+    async loadImage(key, linkId) {
+      const generation = this.generation, project = await this.project(key);
+      if (generation !== this.generation) throw new ProviderError('Discovery changed. Open the project again.', 409);
+      const link = this.links.get(key)?.get(linkId);
+      if (!link || link.kind !== 'attachment' || !imageType(link.path)) throw new ProviderError('Open an image linked from a loaded record.', 404);
+      const image = await this.reader.loadImage(project, clone(link));
+      if (generation !== this.generation) throw new ProviderError('Discovery changed. Open the project again.', 409);
+      return image;
+    }
     async pullRequest(key, number) {
       const generation = this.generation, project = await this.project(key);
       const result = await this.reader.pullRequest(project, number);
@@ -384,7 +440,7 @@
 
   /* Share links: readable hosted URLs such as /owner/repo?root=apps%2Fweb&record=progress.
      They carry no data; the recipient needs GitHub access to the repository. */
-  const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'healthz']);
+  const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'healthz', 'vendor']);
   const OWNER = /^[A-Za-z0-9][A-Za-z0-9-]{0,38}$/, REPO_NAME = /^[A-Za-z0-9_.-]{1,100}$/;
   function shareTarget(url) {
     const parts = url.pathname.split('/').filter(Boolean);
@@ -407,6 +463,6 @@
     ? [...repos.filter(r => r.full_name.toLowerCase() === target.repo.toLowerCase()), ...repos.filter(r => r.full_name.toLowerCase() !== target.repo.toLowerCase())]
     : repos;
 
-  const api = { shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
+  const api = { MAX_IMAGE, imageType, decodeImage, shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenReader = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
