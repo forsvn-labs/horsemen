@@ -5,7 +5,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ## Map
 
 ```text
-horsemen/
+./
 ├── web/                   GitHub canvas (local and hosted), Markdown rendering, themes, previews, and setup guide
 │   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
