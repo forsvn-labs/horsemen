@@ -38,7 +38,13 @@ function treeHTML(body,record){
   const rest=(body.slice(0,fence.index)+body.slice(fence.index+fence[0].length)).trim();
   return '<div class="tree">'+HorsemenPreview.tree(fence[1]).map(l=>'<div class="tree-line'+(l.path.endsWith('/')?' dir':'')+'"><span class="tree-path"><span class="tree-guide">'+escapeHTML(l.guide)+'</span>'+escapeHTML(l.path)+'</span><span class="tree-note">'+escapeHTML(l.note)+'</span></div>').join('')+'</div>'+(rest?renderMarkdown(rest,record.url):'');
 }
+/* The layout choice (rich or list) is saved for each record type. Only these two values are kept. */
+const viewChoices=()=>{try{const saved=JSON.parse(localStorage.getItem('horsemen-peek-views')||'{}');return saved&&typeof saved==='object'?saved:{}}catch{return {}}};
+const viewMode=key=>viewChoices()[key]==='list'?'list':'rich';
+function setViewMode(key,mode){const saved=viewChoices();saved[key]=mode==='list'?'list':'rich';try{localStorage.setItem('horsemen-peek-views',JSON.stringify(saved))}catch{}}
 function overviewHTML(key,record){
+  const shown=HorsemenViews.render(key,record,{mode:viewMode(key),now:Date.now(),links:record.connections?.length||0});
+  if(shown)return shown;
   const P=HorsemenPreview,text=record.content||'',model=P.detail(key,text),stated=P.facts(text);
   let sections=model.sections,hero=null,lede=P.lede(text);
   if(key==='progress'){const next=P.preview(key,text).items.find(i=>i.label==='Next action');if(next)hero={label:'Next action',html:'<p>'+escapeHTML(next.text)+'</p>'}}
@@ -46,7 +52,7 @@ function overviewHTML(key,record){
   const withoutNext=body=>hero&&key==='progress'?body.split('\n').filter(l=>!/^\s*(?:\*\*)?Next action:/i.test(l)).join('\n').trim():body;
   lede=withoutNext(lede);
   const facts=[...stated,...(model.sections.length?[{label:'Sections',value:String(model.sections.length)}]:[]),...(record.connections?.length?[{label:'Links',value:String(record.connections.length)}]:[])];
-  let html='<div class="artifact-overview '+model.layout+'" data-layout="'+model.layout+'"><header class="page-head">'+(riders.includes(key)?icon('seal-'+key,'overview-seal'):'')+'<div class="detail-eyebrow">'+escapeHTML(riderLine[key]||'Connected document')+'</div><h2>'+escapeHTML(model.title||record.name||'Untitled')+'</h2>'+(facts.length?'<dl class="facts">'+facts.map(f=>'<div><dt>'+escapeHTML(f.label)+'</dt><dd>'+escapeHTML(f.value)+'</dd></div>').join('')+'</dl>':'')+'</header>';
+  let html='<div class="artifact-overview '+model.layout+'" data-layout="'+model.layout+'"><header class="page-head">'+(riders.includes(key)?icon('seal-'+key,'overview-seal'):'')+'<div class="detail-eyebrow">'+escapeHTML(riderLine[key]||'Connected document')+'</div><h2>'+escapeHTML(model.title||record.name||'Untitled')+'</h2>'+(facts.length?'<dl class="facts">'+facts.map(f=>'<div><dt>'+escapeHTML(f.label)+'</dt><dd>'+escapeHTML(f.value)+'</dd></div>').join('')+'</dl>':'')+'<div class="view-bar">'+HorsemenViews.toggle(key,'rich')+'</div></header>';
   if(hero)html+='<div class="detail-hero"><span>'+escapeHTML(hero.label)+'</span>'+hero.html+'</div>';
   if(lede)html+='<div class="lede">'+renderMarkdown(lede,record.url)+'</div>';
   if(key==='brain')html+='<p class="detail-intro">Knowledge stays with its original source. Open a connection to explore it, or read the access rules below.</p><div data-connections-slot></div>';
@@ -88,7 +94,9 @@ function renderPeek(){
   for(const [id,mode] of [['reading-tab','overview'],['document-tab','document'],['source-tab','source']]){const b=$('#'+id);b.classList.toggle('active',peekMode===mode);b.setAttribute('aria-pressed',peekMode===mode)}
   const content=$('#peek-content');content.replaceChildren();content.dataset.mode=peekMode;$('.peek-content').scrollTo({top:0,behavior:'instant'});
   if(entry.link&&entry.link.kind!=='document'){
-    content.innerHTML='<div class="external-document"><span class="detail-eyebrow">'+escapeHTML(entry.link.kind)+'</span><h2>'+escapeHTML(entry.link.title)+'</h2><p>Linked from '+escapeHTML(entry.link.source)+'. The contents have not been loaded into Horsemen.</p><p class="external-address">'+escapeHTML(entry.link.href)+'</p></div>';
+    const ref=HorsemenViews.proofKind(entry.link.href),pr=HorsemenViews.prRef(entry.link.href),kinds={pr:'Pull request',commit:'Commit',release:'Release',checks:'Checks',issue:'Issue'};
+    content.innerHTML='<div class="external-document"><span class="detail-eyebrow">'+escapeHTML(kinds[ref?.kind]||entry.link.kind)+'</span><h2>'+escapeHTML(entry.link.title)+'</h2>'+(ref&&kinds[ref.kind]?'<p class="ref-chip"><span class="chip '+ref.kind+'">'+escapeHTML(ref.label)+'</span></p>':'')+'<p>Linked from '+escapeHTML(entry.link.source)+'. The contents have not been loaded into Horsemen.</p><p class="external-address">'+escapeHTML(entry.link.href)+'</p></div>';
+    if(pr&&pr.repo===projects[current]?.repo){const area=document.createElement('section');area.className='evidence-block';area.innerHTML='<h3>Pull request details</h3><p>Load the title, merge state, and description from GitHub. A merged PR alone does not prove delivery.</p>';area.append(prButton(area,pr.number));content.firstChild.append(area)}
   }else if(r.error)content.innerHTML='<div class="callout amber">'+escapeHTML(r.error)+'</div>';
   else content.innerHTML=peekMode==='document'?renderMarkdown(r.content||'',r.url):overviewHTML(entry.key,r);
   const href=r.url||entry.link?.href;
@@ -159,7 +167,15 @@ async function openConnection(link,parentId){
 $('#peek-back').onclick=()=>{peekRequest++;peekTrail.pop();peekMode='overview';renderPeek()};
 $('#document-tab').onclick=()=>setPeekMode('document');
 
-function addEvidence(record){const p=projects[current],area=document.createElement('section');area.className='evidence-block';area.dataset.outline='Delivery evidence';area.innerHTML='<h3>Delivery evidence & PRs</h3><p>The source above owns the delivery claim. A merged PR alone does not prove delivery. Attachments below come from the PR description; comments are not scanned.</p>';const urls=[...record.content.matchAll(/https:\/\/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/g)].filter(m=>m[1]===p.repo);for(const n of new Set(urls.map(m=>m[2]))){const b=document.createElement('button');b.className='btn';b.textContent='Load PR #'+n;b.onclick=async()=>{const version=request;b.disabled=true;try{const pr=await api('/api/pr?project='+p.id+'&number='+n);if(version!==request)return;const box=document.createElement('div');box.innerHTML='<h3>'+escapeHTML(pr.title)+'</h3><p>'+escapeHTML(pr.merged?'Merged · '+pr.merged_at:pr.state)+' · '+escapeHTML(pr.merge_commit_sha||'No merge commit')+'</p>'+renderMarkdown(pr.body||'No PR description.',pr.html_url);area.append(box);b.remove()}catch(e){b.disabled=false;showToast(e.message)}};area.append(b)}if(!urls.length)area.insertAdjacentHTML('beforeend','<p>No same-repository PR links found in this record.</p>');$('#peek-content').append(area)}
+function prButton(area,n){const p=projects[current],b=document.createElement('button');b.className='btn';b.textContent='Load PR #'+n;b.onclick=async()=>{const version=request;b.disabled=true;try{const pr=await api('/api/pr?project='+p.id+'&number='+n);if(version!==request)return;const box=document.createElement('div');box.innerHTML='<h3>'+escapeHTML(pr.title)+'</h3><p>'+escapeHTML(pr.merged?'Merged · '+pr.merged_at:pr.state)+' · '+escapeHTML(pr.merge_commit_sha||'No merge commit')+'</p>'+renderMarkdown(pr.body||'No PR description.',pr.html_url);area.append(box);b.remove()}catch(e){b.disabled=false;showToast(e.message)}};return b}
+function addEvidence(record){const p=projects[current],area=document.createElement('section');area.className='evidence-block';area.dataset.outline='Delivery evidence';area.innerHTML='<h3>Delivery evidence & PRs</h3><p>The source above owns the delivery claim. A merged PR alone does not prove delivery. Attachments below come from the PR description; comments are not scanned.</p>';const urls=[...record.content.matchAll(/https:\/\/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/g)].filter(m=>m[1]===p.repo);for(const n of new Set(urls.map(m=>m[2])))area.append(prButton(area,n));if(!urls.length)area.insertAdjacentHTML('beforeend','<p>No same-repository PR links found in this record.</p>');$('#peek-content').append(area)}
+/* View toggle and Copy buttons inside the peek. The content is replaced on each render, so the handler sits on its container. */
+$('#peek-content').addEventListener('click',e=>{
+  const choice=e.target.closest('[data-view-toggle] [data-view-choice]');
+  if(choice){const key=peekTrail.at(-1)?.key;if(key){setViewMode(key,choice.dataset.viewChoice);renderPeek();$('#peek-content [data-view-choice="'+viewMode(key)+'"]')?.focus({preventScroll:true})}return}
+  const copy=e.target.closest('[data-copy]');
+  if(copy){const text=copy.dataset.copy;Promise.resolve(navigator.clipboard?.writeText(text)).then(()=>{if(!navigator.clipboard)throw Error();copy.textContent='Copied';setTimeout(()=>{copy.textContent='Copy'},1600)}).catch(()=>showToast('Copy is not available. Select the command and copy it.'))}
+});
 $('#reading-tab').onclick=()=>setTab(false);$('#source-tab').onclick=()=>setTab(true);$('#close-peek').onclick=()=>$('#peek').close();$('#peek').addEventListener('close',()=>{peekRequest++;opener?.focus({preventScroll:true});syncHash()});
 for(const b of $$('[data-artifact]')){b.disabled=true;bindArtifact(b)}
 function filter(){const q=$('#search').value.toLowerCase();let count=0;for(const b of $$('[data-artifact]')){b.hidden=!b.textContent.toLowerCase().includes(q);if(!b.hidden)count++}refreshGraph();$('#empty').hidden=$$('[data-artifact]').some(b=>!b.hidden)}

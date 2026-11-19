@@ -50,8 +50,18 @@ See [the hosted viewer](../worker/README.md).
 - Open a card for its visual overview: Vision brief, Progress board, Brain
   source library, Structure map, release timeline, tool cards, or README guide.
   Each overview has a title block, the facts that the record states as
-  `Label: value`, and numbered sections. Full document and Markdown source
-  tabs preserve the complete record.
+  `Label: value`, and the layout for its type. Full document and Markdown
+  source tabs preserve the complete record.
+- Progress groups items by day, latest day first. A board shows Shipped, In
+  progress, Up next, and Needs attention. Each item shows its proof (PR,
+  commit, release, checks, and document links from its text and its evidence
+  row) and a link to its source line. Earlier days fold.
+- Dates show as relative time, such as "2 days ago". Hover shows the exact
+  date. Structure paths open on GitHub, and commands have Copy buttons.
+- Each overview has a layout switch: the rich layout or a compact list. The
+  browser saves the choice for each record type. Views show source excerpts;
+  they do not rewrite records. A record that does not follow its template
+  uses the general section layout. See [artifact views](../docs/product/artifact-views.md).
 - Inside the peek, the left column lists the records and the sections of the
   open page. The path above the page goes back to an earlier document. Use
   the left and right arrow keys, or the buttons at the bottom, to change
@@ -109,7 +119,7 @@ The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
-by the app. The browser stores only opaque project IDs, canvas positions, and the theme choice.
+by the app. The browser stores only opaque project IDs, canvas positions, the theme choice, and the layout choice for each record type.
 External images do not load automatically. Opening an external link leaves
 the local app. Do not expose this server through a tunnel or reverse proxy.
 After switching GitHub accounts, refresh discovery. Project loads also check
@@ -126,6 +136,9 @@ record loads are retried instead of cached. Nothing is written to disk.
 ```sh
 python3 -m unittest discover -s tests -p 'test_gui*.py'
 node tests/test_gui_previews.cjs
+node tests/test_gui_views.cjs
+node tests/test_gui_markdown.cjs
+node tests/test_gui_themes.cjs
 node tests/test_canvas_state.cjs
 python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check
 ```
