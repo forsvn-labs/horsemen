@@ -11,6 +11,8 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 ## Shipped
 
+- **Share links** (2026-11-19): Each project and record on horsemen.forsvn.com has a readable link, such as `/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository open the same record after sign-in. Live on horsemen.forsvn.com.
+
 - **Publish reminder** (2026-11-19): When an agent changes a record but the change has not reached the remote default branch, the Stop hook asks it to commit and push. Then the hosted viewer shows the update. Available from main; other installations get it after a refresh.
 
 - **Readable type and design audit** (2026-11-19): The workspace now has three type sets: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Small labels are larger, phones open in List view, and keyboard focus is easier to see. The audit lists the fixes and the larger ideas still open. Live on horsemen.forsvn.com.
@@ -25,10 +27,6 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 - **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
 
-## In progress
-
-- **Share links** (started 2026-11-19): Each project and record on horsemen.forsvn.com has a readable link, such as `/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository open the same record after sign-in.
-
 ### Technical details
 
 | Item | Evidence |
@@ -36,7 +34,7 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 | Shorter records | [Pre-save edit](horsemen/references/sync.md#pre-save-edit) and the distribution regression test. The source, wheel, and packaged skill checks passed locally. |
 | Hosted viewer | Merged in [PR #6](https://github.com/hungv47/horsemen/pull/6) and deployed from main; the live files match main, `/healthz` reports ok, and the live sign-in redirect was checked. Reader parity and Worker tests passed, and the hosted browser check passed against a fake GitHub: sign-in, project load, live update, and sign-out. Full verification passed locally. See [deploy and limits](worker/README.md). The owner signed in with a real account and saw the projects load on 2026-11-19. |
 | Faster hosted loading | Benchmark with 80 repositories and 150 ms GitHub delay (`scripts/bench_hosted.py`): first project on reload 2.1 s to 0.36 s; first visit 2.2 s to 1.9 s; discovery 8.9 s to 5.9 s. Reader, Worker, and browser checks pass. Merged in [PR #9](https://github.com/hungv47/horsemen/pull/9) after CI passed; deployed from main, and the live files match main. |
-| Share links | Link, Worker, and browser checks pass: a signed-out visitor returns to the shared record after sign-in; sign-in never redirects outside the app; a repository without access shows a clear message. Not yet deployed. |
+| Share links | Link, Worker, and browser checks pass: a signed-out visitor returns to the shared record after sign-in; sign-in never redirects outside the app; a repository without access shows a clear message. Merged in [PR #16](https://github.com/hungv47/horsemen/pull/16) after CI passed; deployed from main, the live files match main, and a live share link keeps its target through sign-in. |
 | Publish reminder | Hook scenario S20 passes: uncommitted and unpushed record edits fire once, published edits and repositories without a remote do not. All 150 hook scenarios and full verification passed locally. Merged in [PR #14](https://github.com/hungv47/horsemen/pull/14) after CI passed. The owner's global skill now installs from this repository and matches main; the Claude Code and Codex hooks run it. |
 | Readable type and design audit | [Design audit](docs/product/design-audit.md). Theme and type tests, canvas rule tests, Worker tests, the fixture browser check, and the hosted browser check passed locally. Not merged or deployed. Squash-merged in [PR #10](https://github.com/hungv47/horsemen/pull/10) after CI passed; deployed from main, and the live files match main. |
 | Views for each record type | [Artifact views](docs/product/artifact-views.md). View tests (`node tests/test_gui_views.cjs`) and the fixture browser check passed locally at desktop and phone width; full repository verification passed locally. Merged in [PR #7](https://github.com/hungv47/horsemen/pull/7) after CI passed on Linux and macOS; deployed from main, and the live files match main. |
