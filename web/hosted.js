@@ -35,33 +35,65 @@
   const gh = async path => (await request(path)).data;
 
   async function repositories() {
-    const repos = new Map();
+    const repos = new Map(), installations = [];
     for (let page = 1; page < 50; page++) {
       const found = (await gh(`/user/installations?per_page=100&page=${page}`)).installations || [];
-      for (const installation of found) {
-        for (let p = 1; p < 100; p++) {
-          const list = (await gh(`/user/installations/${installation.id}/repositories?per_page=100&page=${p}`)).repositories || [];
-          for (const repo of list) repos.set(repo.id, repo);
-          if (list.length < 100) break;
-        }
-      }
+      installations.push(...found);
       if (found.length < 100) break;
     }
+    // Installations are independent: read their repository lists in parallel.
+    await Promise.all(installations.map(async installation => {
+      for (let p = 1; p < 100; p++) {
+        const list = (await gh(`/user/installations/${installation.id}/repositories?per_page=100&page=${p}`)).repositories || [];
+        for (const repo of list) repos.set(repo.id, repo);
+        if (list.length < 100) break;
+      }
+    }));
     if (!repos.size) throw new R.ProviderError('Horsemen cannot see any repositories yet. Select Choose repositories, then install the GitHub App on the projects you want to read.', 404);
     return [...repos.values()].sort((a, b) => String(b.pushed_at || '').localeCompare(String(a.pushed_at || '')));
   }
 
-  const reader = new R.Reader(gh, repositories);
+  const login = document.querySelector('meta[name="horsemen-login"]')?.content || null;
+  const reader = new R.Reader(gh, repositories, 30000, login);
   /* Head checks use ETags: an unchanged branch returns 304 and does not use rate limit. */
   const heads = new Map();
-  reader.head = async project => {
-    const path = `/repos/${project.repo}/commits/${R.quote(project.branch, '')}`, known = heads.get(path);
+  reader.head = async target => {
+    const path = `/repos/${target.repo}/commits/${R.quote(target.branch, '')}`, known = heads.get(path);
     const res = await request(path, known?.etag);
     if (res.status === 304 && known) return known.sha;
-    heads.set(path, { etag: res.etag, sha: res.data.sha });
+    if (res.etag) heads.set(path, { etag: res.etag, sha: res.data.sha });
     return res.data.sha;
   };
-  const state = new R.ScanState(reader);
+  const state = new R.ScanState(reader, { concurrency: 12 });
+
+  /* Saved discovery index: repository names, record paths, revisions, and ETags.
+     It never holds record text. It lets a reload show projects at once, then checks
+     each branch in the background. Sign-out and Clear workspace remove it. */
+  const INDEX_KEY = 'horsemen.discovery.v1';
+  function saveIndex() {
+    const index = state.exportIndex();
+    if (!index) return;
+    index.heads = [...heads].slice(-2000);
+    try { localStorage.setItem(INDEX_KEY, JSON.stringify(index)); } catch { /* Storage is optional. */ }
+  }
+  function forgetIndex() { try { localStorage.removeItem(INDEX_KEY); } catch { /* Storage is optional. */ } }
+  let restored = false;
+  try {
+    const index = JSON.parse(localStorage.getItem(INDEX_KEY) || 'null');
+    restored = state.restore(index, login);
+    if (restored && Array.isArray(index.heads)) for (const [path, value] of index.heads) if (value?.etag) heads.set(path, value);
+    if (!restored && index) forgetIndex();
+  } catch { forgetIndex(); }
+  let revalidation = null;
+  function revalidate() {
+    revalidation = revalidation || state.revalidate().then(() => {
+      saveIndex();
+      document.dispatchEvent(new CustomEvent('horsemen:projects', { detail: state.snapshot() }));
+    }).finally(() => { revalidation = null; });
+    return revalidation;
+  }
+  // Let the first project load before the background check starts.
+  let revalidateTimer = restored ? setTimeout(revalidate, 1500) : null;
 
   /* Live updates: while a project is open and the tab is visible, check its branch for new commits. */
   let watched = null, timer = null, checking = false;
@@ -70,7 +102,7 @@
     checking = true;
     try {
       const updated = await state.refreshProject(watched);
-      if (updated) document.dispatchEvent(new CustomEvent('horsemen:updated', { detail: updated }));
+      if (updated) { saveIndex(); document.dispatchEvent(new CustomEvent('horsemen:updated', { detail: updated })); }
     } catch { /* The next check retries. */ } finally { checking = false; }
   }
   function watch(id) { watched = id; clearInterval(timer); timer = setInterval(check, pollSeconds * 1000); }
@@ -81,8 +113,14 @@
     try {
       switch (url.pathname) {
         case '/api/status': return state.snapshot();
-        case '/api/scan': if (method !== 'POST') break; watched = null; return { started: state.start() };
-        case '/api/clear': if (method !== 'POST') break; watched = null; state.clear(); return { cleared: true };
+        case '/api/scan': {
+          if (method !== 'POST') break;
+          watched = null; clearTimeout(revalidateTimer);
+          const started = state.start();
+          if (started) state.running.then(saveIndex);
+          return { started };
+        }
+        case '/api/clear': if (method !== 'POST') break; watched = null; clearTimeout(revalidateTimer); state.clear(); forgetIndex(); return { cleared: true };
         case '/api/project': { const data = await state.loadProject(q('id')); watch(q('id')); return data; }
         case '/api/document': return await state.loadDocument(q('id'), q('link'));
         case '/api/pr': return await state.pullRequest(q('project'), q('number'));
@@ -92,6 +130,7 @@
   }
 
   async function signOut() {
+    forgetIndex();
     try { await fetch('/auth/logout', { method: 'POST', headers: headers(), cache: 'no-store' }); } finally { signedOut(); }
   }
 
