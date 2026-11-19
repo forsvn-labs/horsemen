@@ -11,6 +11,8 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 ## Shipped
 
+- **Style themes** (2026-11-19): The owner asked for several themes that each look different. The account menu and Jump now show a gallery of eight themes: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, borders, shadows, spacing, canvas, and focus. Modern and High contrast replace the type sets for readable text. Live on horsemen.forsvn.com.
+
 - **Calm workspace** (2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Live on horsemen.forsvn.com.
 
 - **Share links** (2026-11-19): Each project and record on horsemen.forsvn.com has a readable link, such as `/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository open the same record after sign-in. Live on horsemen.forsvn.com.
@@ -29,10 +31,6 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 - **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
 
-## In progress
-
-- **Style themes** (started 2026-11-19): The owner asked for several themes that each look different. The account menu and Jump now show a gallery of eight themes: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, borders, shadows, spacing, canvas, and focus. Modern and High contrast replace the type sets for readable text. In review; not merged or deployed.
-
 ### Technical details
 
 | Item | Evidence |
@@ -42,7 +40,7 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 | Faster hosted loading | Benchmark with 80 repositories and 150 ms GitHub delay (`scripts/bench_hosted.py`): first project on reload 2.1 s to 0.36 s; first visit 2.2 s to 1.9 s; discovery 8.9 s to 5.9 s. Reader, Worker, and browser checks pass. Merged in [PR #9](https://github.com/hungv47/horsemen/pull/9) after CI passed; deployed from main, and the live files match main. |
 | Share links | Link, Worker, and browser checks pass: a signed-out visitor returns to the shared record after sign-in; sign-in never redirects outside the app; a repository without access shows a clear message. Merged in [PR #16](https://github.com/hungv47/horsemen/pull/16) after CI passed; deployed from main, the live files match main, and a live share link keeps its target through sign-in. |
 | Publish reminder | Hook scenario S20 passes: uncommitted and unpushed record edits fire once, published edits and repositories without a remote do not. All 150 hook scenarios and full verification passed locally. Merged in [PR #14](https://github.com/hungv47/horsemen/pull/14) after CI passed. The owner's global skill now installs from this repository and matches main; the Claude Code and Codex hooks run it. |
-| Style themes | Theme tests check every theme and mode for contrast (4.5:1 for text, 7:1 in High contrast), the 12px floor, licensed fonts, and that each theme differs from the others in at least three style traits. The fixture browser check applies each theme, reloads it, checks its fonts, and checks for overflow at desktop and phone width. The hosted browser check, Worker tests, and full verification passed locally. In review on branch `design/style-themes`. |
+| Style themes | Theme tests check every theme and mode for contrast (4.5:1 for text, 7:1 in High contrast), the 12px floor, licensed fonts, and that each theme differs from the others in at least three style traits. The fixture browser check applies each theme, reloads it, checks its fonts, and checks for overflow at desktop and phone width. The hosted browser check, Worker tests, and full verification passed locally. Squash-merged in [PR #20](https://github.com/hungv47/horsemen/pull/20) after CI passed, with a fix for Terminal small-card titles; deployed from main, and the live files match main. |
 | Calm workspace | [Design audit, minimal pass](docs/product/design-audit.md#minimal-pass-2026-11-19) and [artifact views](docs/product/artifact-views.md). Impeccable critique went from 27/40 to 31/40; the rendered-page detector went from 2 findings to 0 at desktop, tablet, and phone width. View, preview, theme, canvas, Worker, fixture browser, and hosted browser checks passed locally, and full verification passed. Squash-merged in [PR #18](https://github.com/hungv47/horsemen/pull/18) after CI passed; deployed from main, and the live files match main. |
 | Readable type and design audit | [Design audit](docs/product/design-audit.md). Theme and type tests, canvas rule tests, Worker tests, the fixture browser check, and the hosted browser check passed locally. Not merged or deployed. Squash-merged in [PR #10](https://github.com/hungv47/horsemen/pull/10) after CI passed; deployed from main, and the live files match main. |
 | Views for each record type | [Artifact views](docs/product/artifact-views.md). View tests (`node tests/test_gui_views.cjs`) and the fixture browser check passed locally at desktop and phone width; full repository verification passed locally. Merged in [PR #7](https://github.com/hungv47/horsemen/pull/7) after CI passed on Linux and macOS; deployed from main, and the live files match main. |
