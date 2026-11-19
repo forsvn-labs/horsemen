@@ -263,6 +263,22 @@ class Edit(unittest.TestCase):
             for b in notes[i + 1:]:
                 self.assertFalse(overlap(a, b), (a['id'], b['id']))
 
+    def test_near_stays_beside_the_anchor_when_one_direction_is_taken(self):
+        # A card is just below the free place. The closer free place is a little higher, not far below.
+        doc = ('{"nodes":[{"id":"anchor","type":"text","x":0,"y":0,"width":320,"height":200,"text":"Anchor."},'
+               '{"id":"taken","type":"text","x":380,"y":150,"width":320,"height":140,"text":"In the way."}]}')
+        self.path('board').write_text(doc, encoding='utf-8')
+        self.assertTrue(self.edit('board', [{'op': 'add', 'node': {'id': 'new', 'text': 'New.'}, 'near': 'anchor'}]).ok)
+        new, anchor, taken = self.node('board', 'new'), self.node('board', 'anchor'), self.node('board', 'taken')
+        self.assertFalse(overlap(new, taken))
+        self.assertEqual(new['x'], anchor['x'] + anchor['width'] + 40)
+        self.assertLess(new['y'], anchor['y'] + anchor['height'], 'the note must stay beside the anchor')
+        self.assertLess(abs(new['y'] - anchor['y']), 200)
+        # Below or above an anchor, the same rule applies from left to right.
+        self.assertTrue(self.edit('board', [{'op': 'add', 'node': {'id': 'under', 'text': 'Under.'}, 'near': 'taken', 'side': 'above'}]).ok)
+        under = self.node('board', 'under')
+        self.assertFalse(any(overlap(under, self.node('board', other)) for other in ('anchor', 'taken', 'new')))
+
     def test_near_unknown_element_is_refused(self):
         self.refused('progress', [{'op': 'add', 'node': {'text': 'x'}, 'near': 'ghost'}], 'op 1', 'near', 'ghost')
         self.refused('progress', [{'op': 'add', 'node': {'text': 'x'}, 'near': 'e-demo'}], 'op 1', 'near')

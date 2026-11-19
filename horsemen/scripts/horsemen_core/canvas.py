@@ -556,26 +556,31 @@ def _blocked(x, y, width, height, rects, margin):
     return None
 
 
-def _slide(x, y, width, height, rects, down):
-    """Move a taken place down, or to the right, until it is free. Each element can block one time only."""
+def _slide(x, y, width, height, rects, down, forward=True):
+    """Move a taken place along one axis until it is free. Each element can block one time only."""
     for _ in range(len(rects) + 1):
         hit = _blocked(x, y, width, height, rects, GAP // 2)
         if hit is None:
             break
         if down:
-            y = hit[1] + hit[3] + GAP
+            y = hit[1] + hit[3] + GAP if forward else hit[1] - GAP - height
         else:
-            x = hit[0] + hit[2] + GAP
+            x = hit[0] + hit[2] + GAP if forward else hit[0] - GAP - width
     return x, y
 
 
 def place(nodes, anchor, side, width, height, skip=None):
-    """A free position beside `anchor`. A place that is taken moves down (right, left) or to the right (below, above)."""
+    """A free position beside `anchor`. A place that is taken moves along the side of the anchor, down or
+    up (right, left) or to the right or left (below, above), to the free place that is nearer."""
     ax, ay, aw, ah = _rect(anchor)
     x, y = {'right': (ax + aw + GAP, ay), 'left': (ax - GAP - width, ay),
             'below': (ax, ay + ah + GAP), 'above': (ax, ay - GAP - height)}[side]
     rects = [_rect(node) for node in nodes if node.get('type') != 'group' and node.get('id') != skip]
-    return _slide(x, y, width, height, rects, side in ('right', 'left'))
+    down = side in ('right', 'left')
+    first = _slide(x, y, width, height, rects, down)
+    second = _slide(x, y, width, height, rects, down, forward=False)
+    moved = (lambda place: abs(place[1] - y)) if down else (lambda place: abs(place[0] - x))
+    return second if moved(second) < moved(first) else first
 
 
 def place_free(nodes, width, height):
