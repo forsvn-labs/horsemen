@@ -29,7 +29,7 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 ## In progress
 
-- **Calm workspace** (started 2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Waits for owner review; not merged or deployed.
+- **Calm workspace** (started 2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Waits for owner review in [PR #18](https://github.com/hungv47/horsemen/pull/18); not merged or deployed.
 
 ### Technical details
 
