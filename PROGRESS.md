@@ -13,7 +13,7 @@ Next action: Use the hosted viewer on real projects and note what to improve; th
 
 - **Publish reminder** (2026-11-19): When an agent changes a record but the change has not reached the remote default branch, the Stop hook asks it to commit and push. Then the hosted viewer shows the update. Available from main; other installations get it after a refresh.
 
-- **Readable type and design audit** (2026-11-19): The workspace now has three type sets: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Small labels are larger, phones open in List view, and keyboard focus is easier to see. The audit lists the fixes and the larger ideas still open. Waits for review and merge. Live on horsemen.forsvn.com.
+- **Readable type and design audit** (2026-11-19): The workspace now has three type sets: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Small labels are larger, phones open in List view, and keyboard focus is easier to see. The audit lists the fixes and the larger ideas still open. Live on horsemen.forsvn.com.
 
 - **Faster hosted loading** (2026-11-19): A reload shows your projects at once from a saved list of repository names and paths, then checks for changes in the background. A first visit reads more repositories at the same time. Live on horsemen.forsvn.com.
 
