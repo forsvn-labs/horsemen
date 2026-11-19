@@ -570,6 +570,40 @@ def scenario_vision_change(env):
     record("C4b engineering content in VISION is a warning", "vision-engineering-content" in codes(report, "warnings"), json.dumps(report["warnings"]))
 
 
+def scenario_publish(env):
+    """Record edits that have not reached the remote default branch are invisible to GitHub readers."""
+    remote = env.base / "publish-remote.git"
+    env.git(env.base, "init", "-q", "--bare", "-b", "main", str(remote))
+    root = healthy_project(env, env.base / "publish")
+    env.git(root, "remote", "add", "origin", str(remote))
+    env.git(root, "push", "-q", "-u", "origin", "main")
+    env.git(root, "remote", "set-head", "origin", "main")
+    env.hook("SessionStart", root, session="pub")
+    write(root, {"PROGRESS.md": PROGRESS + "\n<!-- fictional edit -->\n"})
+    code, out, _, _ = env.hook("Stop", root, session="pub", stop_hook_active=False)
+    reason = (out or {}).get("reason", "")
+    record("S20 an unpublished record edit asks to commit and push", "Publish:" in reason and "PROGRESS.md" in reason and "origin/main" in reason, reason)
+    code, out, _, _ = env.hook("Stop", root, session="pub", stop_hook_active=False)
+    record("S20 the same unpublished edit fires once", review_requested(out) and "Publish:" not in out.get("reason", ""))
+    env.git(root, "commit", "-qam", "progress")
+    env.git(root, "push", "-q", "origin", "main")
+    write(root, {"BRAIN.md": BRAIN + "\n- New source.\n"})
+    env.git(root, "commit", "-qam", "brain")
+    code, out, _, _ = env.hook("Stop", root, session="pub", stop_hook_active=False)
+    reason = (out or {}).get("reason", "")
+    record("S20 a committed but unpushed record edit is unpublished", "Publish:" in reason and "BRAIN.md" in reason and "PROGRESS.md" not in reason.split("Publish:")[1], reason)
+    env.git(root, "push", "-q", "origin", "main")
+    write(root, {"README.md": README + "\nMore.\n"})
+    write(root, {"README.md": README})
+    code, out, _, _ = env.hook("Stop", root, session="pub2", stop_hook_active=False)
+    record("S20 published records do not fire", review_requested(out) and "Publish:" not in out.get("reason", ""), out.get("reason", ""))
+    local = healthy_project(env, env.base / "publish-local")
+    env.hook("SessionStart", local, session="loc")
+    write(local, {"PROGRESS.md": PROGRESS + "\n<!-- fictional edit -->\n"})
+    code, out, _, _ = env.hook("Stop", local, session="loc", stop_hook_active=False)
+    record("S20 a repository without a remote default branch does not fire", review_requested(out) and "Publish:" not in out.get("reason", ""))
+
+
 def scenario_non_software(env):
     root = env.base / "wedding-plan"
     root.mkdir()
@@ -1094,7 +1128,7 @@ def scenario_install_health(env):
 
 
 SCENARIOS = [scenario_noise, scenario_initialization, scenario_adoption, scenario_shipping, scenario_doc_only_commits,
-             scenario_refactor, scenario_knowledge_migration, scenario_vision_change, scenario_non_software,
+             scenario_refactor, scenario_knowledge_migration, scenario_vision_change, scenario_publish, scenario_non_software,
              scenario_scale_and_staleness, scenario_nested, scenario_branch_switch, scenario_changelog_and_links,
              scenario_no_baseline, scenario_install, scenario_examples, scenario_preexisting_untracked,
              scenario_rearm, scenario_slow_git, scenario_install_permissions, scenario_orientation_safety, scenario_check_hardening,

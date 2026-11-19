@@ -1,6 +1,6 @@
 # Vision
 
-Owner: Hung · Confirmed: 2026-11-13 for one public Horsemen project combining the skill and CLI under MIT
+Owner: Hung · Confirmed: 2026-11-18 for an open-source, self-hosted GUI alongside the skill and CLI
 
 Horsemen makes project context easy to carry from one working session to the next.
 
@@ -12,8 +12,11 @@ so their rules and checks stay consistent.
 
 ## The world we are building
 
-One public Horsemen project contains both ways to work with project context:
-an agent skill for guided work and a CLI for repeatable local checks.
+One public Horsemen project combines an agent skill, a CLI, and a visual
+workspace. Operators can connect GitHub, find projects that use Horsemen,
+and open each project as a canvas. Each record and supporting artifact has
+a peek view suited to its content. Operators can also share a canvas publicly.
+The product remains open source and can be self-hosted.
 
 ## Who we build for
 
@@ -28,8 +31,9 @@ The records apply to software, business, research, and personal work.
 
 ## How we get there
 
-First, unite the existing skill and CLI in one tested public project.
-Further product scope, adoption targets, and funding are not decided.
+Keep the existing skill and CLI working while exploring the GUI. Define the
+first release through requirements and an interactive design before building
+the GitHub connection and public sharing.
 
 ## What we will never become
 
@@ -37,4 +41,13 @@ A tool that treats a plan as permission or invents the owner's direction.
 
 ## Open questions
 
-Broader product goals remain for the owner to define when needed.
+- Who should the first release serve best?
+- Should public canvases use reviewed snapshots or live updates?
+- Adoption targets and funding remain undecided.
+
+## Direction changes
+
+- 2026-11-18: Hung expanded the skill-and-CLI scope to include a visual,
+  self-hosted product with GitHub project discovery and public canvas sharing.
+- 2026-11-19: Hung limited the hosted product to linking Git projects and
+  viewing them. It reads records from Git and does not store their data.

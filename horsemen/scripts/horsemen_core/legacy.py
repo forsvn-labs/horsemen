@@ -909,6 +909,17 @@ def stop(payload):
         notes.append("Vision: VISION.md changed. Check README.md, PROGRESS.md (Next, Later), and BRAIN.md for conflicts, "
                      "and log the agreed direction change. Ask only if the owner's intent is unclear.")
 
+    if changed and top and state.get("git"):
+        unpublished = unpublished_records(root, top, changed)
+        if unpublished:
+            names, ref = unpublished
+            fingerprint = digest(ref + "\n" + "\n".join(f"{n}:{now.get(n)}" for n in names))
+            if reminded.get("publish") != fingerprint:
+                reminded["publish"] = fingerprint
+                notes.append(f"Publish: {', '.join(names[:4])} changed in this session but {'differs' if len(names) == 1 else 'differ'} from {ref}. Readers of GitHub, "
+                             f"such as the hosted Horsemen viewer, see the old text until the change reaches {ref}. "
+                             "Commit and push when the project's rules allow.")
+
     if changed:
         report = check(root, top, fast=True)
         errors = [f"{e['file']}: {e['message']}" for e in report["errors"] if e["file"] in changed]
@@ -919,6 +930,27 @@ def stop(payload):
 
     save_state(path, state)
     return completion_reminder(notes)
+
+
+def unpublished_records(root, top, names):
+    """Records changed in this session whose text differs from the remote default branch, as of the last fetch."""
+    ref = (git(top, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD") or "").strip()
+    if not ref:
+        return None  # No remote default branch: nothing reads these records from GitHub.
+    try:
+        rel = Path(root).resolve().relative_to(Path(top).resolve()).as_posix()
+    except ValueError:
+        return None
+    prefix = "" if rel in ("", ".") else rel + "/"
+    out = []
+    for name in sorted(names):
+        local = read(Path(root) / name)
+        if local is None:
+            continue
+        remote = git(top, "show", f"{ref}:{prefix}{name}")
+        if remote != local:
+            out.append(name)
+    return (out, ref) if out else None
 
 
 def completion_reminder(notes):

@@ -8,20 +8,37 @@ Horsemen keeps four Markdown records useful: why the project exists, what has
 shipped, where its knowledge lives, and where to find its parts. It works for
 software, business, research, and personal projects.
 
-One project, two ways to use it:
+Three ways to use it today:
 
-| Use the agent skill to… | Use the CLI to… |
-| --- | --- |
-| Gather context and maintain records with your agent | Check records and inspect a local project |
-| Review connected sources within your existing access | Update one local record with an exact, reviewed edit |
-| Preserve your direction and update the right originals | Get repeatable results without an AI model or account |
+| See your projects in the browser | Keep records current with your agent | Check records without AI |
+| --- | --- | --- |
+| Sign in with GitHub at [horsemen.forsvn.com](https://horsemen.forsvn.com) | Install the agent skill | Install the CLI |
+| Read each record in a view made for it | Gather context and update the right originals | Get repeatable results with Python 3.10+ |
+| Share a link to any project or record | Get a reminder to push record edits | Update one local record with an exact edit |
 
-Both use the same checker. The CLI has no runtime dependencies beyond Python
-3.10+ and optional Git. Default commands only read. Explicit single-record
-updates can save a local edit under an exclusive-writer contract. The CLI
-does not contact outside services.
+The skill and the CLI use the same checker. The CLI has no runtime
+dependencies beyond Python 3.10+ and optional Git, and it does not contact
+outside services.
 
 ## Get started
+
+### See your projects
+
+Open <https://horsemen.forsvn.com>, sign in with GitHub, and choose the
+repositories to show. Each project opens as a canvas of its records. Each
+record opens in a reading view: Progress starts with the next action, then
+current work and shipped work by day with links to proof. Pick one of eight
+themes from the account menu.
+
+Copy a link to a project or record, such as
+`horsemen.forsvn.com/owner/repo?record=progress`. People with GitHub access to
+that repository can open it. The viewer is read-only and stores no project
+data on the server. It shows the default branch, so agents commit and push
+record changes; the skill's Stop hook reminds them.
+
+Run your own copy: [hosted viewer](worker/README.md). Run it on your computer
+with an existing `gh` sign-in: `python3 scripts/serve_gui.py`, then open
+<http://127.0.0.1:8787> ([setup](web/README.md)).
 
 ### Use the agent skill
 
@@ -95,6 +112,8 @@ requests, releases, or provider contents. Automatic Drive saves and automatic
 batch patch application are not available. Local single-record updates are
 explicit; provider saves still require the authorized host workflow. Linux
 and macOS are the test targets; Windows planning, export and updates are unsupported.
+The hosted viewer reads only repositories where its GitHub App is installed,
+and shared links open only for people with GitHub access to the repository.
 
 - [CLI commands and examples](horsemen/CLI.md)
 - [Skill and CLI differences](horsemen/references/cli.md)

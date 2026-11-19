@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-11-19
+
+- Added eight style themes with a live gallery in the account menu and Jump: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, spacing, and colours, and loads only its own fonts. [PR #20](https://github.com/hungv47/horsemen/pull/20).
+
+- Made the workspace calm. The home shows the project list, one account menu, Jump, and Canvas or List; other tools moved to the menu, Jump, or keyboard shortcuts. Each record opens as one reading column, and Progress starts with the next action, then current work and shipped work by day. [Artifact views](docs/product/artifact-views.md). [PR #18](https://github.com/hungv47/horsemen/pull/18).
+
+- Added share links to the hosted viewer. Each project and record has a readable link, such as `horsemen.forsvn.com/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository sign in and open the same record. Links carry no data. [PR #16](https://github.com/hungv47/horsemen/pull/16).
+
+- The Stop hook now reminds an agent to commit and push a record it changed when the change has not reached the remote default branch, so the hosted viewer shows it. Refresh your installation to get it: `npx skills add hungv47/horsemen --skill horsemen`. [Hooks](horsemen/references/hooks.md). [PR #14](https://github.com/hungv47/horsemen/pull/14).
+
+- Added type sets for easier reading: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Fixed the Impeccable design audit findings for small text, focus, and phone layout. [Design audit](docs/product/design-audit.md). [PR #10](https://github.com/hungv47/horsemen/pull/10).
+
+- Made hosted reloads fast. A reload shows your projects at once from a saved list of repository names, paths, and revisions, then checks for changes in the background. The list never holds record text; sign-out removes it. [PR #9](https://github.com/hungv47/horsemen/pull/9).
+
+- Launched the hosted viewer at horsemen.forsvn.com. Sign in with GitHub, choose repositories, and read your Horsemen projects. It is read-only and stores no project data on the server. Open projects update when a new commit lands. [Setup and limits](worker/README.md). [PR #6](https://github.com/hungv47/horsemen/pull/6).
+
+- Each record type now opens in its own view. Progress groups work by day on a status board with proof links; Changelog is a release timeline; Vision, Brain, Structure, Tech stack, and README get a brief, library, map, cards, or guide. Each view has a list layout. Live on horsemen.forsvn.com and in the local app. [Artifact views](docs/product/artifact-views.md). [PR #7](https://github.com/hungv47/horsemen/pull/7).
+
+- Added a private local visual workspace: a canvas of each project's records, a peek with a layout for each record, section and record navigation, a jump field, and six themes. It runs from a source checkout and reads GitHub through the local sign-in. It is not a hosted service and has no public sharing. [Setup and limits](web/README.md). [PR #5](https://github.com/hungv47/horsemen/pull/5).
+
 ## 2026-11-17
 
 - Horsemen now edits new and changed prose before saving. It uses `no-ai-slop` when available and a bundled checklist otherwise.

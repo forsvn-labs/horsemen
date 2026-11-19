@@ -49,6 +49,9 @@ def main():
         receipt["commit"] = run("revision", ["git", "rev-parse", "HEAD"]).strip()
         receipt["source_dirty"] = bool(run("source-status", ["git", "status", "--porcelain"]).strip())
         run("distribution-tests", [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests", "-v"])
+        # Hosted viewer: reader parity with Python, and the Worker's auth and proxy rules.
+        if not shutil.which("node"): raise RuntimeError("hosted-tests need Node.js 20 or later")
+        run("hosted-tests", ["node", "--test", "tests/test_hosted_reader.cjs", "worker/test/worker.test.js"])
         for suite in ("test_cli", "test_documents", "test_progress_layout", "test_techstack", "test_commands",
                       "test_brain", "test_records", "test_drive_adapter"):
             run(suite, [sys.executable, "-B", f"horsemen/scripts/{suite}.py"])
