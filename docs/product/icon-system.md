@@ -1,14 +1,15 @@
 # Horsemen icon system
 
 Original SVG artwork for the local web app. The small icons serve controls and
-record labels. The seals serve record headers and card watermarks. The app mark
+record labels. The workspace does not show the seals by default; they stay
+available for larger artwork. The app mark
 uses four horse profiles that face inward. No font or external image is required.
 
 ## Files
 
 | File in `web/assets/icons/` | Purpose |
 | --- | --- |
-| `icons.svg` | 39 symbols on a 24 × 24 grid |
+| `icons.svg` | 42 symbols on a 24 × 24 grid |
 | `seals.svg` | Four engraved seals on a 120 × 120 grid |
 | `app-icon.svg` | Full colour master on a 1024 × 1024 grid |
 | `app-icon.png` | 1024 × 1024 transparent-corner export |

@@ -1,6 +1,6 @@
 # Local GitHub workspace
 
-Open real Horsemen projects as a draggable canvas. Double-click a record to read it
+Open real Horsemen projects as a calm canvas. Double-click a record to read it
 or inspect its exact Markdown. The app reads GitHub; it does not edit files.
 
 From this source checkout, with Python 3.10+ and GitHub CLI installed:
@@ -13,88 +13,115 @@ python3 scripts/serve_gui.py
 
 Open <http://127.0.0.1:8787>. Use `--port 8790` if that port is occupied.
 The first visit scans repositories available to the active github.com account.
-Refresh GitHub repeats discovery. Clear workspace removes the in-memory scan;
-it does not sign out of GitHub. Stop the server with Ctrl+C.
+Refresh GitHub (in the account menu) repeats discovery. Clear workspace
+removes the in-memory scan; it does not sign out of GitHub. Stop the server
+with Ctrl+C.
 
 The same app also runs as a hosted, read-only viewer with GitHub sign-in.
 See [the hosted viewer](../worker/README.md).
 
 ## Reading and navigation
 
-- Search the left rail by project name, repository, or folder. Multiple search
-  words narrow the result. Nested project roots are separate entries.
-- Open projects as discovery finds them. The remaining scan continues without
-  changing the project you selected.
-- Cards show source excerpts suited to each record: purpose and audience,
-  next action and gates, knowledge sources, paths, releases, and tools.
-  These are excerpts, not generated claims. Open the peek for full context.
-- Click to select; Shift-click adds or removes an artifact. Drag an empty area
-  to select several artifacts, then drag the selection to move it together.
-- Use Select (`V`) or Hand (`H`). Space + drag pans even over a card. Middle
-  or right mouse drag also pans. Scroll pans; Ctrl/Cmd + scroll or pinch zooms.
-- Enter, Open, or double-click opens the selected artifact. Arrow keys move
-  selected artifacts by one pixel; Shift + arrows moves them by ten. Escape
-  cancels an unfinished drag or clears selection. Shift + 1 fits the map;
-  Shift + 2 fits the selection. `0` resets zoom to 100%.
-- Use the link count and chevron on a card to expand or collapse its linked
-  items. No selection is required. Unopened Markdown documents load their links
-  on demand. These controls also work in List view. Collapse all in the toolbar
-  hides all expanded branches. Shared documents remain visible
-  while another expanded branch reaches them. Linked cards that appear take
-  free space beside their parent, so cards do not overlap. Cards on the canvas
-  and cards you moved keep their place. Reset layout arranges all links again.
-  Deeper exploration reveals the ancestor path.
+The screen shows few controls. Everything else is in one of three places:
+the account menu, the Jump field, and the keyboard.
+
+- **Rail.** The rail lists your projects. A lock marks a private repository.
+  A search field appears when you have more than eight projects. Multiple
+  search words narrow the result. Nested project roots are separate entries.
+- **Account menu.** Select your account name at the bottom of the rail. The
+  menu holds Refresh GitHub (with the time of the last check), the colour
+  theme, the type set, and Clear workspace. In hosted mode it also holds
+  Choose repositories and Sign out.
+- **Header.** The header shows the project name and one line: the
+  repository, when PROGRESS says it was updated, and the commit that the app
+  read. It has Jump, Canvas or List, and in hosted mode Copy link.
+- **Jump.** Press Ctrl + K (Command + K on macOS) or select Jump. One field
+  reaches each record, linked document, project, canvas action, theme, and
+  type set. Canvas actions include Fit, Select tool, Hand tool, Open the
+  selected record, Collapse all linked branches, Reset layout, Refresh GitHub,
+  and Clear workspace.
+- **Shortcuts.** Press `?` or choose Keyboard shortcuts in Jump to see every
+  key.
+- The status line under the header shows only while discovery runs, after
+  an error, or after Clear workspace. Problems with a repository show under
+  it until they are fixed.
+
+### Canvas
+
+- Each card shows the record name and a few key lines from the source. These
+  are excerpts, not generated claims. The icon has the colour of the record.
+  Open the card for full context.
+- Click to select; Shift-click adds or removes a card. Drag an empty area to
+  select several cards, then drag the selection to move it together.
+- Press `V` for the Select tool and `H` for the Hand tool. Space + drag pans
+  even over a card. Middle or right mouse drag also pans. Scroll pans;
+  Ctrl/Cmd + scroll or pinch zooms. The zoom control in the corner zooms and
+  fits the map.
+- Enter or double-click opens the selected card. Arrow keys move selected
+  cards by one pixel; Shift + arrows moves them by ten. Escape cancels an
+  unfinished drag or clears the selection. Shift + 1 fits the map; Shift + 2
+  fits the selection. `0` resets zoom to 100%.
+- The link count on a card expands or collapses its linked items. No
+  selection is required. Unopened Markdown documents load their links on
+  demand. These controls also work in List view. Shift + C collapses all
+  branches. Shared documents stay visible while another expanded branch
+  reaches them. Linked cards that appear take free space beside their parent,
+  so cards do not overlap. Cards you moved keep their place. Reset layout (in
+  Jump) arranges all links again. Deeper exploration reveals the ancestor
+  path.
 - List view keeps single-click opening. These controls follow the navigation
   pattern in [Excalidraw](https://plus.excalidraw.com/changelog); this app does
   not include freehand drawing, shape editing, or the Excalidraw editor.
-- Open a card for its visual overview: Vision brief, Progress board, Brain
-  source library, Structure map, release timeline, tool cards, or README guide.
-  Each overview has a title block, the facts that the record states as
-  `Label: value`, and the layout for its type. Full document and Markdown
-  source tabs preserve the complete record.
-- Progress groups items by day, latest day first. A board shows Shipped, In
-  progress, Up next, and Needs attention. Each item shows its proof (PR,
-  commit, release, checks, and document links from its text and its evidence
-  row) and a link to its source line. Earlier days fold.
-- Dates show as relative time, such as "2 days ago". Hover shows the exact
-  date. Structure paths open on GitHub, and commands have Copy buttons.
-- Each overview has a layout switch: the rich layout or a compact list. The
-  browser saves the choice for each record type. Views show source excerpts;
-  they do not rewrite records. A record that does not follow its template
-  uses the general section layout. See [artifact views](../docs/product/artifact-views.md).
-- Inside the peek, the left column lists the records and the sections of the
-  open page. The path above the page goes back to an earlier document. Use
-  the left and right arrow keys, or the buttons at the bottom, to change
-  record.
-- Press Ctrl + K (Command + K on macOS) or select Jump to. One field reaches
-  each project, record, view, theme, and type set.
 - On a screen 640px wide or less, the app opens in List view, so cards stay
   readable. Select Canvas to see the map.
+
+### Record view
+
+- A record opens as one reading column of about 70 characters. The header
+  shows the record name and the facts that the record states, such as
+  "Updated yesterday" and "Stage: pilot". Header actions: Copy link (hosted
+  mode), Open on GitHub, the ⋯ menu, and Close.
+- The ⋯ menu shows the record in its two layouts, as the full document, or
+  as its exact Markdown source. The browser saves the layout choice for each
+  record type. "Read the full document" at the end of a layout is one more
+  way to see everything.
+- Each type has its own layout. See [artifact views](../docs/product/artifact-views.md).
+  Progress: the next action first, then Now (work in progress and items that
+  need attention), Up next, and shipped work by day, newest first. Proof
+  links are small chips. The board is the second layout. Vision: the purpose
+  sentence, then simple sections. Brain: the sources, each with its access
+  line. Structure: the tree, with Copy buttons for commands. Changelog: a
+  dated list. Tech stack: a compact table. README and linked documents: the
+  rendered document.
+- Dates show as relative time, such as "2 days ago". Hover shows the exact
+  date. Each item has a small link to its source line (`L12`).
+- The left column lists the records. "On this page" appears only for long
+  records. The path above the page appears when you open a linked document;
+  each step goes back. Use the left and right arrow keys, or the arrows at
+  the end of the page, to change record.
+- On a phone, the record view fills the screen.
 - The address keeps the selected project and the open record. A reload
   returns to the same place.
-- Open a connected artifact to go deeper. Back returns to the previous record.
-  Explore on canvas adds connected documents as movable nodes. Lines represent
-  explicit links in the source files, not assumed relationships.
 - Linked repository Markdown opens inside the app at the same scanned commit.
-  External documents and other file types show a source card and an external
-  link. Horsemen does not fetch their contents. Missing and unreadable files
-  show an error without replacing the parent record.
+  External documents and other file types show the link and its source.
+  Horsemen does not fetch their contents. Missing and unreadable files show
+  an error without replacing the parent record.
 - Changelog PR links can load merge details and the PR description. Image
   attachments appear as links. A merge alone is not proof of delivery.
 
 ## Design
 
-The look is a modern engraving: bone paper, ink, and one pigment for each
-record. Vision is Conquest (gilt), Progress is War (vermilion), Brain is
-Famine (indigo), and Structure is Death (verdigris). Names and icons carry
-the same meaning without colour. The theme button in the left rail opens six
-themes: Bone and Ink, and one theme for each horse (White, Red, Black, and
-Pale). System follows the device setting. A test checks that text and
-pigments in each theme meet a 4.5:1 contrast ratio. Text is 11px or larger.
-Motion stops when the system asks for reduced motion.
+The look is a calm reading desk: bone paper, ink, and one pigment for each
+record. Vision is gilt, Progress is vermilion, Brain is indigo, and
+Structure is verdigris. The pigment appears on the record icon and a few
+labels only. Names and icons carry the same meaning without colour. The
+account menu has six themes: Bone and Ink, and one theme for each horse
+(White, Red, Black, and Pale). System follows the device setting. A test
+checks that text and pigments in each theme meet a 4.5:1 contrast ratio.
+Text is 12px or larger. Motion stops when the system asks for reduced motion.
 
-The same menu, and the Jump to field, choose a type set. Each set works with
-every colour theme and changes fonts only:
+The same menu, and Jump, choose a type set. Each set works with every colour
+theme and changes fonts only:
 
 - **Engraved** (default): Cleft (titles), Gravure (labels), Halden
   (interface), Vellum (reading), and Signal (code).

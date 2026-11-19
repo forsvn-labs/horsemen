@@ -136,7 +136,8 @@ try:
     until("document.querySelector('#project-name')?.textContent==='alpha'")
     until("!document.querySelector('[data-artifact=progress]').disabled")
     assert value("document.querySelector('#account').textContent.includes('operator')")
-    assert value("document.querySelector('#privacy').textContent==='PRIVATE'")
+    assert value("!document.querySelector('#privacy').hidden"), 'a private repository shows a lock next to its name'
+    assert value("document.querySelector('#menu #choose-repos') && document.querySelector('#menu #sign-out') && !document.querySelector('.demo,.notice')"), 'hosted items sit in the account menu'
     assert value("!!document.querySelector('#sign-out') && document.querySelector('#choose-repos').href.includes('/apps/horsemen-fictional/installations/new')")
     assert value("document.querySelector('[data-artifact=progress]').innerText.includes('Invite three operators')")
     browser('screenshot', str(args.output / '02-project.png'))
@@ -158,7 +159,7 @@ try:
     until("document.querySelector('[data-artifact=progress]') && !document.querySelector('[data-artifact=progress]').disabled && document.querySelector('[data-artifact=progress]').innerText.includes('Publish the pilot results')", 15)
     until("document.querySelector('#scan-status').textContent.includes('Checked')", 20)
 
-    browser('click', '#sign-out')
+    browser('click', '#menu-toggle'); browser('click', '#sign-out')
     until("document.body.innerText.includes('Sign in with GitHub')")
     assert world['revoked'] == 1, 'sign-out revokes the token'
     assert value("localStorage.getItem('horsemen.discovery.v1')") is None, 'sign-out removes the saved index'
@@ -182,7 +183,7 @@ try:
     browser('open', origin + '/example/private-elsewhere')
     until("document.querySelector('#issues') && document.querySelector('#issues').textContent.includes('cannot open example/private-elsewhere')", 20)
     browser('screenshot', str(args.output / '06-no-access.png'))
-    browser('click', '#sign-out')
+    browser('click', '#menu-toggle'); browser('click', '#sign-out')
     until("document.body.innerText.includes('Sign in with GitHub')")
     print('Hosted E2E passed:', args.output)
 finally:

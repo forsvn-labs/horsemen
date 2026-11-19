@@ -154,6 +154,69 @@ further subset would save little and would make it a modified font.
 4. **Plain footer copy.** Replace "pinned aaaaaaa" with "Commit aaaaaaa".
 5. **One theme across pages.** Give the sign-in page the chosen colour theme.
 
+## Minimal pass (2026-11-19)
+
+The owner said the workspace was still overwhelming and asked for a simpler
+screen and better views inside each record. Method: Impeccable `critique`,
+then the `distill`, `quieter`, `layout`, and `typeset` playbooks, then
+`critique` again. Fictional fixtures only.
+
+> ⚠️ Degraded critique: single context, for the same reason as above. Each
+> design review was scored before the detector results were read.
+
+| # | Heuristic | Before | After | What changed |
+| --- | --- | --- | --- | --- |
+| 1 | Visibility of system status | 3 | 3 | The status line shows only during discovery, after an error, or after Clear workspace; the menu keeps the last check time |
+| 2 | Match with the real world | 2 | 3 | No rider lore or roman numerals; "pinned aaaaaaa" became "commit aaaaaaa" in one meta line |
+| 3 | User control and freedom | 3 | 3 | Escape, Back, path steps, and Reset layout (in Jump) still work |
+| 4 | Consistency and standards | 3 | 3 | One search (Jump) instead of two; one menu pattern in the rail and the record |
+| 5 | Error prevention | 3 | 3 | Clear workspace moved into the menu, away from the header |
+| 6 | Recognition rather than recall | 3 | 3 | Canvas tools moved to keys and Jump; the `?` sheet and Jump hints name each key |
+| 7 | Flexibility and efficiency | 4 | 4 | Jump now also reaches the canvas tools, linked documents, and the shortcut sheet |
+| 8 | Aesthetic and minimalist design | 1 | 3 | Home went from 16 controls (not counting cards and projects) to 8; the record view lost its tabs, kicker, seal, facts box, helper text, and hint line |
+| 9 | Error recovery | 3 | 3 | Unchanged |
+| 10 | Help and documentation | 2 | 3 | A shortcut sheet from `?` and from Jump |
+| | **Total** | **27/40** | **31/40** | Acceptable → Good |
+
+Cognitive load: 4 of 8 checklist items failed before (single focus, visual
+hierarchy, minimal choices, progressive disclosure). None fail after.
+
+Detector (`impeccable detect`):
+
+| Scan | Before | After |
+| --- | --- | --- |
+| Rendered page, 1440 × 900 | 2 (11px text, engraving hatch) | 0 |
+| Rendered page, 820 × 1180 | not run | 0 |
+| Rendered page, 390 × 844 | 2 (11px text, engraving hatch) | 0 |
+| Source, `web/` | 10 | 2 |
+
+The two source findings that remain are expected. `cream-palette` is the
+owner's bone paper. `clipped-overflow-container` is the record menu inside
+the record view, which clips its content to its rounded corners; the menu is
+about 190px high and the record view is at least 480px high, so the menu
+always fits.
+
+Changes:
+
+- **Rail:** the brand, the project list (search appears for more than eight
+  projects), and one account menu: Refresh GitHub, Choose repositories
+  (hosted), colours, type set, Clear workspace, and Sign out (hosted).
+- **Header:** the project name with a lock for private repositories, one meta
+  line, Jump, Canvas or List, and Copy link (hosted).
+- **Canvas:** no legend, hint lines, or tool dock. A small zoom control
+  stays. Cards show the record name, a few key lines, and the record colour
+  on the icon. No hatching, seals, or lore. Brain and Structure cards show
+  source names and top-level paths instead of raw table and tree text.
+- **Record view:** one column of about 70 characters; a header with the name,
+  stated facts, Open on GitHub, a ⋯ menu (layouts, full document, Markdown
+  source), and Close. A compact record list; "On this page" only for long
+  records; quiet previous and next arrows at the end of the page. The record
+  fills the screen on a phone.
+- **Views:** see [artifact views](artifact-views.md). Progress now reads as a
+  list by default; the board is the second layout.
+- **Type:** five sizes (12, 14, 16.5, 20, and 26px). The theme test now fails
+  on any text under 12px.
+
 ## Reproduce
 
 Run from the repository root. Each command uses fictional fixtures and writes

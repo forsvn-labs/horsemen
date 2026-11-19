@@ -9,7 +9,13 @@ assert(progress.items.some(i=>i.text.includes('Owner review')));
 assert(!JSON.stringify(progress).includes('Old release'));
 assert(preview('vision','# Vision\nOwner: Someone\n## Why we exist\nHelp people find a home\n## Who we build for\nRenters').items.some(i=>i.text==='Help people find a home'));
 assert(preview('brain','# Brain\n## Providers\n- Research notebook\n## Access\nRead only').items.some(i=>i.text.includes('Research notebook')));
-assert(preview('structure','# Structure\n## Map\n```text\napp/\n└── screens/\n```').items.some(i=>i.text.includes('app/')));
+assert(preview('structure','# Structure\n## Map\n```text\napp/\n└── screens/\n```').items.some(i=>i.text==='screens/'));
+// Cards show names, not raw table or tree text.
+const brainCard=preview('brain','# Brain\n## Providers\n| Role | Provider | Access route |\n| --- | --- | --- |\n| Brain | Shared drive | connector |\n| Tracking | Issue board | CLI |');
+assert.equal(brainCard.items.find(i=>i.label==='Knowledge sources').text,'Shared drive · Issue board','A provider table shows provider names');
+const mapCard=preview('structure','# Structure\n## Map\n```text\nnorthwind/\n├── app/        workspace (start here)\n│   └── views/  views\n├── docs/       decisions\n└── tests/      checks\n```');
+assert.equal(mapCard.items.find(i=>i.label==='Project map').text,'app/ · docs/ · tests/','A tree shows the top-level paths under the project folder');
+assert.equal(preview('structure','# Structure\n## Map\n```text\napp/ — workspace\ndocs/ — decisions\n```').items[0].text,'app/ · docs/','A flat list shows its paths');
 assert(preview('techstack','# Tech stack\n## Tools\n| Tool | Purpose |\n| --- | --- |\n| Python | Local reader |').items.some(i=>i.text.includes('Python')));
 assert(preview('changelog','# Changelog\n## 2026-11-18\n- Delivered search\n[PR](https://github.com/example/app/pull/1)\n## 2025-01-01\n- Older').items.some(i=>i.text.includes('Delivered search')));
 assert(!JSON.stringify(preview('changelog','# Changelog\n## New\n- Current\n## Old\n- Older')).includes('Older'));

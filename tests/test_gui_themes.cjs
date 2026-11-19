@@ -92,14 +92,14 @@ for (const [family, file] of Object.entries(faces)) {
 assert.equal(resolveType(null), 'engraved');
 assert.equal(resolveType('modern'), 'modern');
 assert.equal(resolveType('nonsense'), 'engraved');
-// Readable text everywhere: placeholders use body-text tokens, and no functional text is under 11px.
+// Readable text everywhere: placeholders use body-text tokens, and no text is under 12px.
 assert.doesNotMatch(css, /[^-]color:var\(--ink-3\)/, '--ink-3 is for lines and marks only; it does not reach 4.5:1 for text');
 const small = [];
 for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) for (const size of m[2].matchAll(/(?:font:[^;]*?|font-size:)\s*([0-9.]+)px/g)) {
   const selector = m[1].trim(), px = Number(size[1]);
-  const floor = /^(kbd|\.wordmark small)$/.test(selector) ? 10.5 : 11;
-  if (px < floor) small.push(selector + ' ' + px + 'px');
+  if (px < 12) small.push(selector + ' ' + px + 'px');
 }
-assert.deepEqual(small, [], 'Text meets the 11px floor (10.5px for key caps and the tagline)');
+for (const m of css.matchAll(/--fs-[\w-]+:\s*([0-9.]+)px/g)) if (Number(m[1]) < 12) small.push(m[0]);
+assert.deepEqual(small, [], 'Text meets the 12px floor, including the type scale tokens');
 assert.deepEqual(failures, [], 'Readable contrast in every theme and type set');
 console.log('PASS: ' + themes.length + ' themes × ' + types.length + ' type sets define every colour and font with readable contrast');

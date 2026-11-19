@@ -187,19 +187,37 @@ const unsafeHTML = render('progress', {content: '# Progress\n## Shipped\n- **<im
 assert(!/<img|<script|href="javascript/i.test(unsafeHTML), 'Rendered views never carry source HTML or script links');
 assert(unsafeHTML.includes('&lt;img'));
 
-// Rendered PROGRESS: board, relative dates with exact dates, proof chips, source links, history folds.
-const html = render('progress', {content: template, url: URL_}, {now: NOW});
+// Rendered PROGRESS, default layout: the next action first, then Now, then shipped work by day, newest first.
+const reading = render('progress', {content: template, url: URL_}, {now: NOW});
+assert(reading.includes('data-layout="progress-list"'), 'The reading list is the default Progress layout');
+assert(!reading.includes('class="board4"'), 'The board is not the default');
+const at = text => { const i = reading.indexOf(text); assert(i >= 0, 'Progress list shows ' + text); return i; };
+assert(at('Invite three operators to the pilot.') < at('>Now<') && at('>Now<') < at('>Shipped<'), 'Next action, then Now, then Shipped');
+assert(at('Export') > at('>Now<') && at('Pricing') > at('>Now<') && at('Review pilot feedback') > at('>Now<') && at('Review pilot feedback') < at('>Shipped<'), 'Now holds in-progress, decision, and gate items');
+assert(at('Saved views') < at('>Shipped<'), 'Up next comes before shipped work');
+assert(at('data-day="2026-11-19"') < at('data-day="2026-11-13"') && at('data-day="2026-11-13"') < at('data-day="2026-11-02"'), 'Shipped days run newest first');
+assert(reading.includes('class="chip pr" href="https://github.com/example/alpha/pull/7"'), 'Proof shows as small chips');
+assert(reading.includes('href="' + URL_ + '?plain=1#L16"'), 'Each item links to its source line');
+assert(reading.indexOf('Hosted viewer.') > at('>Shipped<'), 'The roadmap comes last');
+for (const noise of ['page-head', 'detail-eyebrow', 'overview-seal', 'view-help', 'War', 'Campaign']) assert(!reading.includes(noise), 'No repeated header, lore, or helper text: ' + noise);
+assert.equal(views.defaultMode('progress'), 'list');
+assert.equal(views.defaultMode('vision'), 'rich');
+assert.deepEqual(views.layouts('progress'), {list: 'List', rich: 'Board', first: 'list'});
+
+// Rendered PROGRESS board (optional): lanes, relative dates with exact dates, proof chips, source links, history folds.
+const html = render('progress', {content: template, url: URL_}, {now: NOW, mode: 'rich'});
 assert(html.includes('data-layout="board"'));
 for (const label of ['Shipped', 'In progress', 'Up next', 'Needs attention']) assert(html.includes('>' + label + '<'), 'Board lane ' + label);
 assert(html.includes('<time datetime="2026-11-12" title="2026-11-12">1 week ago</time>'), 'Relative date with the exact date on hover');
 assert(html.includes('href="https://github.com/example/alpha/pull/7"'));
 assert(html.includes('href="' + URL_ + '?plain=1#L16"'), 'Each item links to its source line');
 assert((html.match(/<details class="day/g) || []).length === 3, 'Earlier days fold');
-assert(html.includes('data-view-toggle'), 'The view toggle is in the header');
+assert(!html.includes('data-view-toggle') && !html.includes('page-head'), 'Views start with content; the peek header holds the name and layout choice');
 assert(!html.includes('Invite three operators to the pilot.</p><p>Invite'), 'No duplicate hero text');
 const compact = render('progress', {content: template, url: URL_}, {now: NOW, mode: 'list'});
-assert(compact.includes('class="rows-list"'), 'List mode renders compact rows');
+assert.equal(compact, reading, 'List mode is the Progress reading list');
 assert(compact.includes('data-status="shipped"'));
+assert(render('progress', {content: '# Progress\nNext action: Review', url: URL_}, {now: NOW}).includes('Review'), 'A record with only a next action still shows it');
 assert.equal(render('progress', {content: '# Progress\nJust prose.', url: URL_}, {now: NOW}), null, 'Non-template PROGRESS falls back');
 
 // CHANGELOG: releases newest first with version, date, categories, and proof chips.
@@ -208,7 +226,7 @@ assert.deepEqual(cl.releases.map(r => [r.version, r.date]), [['v1.2.0', '2026-11
 assert.deepEqual(cl.releases[0].entries.map(e => [e.group, e.text.slice(0, 6), e.proof.map(x => x.label).join()]), [['Added', 'Search', 'PR #7']]);
 assert.equal(cl.releases[1].entries[0].text, 'First walkthrough delivered.');
 const clHTML = render('changelog', {content: '# Changelog\n## 2026-11-18\n- Search. [PR #7](https://github.com/example/alpha/pull/7)', url: URL_}, {now: NOW});
-assert(clHTML.includes('data-layout="timeline"') && clHTML.includes('timeline-entry') && clHTML.includes('PR #7') && clHTML.includes('Yesterday'));
+assert(clHTML.includes('data-layout="timeline"') && clHTML.includes('class="part release"') && clHTML.includes('PR #7') && clHTML.includes('Yesterday'));
 assert.equal(changelog('# Changelog\nNothing yet.', URL_).empty, true);
 
 // VISION: direction brief with path, beliefs, open questions, and dated decisions.
@@ -220,7 +238,11 @@ assert.deepEqual(v.questions.map(s => s.text), ['Pricing? The owner decides.']);
 assert.deepEqual(v.changes.map(s => s.date), ['2026-10-01']);
 assert.deepEqual(v.other.map(s => s.title), ['Extra thoughts'], 'Unknown sections are kept');
 const vHTML = render('vision', {content: '# Vision\n\nOwner: Ada\n\n## Why we exist\nTeams lose context.\n## How we get there\n- Now: Prove it.\n## Open questions\n- Pricing?', url: URL_}, {now: NOW});
-assert(vHTML.includes('data-layout="brief"') && vHTML.includes('path-step') && vHTML.includes('Still open'));
+assert(vHTML.includes('data-layout="brief"') && vHTML.includes('class="items path"') && vHTML.includes('>Open questions<'));
+assert(vHTML.indexOf('Teams lose context.') < vHTML.indexOf('Prove it.') && vHTML.includes('class="lead"'), 'A short Why section leads as the purpose sentence');
+assert.equal((vHTML.match(/Teams lose context\./g) || []).length, 1, 'The purpose is not repeated');
+const vFull = render('vision', {content: '# Vision\n\nWe help teams.\n\n## Why we exist\nContext.\n## What we will never become\n- A tracker.\n## Who we build for\nOperators.\n## Open questions\n- Pricing?', url: URL_}, {now: NOW});
+assert(vFull.indexOf('We help teams.') < vFull.indexOf('Operators.') && vFull.indexOf('Operators.') < vFull.indexOf('A tracker.') && vFull.indexOf('A tracker.') < vFull.indexOf('Pricing?'), 'Purpose, who, never, then open questions');
 assert.equal(render('vision', {content: '# Vision\nOnly prose.', url: URL_}, {now: NOW}), null);
 
 // BRAIN: providers become cards; verified dates are relative; unverified access is marked.
@@ -228,7 +250,9 @@ const br = brain('# Brain\n\nBrain: Drive · Access verified: 2026-11-17\n\n## P
 assert.deepEqual(br.providers.map(x => [x.title, x.role, x.verified]), [['Google Drive', 'Brain', '2026-11-17'], ['Linear', 'Task tracking', null]]);
 assert.deepEqual(br.steps.map(s => s.text), ['Search decisions first.', 'Open the original.']);
 const brHTML = render('brain', {content: '# Brain\n## Providers\n| Role | Provider | Verified |\n| --- | --- | --- |\n| Brain | Drive | not yet |', url: URL_}, {now: NOW});
-assert(brHTML.includes('data-layout="library"') && brHTML.includes('provider-card') && brHTML.includes('Not verified') && brHTML.includes('data-connections-slot'));
+assert(brHTML.includes('data-layout="library"') && brHTML.includes('class="item source"') && brHTML.includes('Not verified') && brHTML.includes('data-connections-slot'));
+const brAccess = render('brain', {content: '# Brain\n## Providers\n| Role | Provider | Access route | Account and scope |\n| --- | --- | --- | --- |\n| Brain | Drive | connector | personal, read |', url: URL_}, {now: NOW});
+assert(brAccess.includes('<p class="access"><span><span class="sr">Access route: </span>connector</span>'), 'Each source has one access line with labels for screen readers');
 
 // STRUCTURE: full paths for tree nodes, tags, and commands you can copy.
 const st = structure('# Structure\n\n## Map\n\n```text\nalpha/\n├── src/                 code (start here)\n│   └── app/             screens\n├── dist/                build output (generated; do not edit)\n└── package.json         commands\n```\n\n## Repository\n\nCommands: `bun install`, `bun test`.\n\n## Commands\n```sh\npython3 scripts/serve_gui.py\n```\nnode tests/run.cjs', 'https://github.com/example/alpha/blob/abc123/STRUCTURE.md');
@@ -249,31 +273,36 @@ assert.deepEqual(ts.groups[0].cards.map(c => [c.name, c.version, c.unknown]), [[
 assert.equal(ts.checked, '2026-11-18');
 assert.deepEqual(ts.gaps.map(g => g.text), ['Hosting is unknown.']);
 const tsHTML = render('techstack', {content: '# Tech stack\n## Tools\n| Tool | Purpose |\n| --- | --- |\n| Python | Local reader |\n| GitHub CLI | Reads records |', url: URL_}, {now: NOW});
-assert.equal((tsHTML.match(/class="tool-card/g) || []).length, 2);
+assert.equal((tsHTML.match(/<tr class="tool-row/g) || []).length, 2, 'One table row for each tool');
+assert(tsHTML.includes('<th scope="col">Purpose</th>'), 'Source columns become table columns');
 
 // README: pitch, capabilities, and steps with copyable commands.
 const rd = readme('# Alpha\n\nAlpha keeps records close.\n\n## What you get\n- Search\n- Peek\n\n## Install\n```sh\nbun install\n```\n\n## Use\nRun `bun dev`.');
 assert.equal(rd.pitch.text, 'Alpha keeps records close.');
 assert.deepEqual(rd.gets.map(g => g.text), ['Search', 'Peek']);
 assert.deepEqual(rd.commands.map(c => c.text), ['bun install', 'bun dev']);
-assert(render('readme', {content: '# Alpha\n\nPitch.\n\n## Install\n```sh\nbun install\n```', url: URL_}, {now: NOW}).includes('data-copy="bun install"'));
+const rdHTML = render('readme', {content: '# Alpha\n\nPitch.\n\n## Install\n```sh\nbun install\n```', url: URL_}, {now: NOW});
+assert(rdHTML.includes('<pre') && rdHTML.includes('bun install') && rdHTML.includes('<h2'), 'README is the rendered document');
+assert(!rdHTML.includes('<h1'), 'The title is in the peek header, not repeated');
+assert.equal(views.withoutTitle('\n# Alpha\nBody'), 'Body');
+assert.equal(views.withoutTitle('Body only'), 'Body only');
 
 // Every type has compact rows; unknown keys use section rows.
 for (const [key, text] of [['progress', template], ['changelog', '# Changelog\n## 2026-11-18\n- One'], ['vision', '# Vision\n## Why we exist\nBecause.'], ['brain', '# Brain\n## Providers\n- Drive'], ['structure', '# Structure\n## Map\n```text\napp/\n```'], ['techstack', '# Tech stack\n## Tools\n| Tool | Purpose |\n| --- | --- |\n| Python | Reader |'], ['readme', '# App\nPitch.\n## Use\nRun it.'], ['document', '# Notes\n## Findings\nOperators need a next step.']]) {
   const list = rows(key, text, URL_);
   assert(list.length > 0, key + ' has list rows');
   assert(list.every(r => typeof r.label === 'string' && Number.isInteger(r.line)), key + ' rows have labels and source lines');
-  const out = render(key, {content: text, url: URL_}, {now: NOW, mode: 'list'});
-  assert(out && out.includes('class="rows-list"'), key + ' renders the list view');
+  const out = render(key, {content: text, url: URL_}, {now: NOW, mode: key === 'progress' ? 'rich' : 'list'});
+  assert(out && out.includes(key === 'progress' ? 'class="board4"' : 'class="rows-list"'), key + ' renders its second layout');
 }
 
 // Huge records stay fast and bounded.
 const big = '# Progress\n## Shipped\n' + Array.from({length: 6000}, (_, i) => `- **Item ${i}** (2026-11-${String(i % 28 + 1).padStart(2, '0')}): Delivered [PR #${i}](https://github.com/example/alpha/pull/${i})`).join('\n');
 assert(big.length > 400000);
 let t = Date.now();
-const bigHTML = render('progress', {content: big, url: URL_}, {now: NOW});
+const bigHTML = render('progress', {content: big, url: URL_}, {now: NOW, mode: 'rich'});
 const bigList = render('progress', {content: big, url: URL_}, {now: NOW, mode: 'list'});
 assert(Date.now() - t < 1500, 'A 400 KB record renders in under 1.5 s');
 assert(bigHTML.length < 600000 && bigList.length < 600000, 'Huge records are capped');
-assert(bigHTML.includes('more items are in the Full document'), 'The cap is stated');
+assert(bigHTML.includes('more items are in the full document') && bigList.includes('more items are in the full document'), 'The cap is stated');
 console.log('PASS: artifact views for progress, changelog, vision, brain, structure, techstack, readme, documents, lists, and failure modes');
