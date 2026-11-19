@@ -6,8 +6,11 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 
 ```text
 horsemen/
-├── web/                   Local GitHub canvas, Markdown rendering, themes, previews, and setup guide
-│   └── assets/            Bundled fonts with their notice, icons, seals, and app icon
+├── web/                   GitHub canvas (local and hosted), Markdown rendering, themes, previews, and setup guide
+│   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
+│   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
+│   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks
+├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in and read-only proxy
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
 ├── docs/product/           GUI requirements, artifact views, icon system, and release boundaries
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
@@ -36,6 +39,9 @@ horsemen/
 ## Commands
 
 - Run local GUI: `python3 scripts/serve_gui.py`; see [setup and limits](web/README.md).
+- Hosted viewer tests: `node --test tests/test_hosted_reader.cjs worker/test/worker.test.js`.
+- Hosted browser check: `python3 scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check`.
+- Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.

@@ -16,6 +16,9 @@ The first visit scans repositories available to the active github.com account.
 Refresh GitHub repeats discovery. Clear workspace removes the in-memory scan;
 it does not sign out of GitHub. Stop the server with Ctrl+C.
 
+The same app also runs as a hosted, read-only viewer with GitHub sign-in.
+See [the hosted viewer](../worker/README.md).
+
 ## Reading and navigation
 
 - Search the left rail by project name, repository, or folder. Multiple search
