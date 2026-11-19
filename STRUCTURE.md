@@ -9,7 +9,7 @@ horsemen/
 ├── web/                   Local GitHub canvas, Markdown rendering, themes, previews, and setup guide
 │   └── assets/            Bundled fonts with their notice, icons, seals, and app icon
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
-├── docs/product/           GUI requirements, icon system, and release boundaries
+├── docs/product/           GUI requirements, artifact views, icon system, and release boundaries
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
@@ -38,6 +38,7 @@ horsemen/
 - Run local GUI: `python3 scripts/serve_gui.py`; see [setup and limits](web/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
 - Preview checks: `node tests/test_gui_previews.cjs`.
+- Artifact view checks: `node tests/test_gui_views.cjs`.
 - Browser check: `python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check`.
 - Verify: `.venv/bin/python -B scripts/verify.py --output /tmp/horsemen-verification`.
 - Read one record: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core brain --json`.
