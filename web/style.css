@@ -225,7 +225,7 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 
 /* Record view: a calm reading surface. One column of about 70 characters. */
 dialog{color:var(--ink)}
-#peek{--accent:var(--ink-2);width:min(1120px,calc(100vw - 48px));max-width:none;height:calc(100dvh - 48px);max-height:none;margin:24px auto;padding:0;border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;box-shadow:0 30px 80px -30px rgb(var(--shadow)/.55)}
+#peek{--accent:var(--ink-2);width:min(1120px,calc(100vw - 48px));max-width:none;height:calc(100dvh - 48px);max-height:none;margin:24px auto;padding:0;border:1px solid var(--line);border-radius:16px;background:var(--surface);overflow:hidden;box-shadow:0 2px 6px rgb(var(--shadow)/.1),0 18px 36px -18px rgb(var(--shadow)/.45)}
 #peek[data-kind=vision]{--accent:var(--gilt)}#peek[data-kind=progress]{--accent:var(--vermilion)}#peek[data-kind=brain]{--accent:var(--indigo)}#peek[data-kind=structure]{--accent:var(--verdigris)}
 #peek[open]{display:flex;flex-direction:column;animation:sheet-in .28s cubic-bezier(.16,1,.3,1)}
 :is(#peek,#palette,#shortcuts)::backdrop{background:rgb(var(--shadow)/.4);animation:fade .2s ease-out}
@@ -435,7 +435,7 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 .pr-buttons{display:flex;flex-wrap:wrap;gap:8px}
 
 /* Jump palette */
-#palette{width:min(600px,calc(100vw - 32px));max-height:min(560px,calc(100dvh - 120px));margin:12vh auto auto;padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 30px 80px -30px rgb(var(--shadow)/.55)}
+#palette{width:min(600px,calc(100vw - 32px));max-height:min(560px,calc(100dvh - 120px));margin:12vh auto auto;padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 2px 6px rgb(var(--shadow)/.1),0 18px 36px -18px rgb(var(--shadow)/.45)}
 #palette[open]{display:flex;flex-direction:column}
 .palette-field{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line);color:var(--ink-2)}
 #palette-input{flex:1;min-width:0;border:0;background:none;outline:0;font-size:16px;color:var(--ink)}
@@ -450,7 +450,7 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 .palette-empty{margin:16px;color:var(--ink-2)}
 
 /* Shortcut sheet */
-#shortcuts{width:min(520px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 30px 80px -30px rgb(var(--shadow)/.55)}
+#shortcuts{width:min(520px,calc(100vw - 32px));padding:0;border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 2px 6px rgb(var(--shadow)/.1),0 18px 36px -18px rgb(var(--shadow)/.45)}
 .shortcuts-head{display:flex;align-items:center;justify-content:space-between;padding:12px 12px 12px 20px;border-bottom:1px solid var(--line)}
 .shortcuts-head h2{margin:0;font:600 var(--fs-m)/1.2 var(--display)}
 .keys{margin:0;padding:8px 20px 18px}
