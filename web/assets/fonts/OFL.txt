@@ -1,3 +1,4 @@
+Copyright 2026 The Beacon Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Cleft Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Gravure Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Halden Project Authors (https://github.com/Luffixos/fontzz)

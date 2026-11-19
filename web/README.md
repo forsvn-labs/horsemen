@@ -67,7 +67,9 @@ See [the hosted viewer](../worker/README.md).
   the left and right arrow keys, or the buttons at the bottom, to change
   record.
 - Press Ctrl + K (Command + K on macOS) or select Jump to. One field reaches
-  each project, record, view, and theme.
+  each project, record, view, theme, and type set.
+- On a screen 640px wide or less, the app opens in List view, so cards stay
+  readable. Select Canvas to see the map.
 - The address keeps the selected project and the open record. A reload
   returns to the same place.
 - Open a connected artifact to go deeper. Back returns to the previous record.
@@ -88,13 +90,26 @@ Famine (indigo), and Structure is Death (verdigris). Names and icons carry
 the same meaning without colour. The theme button in the left rail opens six
 themes: Bone and Ink, and one theme for each horse (White, Red, Black, and
 Pale). System follows the device setting. A test checks that text and
-pigments in each theme meet a 4.5:1 contrast ratio. Motion stops when the
-system asks for reduced motion.
+pigments in each theme meet a 4.5:1 contrast ratio. Text is 11px or larger.
+Motion stops when the system asks for reduced motion.
 
-Fonts come from [fontzz](https://fontzz.vercel.app) and are served locally:
-Cleft (titles), Gravure (labels), Halden (interface), Vellum (reading), and
-Signal (code). See [the font notice](assets/fonts/NOTICE.txt) and [their licence](assets/fonts/OFL.txt). Icons, seals,
-and the app icon are original; see [the icon system](../docs/product/icon-system.md).
+The same menu, and the Jump to field, choose a type set. Each set works with
+every colour theme and changes fonts only:
+
+- **Engraved** (default): Cleft (titles), Gravure (labels), Halden
+  (interface), Vellum (reading), and Signal (code).
+- **Modern**: Beacon for titles, labels, interface, and reading; Signal for
+  code. Use it when the engraved letters are hard to read.
+- **System**: the fonts of the device. It downloads no font files.
+
+The browser saves the choice and applies it before first paint. Only the
+fonts of the active set are preloaded. The hosted sign-in page uses the same
+choice. Fonts come from [fontzz](https://fontzz.vercel.app) and are served
+locally. See [the font notice](assets/fonts/NOTICE.txt) and
+[their licence](assets/fonts/OFL.txt). Icons, seals, and the app icon are
+original; see [the icon system](../docs/product/icon-system.md). The latest
+design audit and its open items are in
+[the design audit](../docs/product/design-audit.md).
 
 ## Boundaries
 
@@ -119,7 +134,7 @@ The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
-by the app. The browser stores only opaque project IDs, canvas positions, the theme choice, and the layout choice for each record type.
+by the app. The browser stores only opaque project IDs, canvas positions, the theme choice, the type set choice, and the layout choice for each record type.
 In hosted mode, the browser also keeps a discovery index without record text; see
 [fast reloads](../worker/README.md#how-it-works).
 External images do not load automatically. Opening an external link leaves

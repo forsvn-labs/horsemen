@@ -8,7 +8,7 @@ uses four horse profiles that face inward. No font or external image is required
 
 | File in `web/assets/icons/` | Purpose |
 | --- | --- |
-| `icons.svg` | 38 symbols on a 24 × 24 grid |
+| `icons.svg` | 39 symbols on a 24 × 24 grid |
 | `seals.svg` | Four engraved seals on a 120 × 120 grid |
 | `app-icon.svg` | Full colour master on a 1024 × 1024 grid |
 | `app-icon.png` | 1024 × 1024 transparent-corner export |
@@ -104,6 +104,7 @@ contrast. The favicon uses lighter versions of the four pigments on ink.
 | `share` | Share action |
 | `layers` | Record layers |
 | `branch` | Linked branch |
+| `type` | Type set choice |
 
 ## Origin and limits
 
