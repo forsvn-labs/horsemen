@@ -1,0 +1,1 @@
+{"nodes":[{"id":"a","type":"text","x":0,"y":0,"width":320,"height":160,"text":"One end is missing."}],"edges":[{"id":"e","fromNode":"a","toNode":"ghost"}]}
