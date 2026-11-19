@@ -16,6 +16,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
+├── favicon.png             Project icon
 ├── horsemen/               Installable agent skill
 │   ├── SKILL.md            Agent entry point
 │   ├── CLI.md              Executable usage and limits
