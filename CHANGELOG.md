@@ -2,7 +2,7 @@
 
 ## 2026-11-19
 
-- Records now show Mermaid diagrams and charts in the colours of the active theme, with a View code toggle. A diagram that cannot be drawn shows its code and the reason. Images stored in the repository show in place when a record links to them; external images stay links. Works in the hosted viewer and the local app. [Hosted viewer](worker/README.md#how-it-works).
+- Records now show Mermaid diagrams and charts in the colours of the active theme, with a View code toggle. A diagram that cannot be drawn shows its code and the reason. Images stored in the repository show in place when a record links to them; external images stay links. Works in the hosted viewer and the local app. [Hosted viewer](worker/README.md#how-it-works). [PR #27](https://github.com/hungv47/horsemen/pull/27).
 
 - Public repositories open without sign-in. Anyone can read the canvas at a link such as [horsemen.forsvn.com/hungv47/horsemen](https://horsemen.forsvn.com/hungv47/horsemen). Private repositories still need sign-in, and nothing is stored. [PR #25](https://github.com/hungv47/horsemen/pull/25), [PR #26](https://github.com/hungv47/horsemen/pull/26).
 
