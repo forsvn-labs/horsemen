@@ -37,7 +37,7 @@ SOURCES = {
     'docs/research.md': '# Research notebook\nOperators need a clear next step.',
 }
 UPDATED = '# Progress\nNext action: Publish the pilot results.\n## Shipped\n- Pilot results reached all operators.'
-world = {'rev': 'a' * 40, 'sources': dict(SOURCES), 'revoked': 0, 'tokens': 0, 'not_modified': 0}
+world = {'app_calls': 0, 'rev': 'a' * 40, 'sources': dict(SOURCES), 'revoked': 0, 'tokens': 0, 'not_modified': 0}
 def sha(text): return hashlib.sha1(text.encode()).hexdigest()
 
 
@@ -55,7 +55,15 @@ class FakeGitHub(BaseHTTPRequestHandler):
         url = urlsplit(self.path); q = parse_qs(url.query); p = url.path
         if p == '/login/oauth/authorize':
             return self.send(302, None, {'Location': q['redirect_uri'][0] + '?code=fictional&state=' + q['state'][0]})
-        if self.headers.get('Authorization') != 'Bearer ghu_fictional': return self.send(401, {'message': 'Bad credentials'})
+        auth = self.headers.get('Authorization', '')
+        if auth == 'Basic ' + base64.b64encode(b'Iv1.fictional:fictional').decode():
+            # App client credentials: public data only. example/open is public; example/alpha is private.
+            world['app_calls'] += 1
+            if p == '/repos/example/alpha': return self.send(200, {'id': 1, 'full_name': 'example/alpha', 'private': True})
+            if p == '/repos/example/open': return self.send(200, {'id': 9, 'full_name': 'example/open', 'default_branch': 'main', 'private': False, 'visibility': 'public', 'archived': False})
+            if not p.startswith('/repos/example/open/'): return self.send(404, {'message': 'Not Found'})
+            p = p.replace('/repos/example/open/', '/repos/example/alpha/', 1)
+        elif auth != 'Bearer ghu_fictional': return self.send(401, {'message': 'Bad credentials'})
         if p == '/user': return self.send(200, {'login': 'operator'})
         if p == '/user/installations': return self.send(200, {'installations': [{'id': 1}]})
         if p == '/user/installations/1/repositories':
@@ -95,7 +103,7 @@ log = []
 variables = {'GITHUB_API': github, 'GITHUB_WEB': github, 'GITHUB_CLIENT_ID': 'Iv1.fictional', 'GITHUB_CLIENT_SECRET': 'fictional',
              'GITHUB_APP_SLUG': 'horsemen-fictional', 'SESSION_KEY': base64.b64encode(secrets.token_bytes(32)).decode(), 'POLL_SECONDS': '5'}
 local_wrangler = root / 'worker/node_modules/.bin/wrangler'
-command = [str(local_wrangler) if local_wrangler.exists() else 'bunx', *([] if local_wrangler.exists() else ['wrangler']), 'dev', '--port', str(args.port), '--ip', '127.0.0.1', '--local', '--local-upstream', f'localhost:{args.port}', '--show-interactive-dev-session=false']
+command = [str(local_wrangler) if local_wrangler.exists() else 'bunx', *([] if local_wrangler.exists() else ['wrangler']), 'dev', '--port', str(args.port), '--ip', '127.0.0.1', '--local', '--local-upstream', f'localhost:{args.port}', '--show-interactive-dev-session=false', '--persist-to', str(args.output / 'wrangler-state')]  # fresh cache and state per run
 for k, v in variables.items(): command += ['--var', f'{k}:{v}']
 dev = subprocess.Popen(command, cwd=root / 'worker', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
 
@@ -185,6 +193,15 @@ try:
     browser('screenshot', str(args.output / '06-no-access.png'))
     browser('click', '#menu-toggle'); browser('click', '#sign-out')
     until("document.body.innerText.includes('Sign in with GitHub')")
+    # Public view: a public repository opens without sign-in, keeps nothing in the browser, and offers sign-in.
+    browser('open', origin + '/example/open?record=progress')
+    until("document.querySelector('meta[name=horsemen-mode]')?.content === 'public'")
+    until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Publish the pilot results')", 20)
+    assert value("!!document.querySelector('#public-sign-in') && !document.querySelector('#sign-out')"), 'public view offers sign-in, not sign-out'
+    assert value("localStorage.getItem('horsemen.discovery.v1') === null"), 'public view saves no index'
+    assert value("location.pathname + location.search === '/example/open?record=progress'")
+    browser('screenshot', str(args.output / '07-public-view.png'))
+    assert world['app_calls'] > 0
     print('Hosted E2E passed:', args.output)
 finally:
     try: browser('close')

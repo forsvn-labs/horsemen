@@ -132,7 +132,7 @@ ${target ? `<p class="share-target">Sign in to open <b>${escapeHTML(target)}</b>
 <li><b>Stores none of your project data.</b> Records go from GitHub to this browser when you open them.</li>
 <li><b>You choose the repositories.</b> Install the GitHub App on only the ones you want to see.</li></ul>
 <a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
-<small>Open source: <a href="https://github.com/hungv47/horsemen">github.com/hungv47/horsemen</a></small>`, 200, headers);
+<small><a href="/hungv47/horsemen">See this project without signing in</a> · Open source: <a href="https://github.com/hungv47/horsemen">github.com/hungv47/horsemen</a></small>`, 200, headers);
 const errorPage = (status, message, headers = {}) => page('Horsemen', `<h1>${escapeHTML(message)}</h1><p><a class="btn" href="/auth/login">Sign in again</a></p>`, status, headers);
 
 /* ---------------------------------------------------------------- GitHub proxy */
@@ -155,8 +155,8 @@ const ERRORS = {
   409: [409, 'Empty repository.'],
   422: [422, 'GitHub could not read this path.'],
 };
-function allowedTarget(path, search) {
-  const route = ROUTES.find(([pattern]) => pattern.test(path));
+function allowedTarget(path, search, routes = ROUTES) {
+  const route = routes.find(([pattern]) => pattern.test(path));
   if (!route) return null;
   const segments = path.split('/').slice(1);
   for (const [i, segment] of segments.entries()) {
@@ -192,7 +192,7 @@ async function proxy(env, request, session, path) {
 
 /* ---------------------------------------------------------------- app */
 /* Share links: /owner/repo with an optional ?root=&record= query. They carry no data. */
-const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'healthz']);
+const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'pub', 'healthz']);
 const SHARE_PATH = /^\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9_.-]{1,100})\/?$/;
 function shareRepo(path) {
   const m = path.match(SHARE_PATH);
@@ -210,14 +210,59 @@ function safeNext(next) {
   return u.pathname + (qs ? '?' + qs : '');
 }
 
-async function appPage(env, request, session) {
+/* ---------------------------------------------------------------- public view
+   Anyone can read a public repository's records without signing in. Reads use the
+   GitHub App's client credentials, never a user token, and every read first checks
+   that the repository is public. Public data is cached at the edge for a short time
+   (branch heads and repository metadata) or a day (objects addressed by SHA). */
+const PUBLIC_ROUTES = [[new RegExp(`^/repos/${NAME}/${NAME}$`), []], ...ROUTES.filter(([pattern]) => pattern.source.startsWith('^\\/repos'))];
+const appHeaders = env => ({ authorization: 'Basic ' + btoa(env.GITHUB_CLIENT_ID + ':' + env.GITHUB_CLIENT_SECRET), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'horsemen-viewer' });
+const cacheOf = env => env.CACHE || globalThis.caches?.default || null;
+const PASS = ['etag', 'x-ratelimit-limit', 'x-ratelimit-remaining'];
+async function publicFetch(env, origin, target, ttl) {
+  const cache = cacheOf(env), key = `${origin}/__cache/pub${target}`;
+  if (cache) { const hit = await cache.match(key); if (hit) return hit; }
+  let res;
+  try { res = await fetch(apiBase(env) + target, { headers: appHeaders(env) }); } catch { return null; }
+  if (!res.ok) return res;
+  const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': `public, max-age=${ttl}` };
+  for (const h of PASS) if (res.headers.get(h)) headers[h] = res.headers.get(h);
+  const stored = new Response(await res.arrayBuffer(), { status: 200, headers });
+  if (cache) { try { await cache.put(key, stored.clone()); } catch { /* Caching is optional. */ } }
+  return stored;
+}
+/* Repository metadata when the repository is public; otherwise null. */
+async function publicRepo(env, origin, repo) {
+  const res = await publicFetch(env, origin, `/repos/${repo}`, 60);
+  if (!res || !res.ok) return null;
+  try { const meta = await res.clone().json(); return meta && meta.private === false ? meta : null; } catch { return null; }
+}
+async function publicProxy(env, request, path) {
+  if (request.method !== 'GET') return json({ error: 'Only reads are allowed.' }, 405);
+  if (!sameOrigin(request)) return json({ error: 'Request rejected.' }, 403);
+  const url = new URL(request.url), target = allowedTarget(path, url.search, PUBLIC_ROUTES);
+  if (!target) return json({ error: 'Not found.' }, 404);
+  if (!(await publicRepo(env, url.origin, path.split('/').slice(2, 4).join('/')))) return json({ error: 'Repository or record is not public.' }, 404);
+  const immutable = /\/git\/(?:trees|blobs)\/|[?&]ref=[0-9a-f]{40}(?:&|$)/.test(target);
+  const res = await publicFetch(env, url.origin, target, immutable ? 86400 : 60);
+  if (!res) return json({ error: 'GitHub request failed. Retry.' }, 502);
+  if (!res.ok) { const [status, error] = res.status === 401 ? [502, 'GitHub request failed. Retry.'] : (ERRORS[res.status] || [502, 'GitHub request failed. Retry.']); return json({ error }, status); }
+  const headers = { 'content-type': 'application/json; charset=utf-8' };
+  for (const h of PASS) if (res.headers.get(h)) headers[h] = res.headers.get(h);
+  if (headers.etag && request.headers.get('if-none-match') === headers.etag) return respond(null, 304, { etag: headers.etag });
+  return respond(res.body, 200, headers);
+}
+
+async function appPage(env, request, session, mode = 'hosted') {
   const res = await env.ASSETS.fetch(new Request(new URL('/', request.url)));
   if (!res.ok) return respond('App files are missing.', 500);
   let html = await res.text();
   const anchor = '<script src="/app.js" defer>';
   if (!html.includes('__SESSION__') || !html.includes(anchor)) return respond('App page is incompatible with hosted mode.', 500);
-  html = html.replace('__SESSION__', await csrfFor(env, session))
-    .replace('<meta charset="utf-8">', '<meta charset="utf-8"><meta name="horsemen-mode" content="hosted"><meta name="horsemen-login" content="' + escapeHTML(session.l || '') + '">')
+  const meta = mode === 'public' ? '<meta name="horsemen-mode" content="public">'
+    : '<meta name="horsemen-mode" content="hosted"><meta name="horsemen-login" content="' + escapeHTML(session.l || '') + '">';
+  html = html.replace('__SESSION__', mode === 'public' ? '' : await csrfFor(env, session))
+    .replace('<meta charset="utf-8">', '<meta charset="utf-8">' + meta)
     .replace(/<title>[^<]*<\/title>/, '<title>Horsemen</title>')
     .replace(anchor, '<script src="/hosted-reader.js" defer></script><script src="/hosted.js" defer></script>' + anchor);
   return respond(html, 200, { 'content-type': 'text/html; charset=utf-8' });
@@ -277,8 +322,13 @@ async function handle(request, env) {
 
   const session = await readSession(env, request);
   if (path === '/' || path === '/index.html') return session ? appPage(env, request, session) : signInPage();
+  if (path.startsWith('/pub/')) return publicProxy(env, request, path.slice(4));
   const shared = shareRepo(path);
-  if (shared) return session ? appPage(env, request, session) : signInPage({}, shared, path + url.search);
+  if (shared) {
+    if (session && url.searchParams.get('view') !== 'public') return appPage(env, request, session);
+    if (await publicRepo(env, url.origin, shared)) return appPage(env, request, null, 'public');
+    return session ? appPage(env, request, session) : signInPage({}, shared, path + url.search);
+  }
 
   const guarded = path.startsWith('/api/') || path.startsWith('/gh/') || path === '/auth/refresh' || path === '/auth/logout';
   if (!guarded) return staticFile(env, request, path);
