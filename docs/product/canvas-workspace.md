@@ -1,6 +1,6 @@
 # Canvas workspace design
 
-Status: proposal for the owner's approval, written 2026-11-20. Nothing on this
+Status: proposal for the owner's approval, written 2026-11-19. Nothing on this
 page is built. The owner gave the direction and three decisions on 2026-11-19;
 this page turns them into a design and a build plan.
 
