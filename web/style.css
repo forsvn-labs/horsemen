@@ -479,7 +479,7 @@ dialog{color:var(--ink)}
 figure.diagram{margin:1.25em 0;min-width:0;max-width:100%}
 figure.diagram[data-state]{border:var(--bw) var(--bs) var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
 figure.diagram[data-state] .diagram-source{margin:0;border:0;border-radius:0}
-.diagram-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;border-bottom:var(--bw) var(--bs) var(--line);font:500 var(--fs-s)/1.5 var(--ui);color:var(--ink-3)}
+.diagram-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;border-bottom:var(--bw) var(--bs) var(--line);font:500 var(--fs-s)/1.5 var(--ui);color:var(--ink-2)}
 .diagram-kind{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .diagram-bar .link-btn{flex:none;font-size:var(--fs-s)}
 .diagram-canvas{overflow:auto;padding:16px;text-align:center;background:var(--surface);overscroll-behavior-x:contain}
@@ -489,7 +489,7 @@ figure.diagram[data-state] .diagram-source{margin:0;border:0;border-radius:0}
 .diagram-error:before{content:'!' / '';display:inline-grid;place-items:center;width:1.4em;height:1.4em;margin-right:6px;border-radius:50%;background:var(--vermilion);color:var(--surface);font-weight:700}
 /* Repository images. A failed image keeps its alt text as a link, with the reason. */
 .md-image img{display:inline-block;max-width:100%;height:auto;vertical-align:middle;border-radius:var(--radius-s)}
-.md-image-note{display:block;color:var(--ink-3);font:var(--fs-s)/1.5 var(--ui)}
+.md-image-note{display:block;color:var(--ink-2);font:var(--fs-s)/1.5 var(--ui)}
 :is(.prose,.view) table{width:100%;border-collapse:collapse;font:.875rem/1.5 var(--ui)}
 :is(.prose,.view) th{padding:8px 12px;text-align:left;font-weight:600;font-size:.8125rem;color:var(--ink-2);background:var(--surface-2);white-space:nowrap}
 :is(.prose,.view) td{padding:9px 12px;border-top:var(--bw) var(--bs) var(--line);vertical-align:top;overflow-wrap:anywhere}
