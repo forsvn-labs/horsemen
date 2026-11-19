@@ -275,7 +275,9 @@ function publicGitHub({ privateRepo = false } = {}) {
     return json({ message: 'Not Found' }, 404);
   });
 }
-const basic = 'Basic ' + Buffer.from('Iv1.fictional:fictional-secret').toString('base64');
+// GitHub rejects GitHub App client credentials on repository reads, so public reads use a
+// dedicated public-read token when one is set, and no credentials otherwise. Never a user token.
+const anonymous = null, publicToken = 'Bearer github_pat_public_fictional';
 
 test('a signed-out visitor sees the canvas of a public repository without signing in', async () => {
   publicGitHub(); const e = env({ CACHE: memoryCache() });
@@ -284,7 +286,7 @@ test('a signed-out visitor sees the canvas of a public repository without signin
   assert.match(html, /<meta name="horsemen-mode" content="public">/); assert.doesNotMatch(html, /Sign in with GitHub<\/a>\n<small>/);
   assert.equal(res.headers.get('set-cookie'), null, 'no cookie for public view');
   assert.doesNotMatch(html, /__SESSION__/);
-  assert.equal(calls[0].headers.get('authorization'), basic, 'repository check uses app credentials, not a user token');
+  assert.equal(calls[0].headers.get('authorization'), anonymous, 'repository check sends no user token');
 });
 
 test('private, missing, and unreadable repositories still ask for sign-in', async () => {
@@ -297,12 +299,12 @@ test('private, missing, and unreadable repositories still ask for sign-in', asyn
   assert.match(await (await call('/example/open', {}, env({ CACHE: memoryCache() }))).text(), /Sign in to open/);
 });
 
-test('the public proxy reads only public repositories, with app credentials', async () => {
+test('the public proxy reads only public repositories, without user credentials', async () => {
   publicGitHub({ privateRepo: true }); const e = env({ CACHE: memoryCache() });
   const h = { 'sec-fetch-site': 'same-origin' };
   const ok = await call('/pub/repos/example/open/git/blobs/' + 'b'.repeat(40), { headers: h }, e);
   assert.equal(ok.status, 200); assert.equal((await ok.json()).encoding, 'base64');
-  assert.ok(calls.every(r => r.headers.get('authorization') === basic));
+  assert.ok(calls.every(r => r.headers.get('authorization') === anonymous));
   assert.equal((await call('/pub/repos/example/open', { headers: h }, e)).status, 200);
   const before = calls.length;
   for (const p of ['/pub/repos/example/secret/git/blobs/' + 'b'.repeat(40), '/pub/user', '/pub/user/installations', '/pub/repos/example/open/actions/secrets', '/pub/repos/example/open/contents/../x'])
@@ -313,9 +315,12 @@ test('the public proxy reads only public repositories, with app credentials', as
 });
 
 test('a signed-in visitor never sends a user token through the public proxy', async () => {
-  const { headers } = await signIn(); publicGitHub(); const e = env({ CACHE: memoryCache() });
-  await call('/pub/repos/example/open/commits/main', { headers: { ...headers, 'sec-fetch-site': 'same-origin' } }, e);
-  assert.ok(calls.length && calls.every(r => r.headers.get('authorization') === basic));
+  const { headers } = await signIn(); publicGitHub();
+  await call('/pub/repos/example/open/commits/main', { headers: { ...headers, 'sec-fetch-site': 'same-origin' } }, env({ CACHE: memoryCache() }));
+  assert.ok(calls.length && calls.every(r => r.headers.get('authorization') === anonymous));
+  publicGitHub();
+  await call('/pub/repos/example/open/commits/main', { headers: { ...headers, 'sec-fetch-site': 'same-origin' } }, env({ CACHE: memoryCache(), GITHUB_PUBLIC_TOKEN: 'github_pat_public_fictional' }));
+  assert.ok(calls.length && calls.every(r => r.headers.get('authorization') === publicToken), 'the public-read token when set');
 });
 
 test('public reads are cached: immutable objects once, branch heads briefly, with 304 support', async () => {
