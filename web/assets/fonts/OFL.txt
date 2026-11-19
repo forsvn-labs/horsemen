@@ -1,8 +1,14 @@
 Copyright 2026 The Beacon Project Authors (https://github.com/Luffixos/fontzz)
+Copyright 2026 The Brioche Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Cleft Project Authors (https://github.com/Luffixos/fontzz)
+Copyright 2026 The Diode Project Authors (https://github.com/Luffixos/fontzz)
+Copyright 2026 The Folio Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Gravure Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Halden Project Authors (https://github.com/Luffixos/fontzz)
+Copyright 2026 The Mallow Project Authors (https://github.com/Luffixos/fontzz)
+Copyright 2026 The Opaline Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Signal Project Authors (https://github.com/Luffixos/fontzz)
+Copyright 2026 The Tessera Project Authors (https://github.com/Luffixos/fontzz)
 Copyright 2026 The Vellum Project Authors (https://github.com/Luffixos/fontzz)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.

@@ -29,15 +29,14 @@ the account menu, the Jump field, and the keyboard.
   A search field appears when you have more than eight projects. Multiple
   search words narrow the result. Nested project roots are separate entries.
 - **Account menu.** Select your account name at the bottom of the rail. The
-  menu holds Refresh GitHub (with the time of the last check), the colour
-  theme, the type set, and Clear workspace. In hosted mode it also holds
-  Choose repositories and Sign out.
+  menu holds Refresh GitHub (with the time of the last check), the theme
+  gallery, and Clear workspace. In hosted mode it also holds Choose
+  repositories and Sign out.
 - **Header.** The header shows the project name and one line: the
   repository, when PROGRESS says it was updated, and the commit that the app
   read. It has Jump, Canvas or List, and in hosted mode Copy link.
 - **Jump.** Press Ctrl + K (Command + K on macOS) or select Jump. One field
-  reaches each record, linked document, project, canvas action, theme, and
-  type set. Canvas actions include Fit, Select tool, Hand tool, Open the
+  reaches each record, linked document, project, canvas action, and theme. Canvas actions include Fit, Select tool, Hand tool, Open the
   selected record, Collapse all linked branches, Reset layout, Refresh GitHub,
   and Clear workspace.
 - **Shortcuts.** Press `?` or choose Keyboard shortcuts in Jump to see every
@@ -111,28 +110,51 @@ the account menu, the Jump field, and the keyboard.
 
 ## Design
 
-The look is a calm reading desk: bone paper, ink, and one pigment for each
-record. Vision is gilt, Progress is vermilion, Brain is indigo, and
+The default look is a calm reading desk: bone paper, ink, and one pigment
+for each record. Vision is gilt, Progress is vermilion, Brain is indigo, and
 Structure is verdigris. The pigment appears on the record icon and a few
-labels only. Names and icons carry the same meaning without colour. The
-account menu has six themes: Bone and Ink, and one theme for each horse
-(White, Red, Black, and Pale). System follows the device setting. A test
-checks that text and pigments in each theme meet a 4.5:1 contrast ratio.
-Text is 12px or larger. Motion stops when the system asks for reduced motion.
+labels only. Names and icons carry the same meaning without colour.
 
-The same menu, and Jump, choose a type set. Each set works with every colour
-theme and changes fonts only:
+### Themes
 
-- **Engraved** (default): Cleft (titles), Gravure (labels), Halden
-  (interface), Vellum (reading), and Signal (code).
-- **Modern**: Beacon for titles, labels, interface, and reading; Signal for
-  code. Use it when the engraved letters are hard to read.
-- **System**: the fonts of the device. It downloads no font files.
+Open the account menu or Jump (Ctrl/Cmd + K) to choose a theme. Each tile
+shows a small card and a line of text in that theme's own fonts and colours.
+A theme applies at once. The browser saves it and applies it before first
+paint, so the page does not flash. Each theme sets its own fonts, corner
+radius, borders, shadows, spacing, canvas, accent, and focus ring.
 
-The browser saves the choice and applies it before first paint. Only the
-fonts of the active set are preloaded. The hosted sign-in page uses the same
-choice. Fonts come from [fontzz](https://fontzz.vercel.app) and are served
-locally. See [the font notice](assets/fonts/NOTICE.txt) and
+| Theme | Look | Modes | Fonts |
+| --- | --- | --- | --- |
+| **Engraved** (default) | Carved titles and book text on bone paper | Six palettes | Cleft, Gravure, Halden, Vellum, Signal |
+| **Modern** | A clean product interface: grey, rounded, one blue accent | Light, dark | Beacon, Signal |
+| **Editorial** | A newspaper page: Didone titles, double rules, no shadows | Light | Opaline, Folio, Signal |
+| **Terminal** | A phosphor screen: monospace, dashed borders, amber accent, compact | Dark | Diode titles, device monospace |
+| **Swiss** | A column grid, a bold grotesk, black and white, one red | Light | Halden, Signal |
+| **Blueprint** | White line work on a blue field, a grid, corner ticks, mono labels | Dark | Tessera, Signal |
+| **Soft** | Pastel colours, very round corners, wide spacing, soft shadows | Light, dark | Brioche, Mallow, Signal |
+| **High contrast** | Black and white, larger text, 2px borders, a thick focus ring | Light, dark | Beacon, Signal |
+
+The selected tile shows its options. Engraved shows its six palettes: Bone
+and Ink, and one for each horse (White, Red, Black, and Pale). System
+chooses Bone or Ink from the device. A theme with a light and a dark mode
+shows System, Light, and Dark; System follows the device.
+
+For easier reading, choose Modern or High contrast. They replace the
+earlier type sets: a browser that saved the Modern or System type set opens
+in the Modern theme. The hosted sign-in page stays Engraved, but it uses the
+Beacon type for people who chose Modern or High contrast.
+
+A test checks every theme and mode. Text and pigments meet a 4.5:1 contrast
+ratio (7:1 in High contrast), focus rings meet 3:1, and text is 12px or
+larger. Motion stops when the system asks for reduced motion.
+
+### Fonts
+
+The browser downloads only the fonts of the active theme, and theme.js
+preloads only its main files. The theme gallery shows a live preview of each
+theme, so the first time it opens, it loads one or two fonts for each theme.
+Fonts come from [fontzz](https://fontzz.vercel.app) and are served locally.
+See [the font notice](assets/fonts/NOTICE.txt) and
 [their licence](assets/fonts/OFL.txt). Icons, seals, and the app icon are
 original; see [the icon system](../docs/product/icon-system.md). The latest
 design audit and its open items are in
@@ -161,7 +183,7 @@ The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
-by the app. The browser stores only opaque project IDs, canvas positions, the theme choice, the type set choice, and the layout choice for each record type.
+by the app. The browser stores only opaque project IDs, canvas positions, the theme, palette, and mode choices, and the layout choice for each record type.
 In hosted mode, the browser also keeps a discovery index without record text; see
 [fast reloads](../worker/README.md#how-it-works).
 External images do not load automatically. Opening an external link leaves

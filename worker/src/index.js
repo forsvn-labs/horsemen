@@ -101,15 +101,15 @@ const githubHeaders = token => ({ authorization: 'Bearer ' + token, accept: 'app
 
 /* ---------------------------------------------------------------- pages */
 function page(title, body, status = 200, headers = {}) {
-  // theme.js applies the saved type set before first paint and preloads only its fonts.
+  // theme.js applies the saved theme before first paint and preloads only its fonts. This page stays Engraved;
+  // readers who chose Modern or High contrast keep the readable Beacon type.
   const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHTML(title)}</title><link rel="icon" href="/assets/icons/favicon.svg" type="image/svg+xml"><script src="/theme.js"></script><style>
 @font-face{font-family:Cleft;src:url(/assets/fonts/cleft.woff2) format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:Halden;src:url(/assets/fonts/halden.woff2) format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:Vellum;src:url(/assets/fonts/vellum.woff2) format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:Beacon;src:url(/assets/fonts/beacon.woff2) format("woff2");font-weight:100 900;font-display:swap}
 :root{--paper:#f2ede3;--ink:#1f1b16;--muted:#5d554a;--rule:#d6ccbb;--gilt:#8a6a1f;--card:#fbf8f2;--title:Cleft,Georgia,serif;--text:Vellum,Georgia,serif;--ui:Halden,system-ui,sans-serif;--title-weight:400}
-:root[data-type=modern]{--title:Beacon,system-ui,sans-serif;--text:Beacon,system-ui,sans-serif;--ui:Beacon,system-ui,sans-serif;--title-weight:600}
-:root[data-type=system]{--title:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--text:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--title-weight:650}
+:root[data-style=modern],:root[data-style=contrast]{--title:Beacon,system-ui,sans-serif;--text:Beacon,system-ui,sans-serif;--ui:Beacon,system-ui,sans-serif;--title-weight:600}
 @media (prefers-color-scheme:dark){:root{--paper:#16130f;--ink:#efe7d8;--muted:#b3a893;--rule:#3a332a;--gilt:#d9b25a;--card:#1e1a15}}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--paper);color:var(--ink);font:16px/1.55 var(--ui);padding:24px 16px}
 main{max-width:520px;width:100%;background:var(--card);border:1px solid var(--rule);border-radius:14px;padding:36px 32px}

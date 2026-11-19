@@ -318,68 +318,126 @@ try:
             browser('screenshot',str(args.output/'mobile-progress-peek.png'))
         browser('press','Escape')
     browser('set','viewport','1440','1100');browser('click','#fit');browser('screenshot',str(args.output/'desktop.png'))
+    # Themes: one gallery in the account menu. Each tile previews its theme in that theme's own fonts and colours.
+    styles=value('JSON.stringify(HorsemenThemes.styles)')
+    ids=[t['id'] for t in styles]
+    assert len(ids)>=7 and ids[0]=='engraved', 'At least seven themes; Engraved is the default'
+    browser('click','#menu-toggle')
+    assert value('document.querySelectorAll("#menu [data-style-choice]").length')==len(ids), 'One tile for each theme'
+    assert browser('get','attr','[data-style-choice="engraved"]','aria-checked').strip()=='true', 'Engraved is the default'
+    assert value('JSON.stringify([...document.querySelectorAll("#menu [role=menuitem]")].map(b=>b.id))')==['connect','clear'], 'The menu holds Refresh GitHub and Clear workspace'
+    assert value('JSON.stringify([document.querySelector("#palette-row").hidden,document.querySelector("#mode-row").hidden,document.querySelectorAll("#palette-row [data-theme-choice]").length])')==[False,True,7], 'Engraved shows its six palettes and System'
+    previews=value('JSON.stringify([...document.querySelectorAll("#menu .theme-preview")].map(p=>{const t=p.querySelector(".tp-title"),c=p.querySelector(".tp-card");return [p.dataset.style,getComputedStyle(t).fontFamily.split(",")[0].replace(/\\"/g,""),getComputedStyle(p).backgroundColor,getComputedStyle(c).borderRadius,getComputedStyle(c).borderTopStyle]}))')
+    assert [p[0] for p in previews]==ids, 'Previews follow the theme order'
+    assert len({tuple(p[1:]) for p in previews})==len(ids), 'Each preview looks different'
+    for p,t in zip(previews,styles):
+        display=value(f'JSON.stringify(getComputedStyle(document.querySelector(".theme-preview[data-style={t["id"]}]")).getPropertyValue("--display").split(",")[0].trim())')
+        assert p[1]==display, t['id']+' preview uses its own display font'
     scheme=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
     other='ember' if scheme=='light' else 'pale'
-    browser('click','#menu-toggle')
-    assert value('document.querySelectorAll("#menu [data-theme-choice]").length')==7, 'System and six themes'
-    assert value('document.querySelectorAll("#menu [role=group] [role=menuitemradio]").length')==10, 'Colours and type sets share one menu, in labelled groups'
-    assert value('JSON.stringify([...document.querySelectorAll("#menu [role=menuitem]")].map(b=>b.id))')==['connect','clear'], 'The menu holds Refresh GitHub and Clear workspace'
     assert browser('get','attr','[data-theme-choice="system"]','aria-checked').strip()=='true'
     browser('click',f'[data-theme-choice="{other}"]')
-    assert value('JSON.stringify([document.documentElement.dataset.theme,localStorage.getItem("horsemen-theme")])')==[other,other], 'Theme choice applies and is saved'
+    assert value('JSON.stringify([document.documentElement.dataset.theme,localStorage.getItem("horsemen-theme")])')==[other,other], 'Engraved palette choice applies and is saved'
     assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')!=scheme
-    browser('screenshot',str(args.output/('desktop-'+other+'.png')))
-    browser('dblclick','[data-artifact="progress"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
-    browser('screenshot',str(args.output/('progress-peek-'+other+'.png')));browser('press','Escape')
-    browser('click','#menu-toggle');browser('click','[data-theme-choice="system"]')
+    browser('click','[data-theme-choice="system"]')
     assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')==scheme and value('JSON.stringify(localStorage.getItem("horsemen-theme"))') is None, 'System follows the device again'
     browser('press','Escape')
     assert browser('eval','document.querySelector("#menu").hidden').strip()=='true', 'Escape closes the menu'
-    browser('click','#fit')
-    dock=value('JSON.stringify((()=>{const d=document.querySelector(".zoom").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>{const r=e.getBoundingClientRect();return r.bottom<=d.top||r.right<=d.left})})())')
-    assert dock, 'Fit keeps every card clear of the zoom control'
-    # Type sets: one choice for every colour theme. It is saved, and it loads before first paint.
     browser('click','#menu-toggle')
-    assert value('document.querySelectorAll("#menu [data-type-choice]").length')==3, 'Engraved, Modern, and System'
-    assert browser('get','attr','[data-type-choice="engraved"]','aria-checked').strip()=='true', 'Engraved is the default'
-    browser('click','[data-type-choice="modern"]')
-    assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['modern','modern'], 'Type choice applies and is saved'
-    assert browser('get','attr','[data-type-choice="modern"]','aria-checked').strip()=='true' and browser('get','attr','[data-type-choice="engraved"]','aria-checked').strip()=='false'
-    browser('press','Escape')
-    fonts='JSON.stringify(performance.getEntriesByType("resource").map(e=>e.name.split("/").pop()).filter(n=>n.endsWith(".woff2")).sort())'
-    head='JSON.stringify((()=>{const links=[...document.querySelectorAll("link[rel=preload][as=font]")],css=document.querySelector("link[rel=stylesheet]");return [links.map(l=>l.getAttribute("href")),links.every(l=>l.compareDocumentPosition(css)&Node.DOCUMENT_POSITION_FOLLOWING)]})())'
-    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','--fn','document.fonts.status === "loaded"')
-    assert value('JSON.stringify(document.documentElement.dataset.type)')=='modern', 'The type choice survives a reload'
-    assert value(head)==[['/assets/fonts/beacon.woff2'],True], 'Only the active set is preloaded, before the stylesheet'
-    assert 'Beacon' in value('JSON.stringify(getComputedStyle(document.querySelector("#project-name")).fontFamily)')
-    assert not set(value(fonts))&{'cleft.woff2','gravure.woff2','halden.woff2','vellum.woff2'}, 'Modern downloads no Engraved fonts'
-    browser('click','#fit');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
-    browser('screenshot',str(args.output/'desktop-modern.png'))
-    browser('dblclick','[data-artifact="progress"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
-    assert browser('eval',fits).strip()=='true', 'Progress fits with the wider Modern letters'
-    browser('screenshot',str(args.output/'progress-peek-modern.png'));browser('press','Escape')
-    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','system type');browser('press','Enter')
-    assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['system','system'], 'Jump to reaches the type sets'
-    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','--fn','document.fonts.status === "loaded"')
-    assert value(head)==[[],True] and value(fonts)==[], 'System preloads and downloads no font files'
-    browser('click','#fit');browser('screenshot',str(args.output/'desktop-system.png'))
-    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','engraved type');browser('press','Enter')
-    assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['engraved',None], 'Engraved is the default again'
-    browser('click','#menu-toggle')
-    assert value('JSON.stringify(document.activeElement.dataset.themeChoice)')=='system', 'The menu opens on the chosen colour'
+    assert value('JSON.stringify(document.activeElement.dataset.styleChoice)')=='engraved', 'The menu opens on the chosen theme'
     browser('press','End')
     assert value('JSON.stringify(document.activeElement.id)')=='clear', 'End reaches the last menu item'
     browser('press','ArrowDown')
     assert value('JSON.stringify(document.activeElement.id)')=='connect', 'Arrow keys wrap across every group'
     browser('press','Escape')
     assert value('JSON.stringify([document.querySelector("#menu").hidden,document.activeElement.id])')==[True,'menu-toggle'], 'Escape closes the menu and returns focus'
+    browser('click','#fit')
+    dock=value('JSON.stringify((()=>{const d=document.querySelector(".zoom").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>{const r=e.getBoundingClientRect();return r.bottom<=d.top||r.right<=d.left})})())')
+    assert dock, 'Fit keeps every card clear of the zoom control'
+
+    # Each theme: a click applies it at once, it survives a reload, it loads only its own fonts, and nothing overflows.
+    browser('set','media','light')
+    fonts='JSON.stringify([...document.fonts].filter(f=>f.status==="loaded").map(f=>f.family.replace(/\\"/g,"")))'
+    roles='JSON.stringify(["display","label","ui","prose","mono"].flatMap(r=>getComputedStyle(document.documentElement).getPropertyValue("--"+r).split(",").map(f=>f.trim().replace(/\\"/g,""))))'
+    head='JSON.stringify((()=>{const links=[...document.querySelectorAll("link[rel=preload][as=font]")],css=document.querySelector("link[rel=stylesheet]");return [links.map(l=>l.getAttribute("href")),links.every(l=>l.compareDocumentPosition(css)&Node.DOCUMENT_POSITION_FOLLOWING)]})())'
+    no_overflow='JSON.stringify([document.documentElement.scrollWidth<=innerWidth,[".topbar",".rail",".heading-actions"].every(s=>{const e=document.querySelector(s);return e.scrollWidth<=e.clientWidth+1})])'
+    for t in styles:
+        if browser('eval','document.querySelector("#menu").hidden').strip()=='true':browser('click','#menu-toggle')
+        browser('click',f'[data-style-choice="{t["id"]}"]')
+        assert value('JSON.stringify([document.documentElement.dataset.style,localStorage.getItem("horsemen-style")])')==[t['id'],None if t['id']=='engraved' else t['id']], t['id']+' applies at once and is saved'
+        assert browser('get','attr',f'[data-style-choice="{t["id"]}"]','aria-checked').strip()=='true' and browser('eval','document.querySelector("#menu").hidden').strip()=='false', 'The menu stays open to compare themes'
+        if t['id']=='engraved':browser('screenshot',str(args.output/'theme-picker.png'))
+        browser('press','Escape')
+        browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','--fn','document.fonts.status === "loaded"')
+        mode=value('JSON.stringify(document.documentElement.dataset.mode)')
+        assert value('JSON.stringify(document.documentElement.dataset.style)')==t['id'], t['id']+' survives a reload'
+        assert mode in t['modes'] and value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')==mode, t['id']+' uses a mode it supports'
+        assert value(head)==[[f'/assets/fonts/{f}.woff2' for f in t['fonts']],True], t['id']+' preloads only its own fonts, before the stylesheet'
+        assert set(value(fonts))<=set(value(roles)), t['id']+' downloads no font from another theme'
+        browser('click','#fit');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+        assert value(no_overflow)==[True,True], t['id']+' has no layout overflow at desktop width'
+        browser('screenshot',str(args.output/f'theme-{t["id"]}-home.png'))
+        browser('eval','openPeek("progress",document.querySelector("[data-artifact=progress]"))');browser('wait','#peek[open]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+        assert browser('eval',fits).strip()=='true', 'Progress fits in '+t['id']
+        browser('screenshot',str(args.output/f'theme-{t["id"]}-progress.png'));browser('press','Escape')
+
+    # No flash: theme.js sets the theme in <head>, before the stylesheet, and the theme does not wait for app.js.
+    assert value('JSON.stringify((()=>{const s=document.querySelector("script[src=\\"/theme.js\\"]"),css=document.querySelector("link[rel=stylesheet]");return [!s.async&&!s.defer,!!(s.compareDocumentPosition(css)&Node.DOCUMENT_POSITION_FOLLOWING)]})())')==[True,True], 'theme.js blocks parsing and runs before the stylesheet loads'
+    browser('eval','localStorage.setItem("horsemen-style","editorial")')
+    browser('network','route','**/app.js','--abort')
+    browser('reload');browser('wait','--fn','document.readyState === "complete"')
+    assert value('JSON.stringify([document.documentElement.dataset.style,getComputedStyle(document.body).backgroundColor,getComputedStyle(document.querySelector("#project-name")).fontFamily.split(",")[0]])')==['editorial','rgb(243, 239, 228)','Opaline'], 'The first paint already has the saved theme'
+    browser('network','unroute','**/app.js')
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+
+    # System mode follows the device for a theme with light and dark; a chosen mode wins.
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','modern theme');browser('press','Enter')
+    assert value('JSON.stringify([document.documentElement.dataset.style,localStorage.getItem("horsemen-style")])')==['modern','modern'], 'Jump reaches the themes'
+    browser('set','media','dark')
+    browser('wait','--fn','document.documentElement.dataset.mode === "dark"')
+    browser('set','media','light')
+    browser('wait','--fn','document.documentElement.dataset.mode === "light"')
+    browser('click','#menu-toggle')
+    assert value('JSON.stringify([document.querySelector("#palette-row").hidden,document.querySelector("#mode-row").hidden])')==[True,False], 'Modern shows the mode, not the Engraved palettes'
+    browser('click','[data-mode-choice="dark"]')
+    assert value('JSON.stringify([document.documentElement.dataset.mode,localStorage.getItem("horsemen-mode"),getComputedStyle(document.documentElement).colorScheme])')==['dark','dark','dark'], 'A chosen mode wins over the device'
+    browser('click','[data-mode-choice="system"]')
+    assert value('JSON.stringify([document.documentElement.dataset.mode,localStorage.getItem("horsemen-mode")])')==['light',None], 'System follows the device again'
+    browser('press','Escape')
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','dark mode');browser('press','Enter')
+    assert value('JSON.stringify(document.documentElement.dataset.mode)')=='dark', 'Jump reaches the mode'
+
+    # The old type sets were for readable text. A saved Modern or System type set opens the Modern theme.
+    browser('eval','localStorage.clear();localStorage.setItem("horsemen-type","system")')
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+    assert value('JSON.stringify(document.documentElement.dataset.style)')=='modern', 'Readable type stays after the update'
+    browser('click','#menu-toggle');browser('click','[data-style-choice="engraved"]');browser('press','Escape')
+    assert value('JSON.stringify([localStorage.getItem("horsemen-style"),localStorage.getItem("horsemen-type")])')==[None,None], 'Choosing a theme replaces the old type set'
+
+    # Phone width: every theme fits, and every record view fits without sideways scrolling.
+    browser('set','viewport','390','844')
+    for t in styles:
+        browser('eval',f'localStorage.setItem("horsemen-style","{t["id"]}")')
+        browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+        assert browser('eval','document.documentElement.scrollWidth <= innerWidth').strip()=='true', t['id']+' fits a phone'
+        for key in ['progress','vision','brain','structure','changelog','techstack']:
+            browser('eval',f'openPeek("{key}",document.querySelector("[data-artifact={key}]"))');browser('wait','#peek[open]')
+            assert browser('eval',fits).strip()=='true', key+' fits a phone in '+t['id']
+            browser('press','Escape')
+        browser('click','#menu-toggle')
+        menu=value('JSON.stringify((()=>{const r=document.querySelector("#menu").getBoundingClientRect();return [r.left>=0,r.right<=innerWidth,r.top>=0,r.bottom<=innerHeight]})())')
+        assert menu==[True,True,True,True], 'The theme menu fits a phone in '+t['id']
+        browser('press','Escape')
+        if t['id']=='contrast':browser('screenshot','--full',str(args.output/'theme-contrast-phone.png'))
+    browser('eval','localStorage.removeItem("horsemen-style")')
+    browser('set','viewport','1440','1100');browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
     browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#menu-toggle');browser('click','#clear')
     browser('wait','--fn','document.body.dataset.state === "idle"')
     assert browser('get','text','#source-content').strip()==''
     assert browser('get','text','#peek-content').strip()==''
     assert browser('get','text','#project-name').strip()=='Workspace cleared'
     assert not browser('errors').strip()
-    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, themes and type sets, no browser errors.')
+    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, every theme at desktop and phone width, no browser errors.')
 except BaseException:
     try:
         browser('screenshot',str(args.output/'failure.png'))

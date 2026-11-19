@@ -1,6 +1,13 @@
-Fonts in this folder: Beacon, Cleft, Gravure, Halden, Signal, Vellum (variable, weights 100 to 900).
-Engraved type set: Cleft, Gravure, Halden, Vellum, Signal. Modern type set: Beacon, Signal.
-The System type set uses device fonts and downloads none of these files.
+Fonts in this folder: Beacon, Brioche, Cleft, Diode, Folio, Gravure, Halden,
+Mallow, Opaline, Signal, Tessera, Vellum (variable, weights 100 to 900, Latin subset).
+Each theme loads only its own fonts:
+  Engraved: Cleft, Gravure, Halden, Vellum, Signal.
+  Modern and High contrast: Beacon, Signal.
+  Editorial: Opaline (titles), Folio (text), Signal.
+  Terminal: Diode (titles); device monospace fonts for text.
+  Swiss: Halden, Signal.
+  Blueprint: Tessera, Signal.
+  Soft: Brioche (titles), Mallow (text), Signal.
 Source: https://fontzz.vercel.app
 Each file states its copyright and the SIL Open Font License 1.1 in its name table.
 The copyright lines and the full licence text are in OFL.txt in this folder.
