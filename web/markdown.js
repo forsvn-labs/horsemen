@@ -2,6 +2,12 @@
 (function(root){
   const escapeHTML=s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
   function safeURL(value,base){try{const u=new URL(value,base);return ['https:','http:'].includes(u.protocol)?u.href:null}catch{return null}}
+  /* A repository image: a relative path (no scheme, not //host) to a PNG, JPEG, GIF, WebP, or SVG file. The app loads it only
+     when a loaded record registered the same link; external images stay links and are never fetched. */
+  const IMAGE=/\.(?:png|jpe?g|gif|webp|svg)$/i;
+  const imageSource=target=>!/^[a-z][a-z0-9+.-]*:/i.test(target)&&!target.startsWith('//')&&!target.includes('\\')&&IMAGE.test(target.replace(/[?#].*$/,''));
+  /* "/path" means the repository root, as on GitHub, when the base is a file view on github.com. */
+  function repoURL(target,base){const root=target.startsWith('/')&&String(base||'').match(/^https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^/]+\//);return safeURL(root?root[0]+target.slice(1):target,base)}
   const anchor=(url,label)=>'<a target="_blank" rel="noopener noreferrer" href="'+escapeHTML(url)+'">'+label+'</a>';
   const LINK=/(`[^`]+`|!?\[[^\]]*\]\((?:[^\s()]|\([^\s()]*\))+\)|<https?:\/\/[^\s<>]+>|https?:\/\/[^\s<>\]]+)/g;
   function marks(text){
@@ -17,6 +23,7 @@
     const plain=String(text).replaceAll('\u0000','').replace(LINK,part=>{
       if(part.startsWith('`'))return hold('<code>'+escapeHTML(part.slice(1,-1))+'</code>');
       const m=part.match(/^(!?)\[([^\]]*)\]\((.+)\)$/);
+      if(m&&m[1]&&imageSource(m[3])){const url=repoURL(m[3],base);if(url)return hold('<span class="md-image" data-image="'+escapeHTML(url)+'" data-alt="'+escapeHTML(m[2])+'">'+anchor(url,'Image: '+(m[2]?marks(m[2]):escapeHTML(url)))+'</span>')}
       if(m){const url=safeURL(m[3],base);return hold(url?anchor(url,(m[1]?'Attachment: ':'')+(m[2]?marks(m[2]):escapeHTML(url))):marks(m[2]))}
       if(part.startsWith('<')){const url=safeURL(part.slice(1,-1),base);return url?hold(anchor(url,escapeHTML(part.slice(1,-1)))):part}
       const tail=part.match(/[.,;:!?)'"]+$/)?.[0]||'',bare=tail?part.slice(0,-tail.length):part,url=safeURL(bare,base);
@@ -56,8 +63,10 @@
     for(let i=0;i<lines.length;i++){
       const line=lines[i];
       if(/^\s*```/.test(line)){
-        flush();const code=[];i++;while(i<lines.length&&!/^\s*```/.test(lines[i]))code.push(lines[i++]);
-        out.push('<pre><code>'+escapeHTML(code.join('\n'))+'</code></pre>');continue;
+        flush();const lang=line.replace(/^\s*```/,'').trim().split(/\s+/)[0].toLowerCase(),code=[];i++;while(i<lines.length&&!/^\s*```/.test(lines[i]))code.push(lines[i++]);
+        const pre='<pre'+(lang==='mermaid'?' class="diagram-source"':'')+'><code>'+escapeHTML(code.join('\n'))+'</code></pre>';
+        /* A Mermaid block is a figure. Until media.js draws it, and when drawing fails, the figure shows the code. */
+        out.push(lang==='mermaid'?'<figure class="diagram" data-diagram="mermaid">'+pre+'</figure>':pre);continue;
       }
       if(!line.trim()){flush();continue}
       if(/^<details(?: open)?>\s*$/.test(line)){flush();out.push(line.includes('open')?'<details open>':'<details>');open++;continue}
@@ -97,6 +106,6 @@
     flush();while(open-->0)out.push('</details>');
     return out.join('');
   }
-  const api={escapeHTML,safeURL,inline,render};
+  const api={escapeHTML,safeURL,inline,render,imageSource};
   if(typeof module!=='undefined')module.exports=api;else root.HorsemenMarkdown=api;
 })(globalThis);

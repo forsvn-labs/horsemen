@@ -71,6 +71,8 @@ function renderPeek(){
   if(entry.key==='changelog'&&!r.error&&peekMode==='overview')addEvidence(r);
   /* Code blocks get a Copy button. */
   for(const pre of content.querySelectorAll('.prose pre')){const b=document.createElement('button');b.type='button';b.className='copy';b.dataset.copy=pre.textContent.trim();b.setAttribute('aria-label','Copy code');b.textContent='Copy';pre.classList.add('has-copy');pre.append(b)}
+  /* Diagrams and repository images: drawn and loaded after the content is in place. */
+  HorsemenMedia.hydrate(content,{links:r.connections||[],loadImage:imageURL});
   /* The full document is one click away from an overview that is not already the document. */
   if(peekMode==='overview'&&!r.error&&!(entry.link&&entry.link.kind!=='document')&&!content.querySelector('[data-layout=document],[data-layout=guide]'))content.insertAdjacentHTML('beforeend','<p class="more-bar"><button type="button" class="link-btn" data-peek-mode="document">Read the full document</button></p>');
   renderPeekNav();
@@ -143,7 +145,19 @@ async function openConnection(link,parentId){
 }
 $('#peek-back').onclick=()=>{peekRequest++;peekTrail.pop();peekMode='overview';renderPeek()};
 
-function prButton(area,n){const p=projects[current],b=document.createElement('button');b.className='btn';b.textContent='Load PR #'+n;b.onclick=async()=>{const version=request;b.disabled=true;try{const pr=await api('/api/pr?project='+p.id+'&number='+n);if(version!==request)return;const box=document.createElement('div');box.className='prose';box.innerHTML='<h4>'+escapeHTML(pr.title)+'</h4><p class="quiet">'+escapeHTML(pr.merged?'Merged · '+pr.merged_at:pr.state)+' · '+escapeHTML(pr.merge_commit_sha||'No merge commit')+'</p>'+renderMarkdown(pr.body||'No PR description.',pr.html_url);area.append(box);b.remove()}catch(e){b.disabled=false;showToast(e.message)}};return b}
+/* Repository images: the app's reader returns the bytes of a registered image link; the page shows them as a blob: URL.
+   URLs are kept for the open project and released when the records change. */
+let imageCache=new Map();
+function releaseImages(){for(const url of imageCache.values())url.then(u=>URL.revokeObjectURL(u),()=>{});imageCache=new Map()}
+function imageURL(link){
+  const p=projects[current],key=p.id+':'+link.id,path='/api/image?id='+encodeURIComponent(p.id)+'&link='+encodeURIComponent(link.id);
+  if(!imageCache.has(key)){
+    const load=hosted?api(path).then(data=>new Blob([data.bytes],{type:data.type})):fetch(path,{headers:{'X-Horsemen-Session':session},cache:'no-store'}).then(async r=>{if(r.ok)return r.blob();let message='';try{message=(await r.json()).error}catch{}throw Error(message||'It could not be loaded.')});
+    const url=load.then(blob=>URL.createObjectURL(blob));url.catch(()=>imageCache.get(key)===url&&imageCache.delete(key));imageCache.set(key,url);
+  }
+  return imageCache.get(key);
+}
+function prButton(area,n){const p=projects[current],b=document.createElement('button');b.className='btn';b.textContent='Load PR #'+n;b.onclick=async()=>{const version=request;b.disabled=true;try{const pr=await api('/api/pr?project='+p.id+'&number='+n);if(version!==request)return;const box=document.createElement('div');box.className='prose';box.innerHTML='<h4>'+escapeHTML(pr.title)+'</h4><p class="quiet">'+escapeHTML(pr.merged?'Merged · '+pr.merged_at:pr.state)+' · '+escapeHTML(pr.merge_commit_sha||'No merge commit')+'</p>'+renderMarkdown(pr.body||'No PR description.',pr.html_url);area.append(box);HorsemenMedia.hydrate(box);b.remove()}catch(e){b.disabled=false;showToast(e.message)}};return b}
 function addEvidence(record){const p=projects[current],urls=[...record.content.matchAll(/https:\/\/github\.com\/([^/\s]+\/[^/\s]+)\/pull\/(\d+)/g)].filter(m=>m[1]===p.repo);if(!urls.length)return;const area=document.createElement('section');area.className='part evidence-block';area.dataset.outline='Pull requests';area.innerHTML='<h3 class="part-title">Pull requests</h3><p class="quiet">Load a pull request’s title, merge state, and description. A merged pull request alone does not prove delivery.</p>';const row=document.createElement('div');row.className='pr-buttons';for(const n of new Set(urls.map(m=>m[2])))row.append(prButton(area,n));area.append(row);$('#peek-content').append(area)}
 /* Mode links and Copy buttons inside the peek. The content is replaced on each render, so the handler sits on its container. */
 $('#peek-content').addEventListener('click',e=>{
@@ -156,7 +170,7 @@ $('#close-peek').onclick=()=>$('#peek').close();$('#peek').addEventListener('clo
 $('#peek-more').onclick=()=>toggleMenu($('#peek-menu'));
 for(const b of $$('[data-artifact]')){b.disabled=true;bindArtifact(b)}
 const waiting='<span class="waiting">Waiting for source…</span>';
-function clearRecords(){request++;records={};clearConnections();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-sub','#peek-meta','#peek-content','#source-content','#peek-records','#peek-outline','#peek-menu'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML=waiting}}
+function clearRecords(){request++;records={};releaseImages();clearConnections();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-sub','#peek-meta','#peek-content','#source-content','#peek-records','#peek-outline','#peek-menu'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML=waiting}}
 /* The quiet line under the project name: where it lives, when Progress says it was updated, and the commit read. */
 function projectMeta(p){
   const updated=records.progress&&!records.progress.error?HorsemenPreview.facts(records.progress.content).find(f=>/^updated$/i.test(f.label)):null,r=updated&&HorsemenViews.relative(updated.value.slice(0,10));

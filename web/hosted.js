@@ -134,6 +134,8 @@
         case '/api/project': { const data = await state.loadProject(q('id')); watch(q('id')); return data; }
         case '/api/document': return await state.loadDocument(q('id'), q('link'));
         case '/api/pr': return await state.pullRequest(q('project'), q('number'));
+        /* Image bytes for a registered image link; the app shows them as a blob: URL. */
+        case '/api/image': return await state.loadImage(q('id'), q('link'));
       }
     } catch (error) { throw Error(error instanceof R.ProviderError ? error.message : 'Request failed. Retry.'); }
     throw Error('Not found.');

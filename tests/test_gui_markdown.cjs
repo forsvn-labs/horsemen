@@ -48,4 +48,36 @@ assert.equal(render('<details open>\n<summary>Open</summary>\nText', base), '<de
 assert.equal(render('</details>\nText', base), '<p>&lt;/details&gt; Text</p>');
 assert.equal(render('Shown\n<!-- hidden\nnote -->\nAlso shown', base), '<p>Shown</p><p>Also shown</p>');
 assert.equal(render('', base), '');
+
+// Mermaid: a fenced mermaid block becomes a diagram figure. The code stays inside it as the fallback.
+const A = '<a target="_blank" rel="noopener noreferrer" href="';
+assert.equal(render('```mermaid\nflowchart LR\n  A --> B\n```', base), '<figure class="diagram" data-diagram="mermaid"><pre class="diagram-source"><code>flowchart LR\n  A --&gt; B</code></pre></figure>');
+assert.equal(render('```Mermaid \npie\n  "A" : 1\n```', base), '<figure class="diagram" data-diagram="mermaid"><pre class="diagram-source"><code>pie\n  &quot;A&quot; : 1</code></pre></figure>', 'the language name ignores case and spaces');
+const hostile = render('```mermaid\nflowchart LR\n  A["<img src=x onerror=alert(1)>"] --> B[<script>x</script>]\n```', base);
+assert(!hostile.includes('<img') && !hostile.includes('<script') && hostile.includes('&lt;script&gt;'), 'diagram source is escaped');
+assert.equal(render('```mermaid\ngraph TD\nA', base), '<figure class="diagram" data-diagram="mermaid"><pre class="diagram-source"><code>graph TD\nA</code></pre></figure>', 'an open fence still shows the code');
+assert.equal(render('```mermaidx\nA\n```', base), '<pre><code>A</code></pre>', 'only the mermaid language is a diagram');
+assert.equal(render('```text\nflowchart LR\n```', base), '<pre><code>flowchart LR</code></pre>');
+assert.equal(render('- Item\n\n```mermaid\npie\n```', base), '<ul><li>Item</li></ul><figure class="diagram" data-diagram="mermaid"><pre class="diagram-source"><code>pie</code></pre></figure>');
+
+// Images: a relative image path in this repository becomes an image placeholder with a link fallback.
+const img = (url, alt, label = alt) => '<span class="md-image" data-image="' + url + '" data-alt="' + alt + '">' + A + url + '">Image: ' + label + '</a></span>';
+assert.equal(inline('![Flow chart](img/flow.png)', base), img('https://github.com/example/app/blob/abc/img/flow.png', 'Flow chart'));
+assert.equal(inline('![Logo](../brand/Logo.SVG)', 'https://github.com/example/app/blob/abc/docs/BRAIN.md'), img('https://github.com/example/app/blob/abc/brand/Logo.SVG', 'Logo'));
+assert.equal(inline('![Root](/media/a.webp)', 'https://github.com/example/app/blob/abc/docs/BRAIN.md'), img('https://github.com/example/app/blob/abc/media/a.webp', 'Root'), 'a root path resolves to the repository root');
+for (const ext of ['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']) assert(inline(`![x](a.${ext})`, base).startsWith('<span class="md-image"'), ext);
+assert.equal(inline('![A "quoted" <b>alt</b>](a.png)', base), img('https://github.com/example/app/blob/abc/a.png', 'A &quot;quoted&quot; &lt;b&gt;alt&lt;/b&gt;'), 'alt text is escaped');
+assert(inline('![**Bold**](a.png)', base).includes('>Image: <strong>Bold</strong></a>'));
+// External images, other files, and unsafe sources stay links or text; nothing is fetched.
+assert.equal(inline('![shot](https://example.com/a.png)', base), A + 'https://example.com/a.png">Attachment: shot</a>');
+assert.equal(inline('![shot](//evil.example/a.png)', base), A + 'https://evil.example/a.png">Attachment: shot</a>');
+assert.equal(inline('![Report](docs/report.pdf)', base), A + 'https://github.com/example/app/blob/abc/docs/report.pdf">Attachment: Report</a>');
+assert.equal(inline('![x](data:image/png;base64,AAAA)', base), 'x');
+assert.equal(inline('![x](javascript:alert(1).png)', base), 'x');
+assert.equal(inline('![x](a.png)', 'https://example.com/pull/1').includes('md-image'), true, 'the app decides if the image is registered');
+// Classification for the app and tests.
+const {imageSource} = require('../web/markdown.js');
+assert.equal(imageSource('img/a.png'), true); assert.equal(imageSource('a.PNG?raw=1#x'), true);
+assert.equal(imageSource('https://example.com/a.png'), false); assert.equal(imageSource('//x/a.png'), false);
+assert.equal(imageSource('a.pdf'), false); assert.equal(imageSource('a.png.txt'), false); assert.equal(imageSource('mailto:a.png'), false);
 console.log('PASS: Markdown rendering is safe and keeps document structure');
