@@ -7,26 +7,24 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Review the visual workspace pull request. Then refresh existing skill installations before the next project update.
+Next action: Use the local workspace on real projects and note what to improve. Refresh existing skill installations before the next project update.
 
 ## Shipped
 
+- **Visual workspace** (2026-11-19): A private local app shows each project as a canvas of its records. Each record opens in a peek with its own layout, a section outline, and a way to jump between records. It has six themes and reads GitHub through the existing sign-in. Available from main; run `python3 scripts/serve_gui.py`.
+
 - **Shorter records** (2026-11-17): Horsemen edits changed prose before saving. New source installs include the rule.
-
-## In progress
-
-- **Visual workspace**: The local app now uses an existing GitHub sign-in to discover projects and load their records. The canvas supports project search, record-specific previews, and PR evidence links. Canvas controls now separate selection from opening: group dragging, area selection, Hand/Space pan, and modified-wheel zoom. Linked branches can expand or collapse directly from each card. Linked cards that appear now take free space beside their parent, so cards do not overlap. The interface has a new engraved identity based on the four riders, with six themes, local fonts, and original icons. The peek now lists the records and the sections of the open page, and each overview has numbered sections and stated facts. A jump field reaches each project, record, view, and theme. Each artifact now has a visual overview. Connected repository documents open inside the peek, with a Back path, and can expand onto the canvas. External documents remain source links. Projects appear during discovery; parallel reads and a memory cache reduce loading delays. A live account scan and record read passed locally. Public sharing and hosted sign-in remain pending.
 
 ### Technical details
 
 | Item | Evidence |
 | --- | --- |
 | Shorter records | [Pre-save edit](horsemen/references/sync.md#pre-save-edit) and the distribution regression test. The source, wheel, and packaged skill checks passed locally. |
-| Visual workspace | [Prototype](docs/show-me/product-gui/prototype.html), [canvas options](docs/show-me/product-gui/index.html), and [GUI requirements](docs/product/gui-requirements.md). Demo checks passed at desktop, tablet, and phone sizes; full repository verification passed locally. Run [the demo checks](docs/show-me/product-gui/verify.py) or the verification command in CONTRIBUTING.md. The owner chose a private local app first. Run `python3 scripts/serve_gui.py`; [setup and limits](web/README.md). Reader tests and fixture browser checks passed for discovery, source views, missing records, access failures, saved layouts, and clearing old content. Full source, wheel, and packaged-skill verification passed locally. Search and preview tests passed, including selection during an active scan. Live timing checks confirmed faster repeat loads; no private records were saved as test output. Linked-document tests cover source-authorized reads, nested navigation, external links, and visual overviews. Canvas rule and browser checks cover selection, group movement, drag cancellation, zoom, and shared branch collapse. Card controls passed mouse, keyboard, and list-view checks without selecting, dragging, or opening the card. Arrangement rule tests and browser checks found no overlap for nested and parallel branches. Browser checks passed in the light and dark themes; see [the icon system](docs/product/icon-system.md). Markdown, theme contrast, peek navigation, and reload checks passed locally. No public GUI release has been made. |
+| Visual workspace | [Prototype](docs/show-me/product-gui/prototype.html), [canvas options](docs/show-me/product-gui/index.html), and [GUI requirements](docs/product/gui-requirements.md). Demo checks passed at desktop, tablet, and phone sizes; full repository verification passed locally. Run [the demo checks](docs/show-me/product-gui/verify.py) or the verification command in CONTRIBUTING.md. The owner chose a private local app first. Run `python3 scripts/serve_gui.py`; [setup and limits](web/README.md). Reader tests and fixture browser checks passed for discovery, source views, missing records, access failures, saved layouts, and clearing old content. Full source, wheel, and packaged-skill verification passed locally. Search and preview tests passed, including selection during an active scan. Live timing checks confirmed faster repeat loads; no private records were saved as test output. Linked-document tests cover source-authorized reads, nested navigation, external links, and visual overviews. Canvas rule and browser checks cover selection, group movement, drag cancellation, zoom, and shared branch collapse. Card controls passed mouse, keyboard, and list-view checks without selecting, dragging, or opening the card. Arrangement rule tests and browser checks found no overlap for nested and parallel branches. Browser checks passed in the light and dark themes; see [the icon system](docs/product/icon-system.md). Markdown, theme contrast, peek navigation, and reload checks passed locally. Merged in [PR #5](https://github.com/hungv47/horsemen/pull/5); CI passed on Linux and macOS. |
 
 ### Gates
 
-Existing installations do not change until refreshed. The visual workspace is a local source preview in review; it has no public GUI release.
+Existing installations do not change until refreshed. The visual workspace is a local source preview. Public sharing and hosted sign-in are not built.
 
 </details>
 

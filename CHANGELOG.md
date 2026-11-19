@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-19
+
+- Added a private local visual workspace: a canvas of each project's records, a peek with a layout for each record, section and record navigation, a jump field, and six themes. It runs from a source checkout and reads GitHub through the local sign-in. It is not a hosted service and has no public sharing. [Setup and limits](web/README.md). [PR #5](https://github.com/hungv47/horsemen/pull/5).
+
 ## 2026-11-17
 
 - Horsemen now edits new and changed prose before saving. It uses `no-ai-slop` when available and a bundled checklist otherwise.
