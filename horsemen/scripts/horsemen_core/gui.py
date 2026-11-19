@@ -365,7 +365,10 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(404,{'error':'Not found.'})
     def do_OPTIONS(self): self.respond(403,{'error':'Cross-origin requests are not allowed.'})
 
+class WorkspaceServer(ThreadingHTTPServer):
+    # A browser opens several connections at once for the page files. The default queue of 5 refuses some of them.
+    request_queue_size=128
 def make_server(port, state, assets):
-    server=ThreadingHTTPServer(('127.0.0.1',port),Handler)
+    server=WorkspaceServer(('127.0.0.1',port),Handler)
     server.daemon_threads=True;server.state=state;server.assets=Path(assets);server.session=secrets.token_urlsafe(32)
     return server

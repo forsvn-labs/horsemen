@@ -137,7 +137,9 @@ def value(code):
 def until(code, seconds=30):
     deadline = time.time() + seconds
     while time.time() < deadline:
-        if value(code): return
+        try:
+            if value(code): return
+        except (AssertionError, ValueError): pass  # The page is between two documents (for example during sign-in). Try again.
         time.sleep(0.5)
     raise AssertionError('Timed out waiting for: ' + code + ' at ' + str(value('location.href+" | "+document.body.innerText.slice(0,300)')))
 
