@@ -133,6 +133,12 @@ class HTTPTests(unittest.TestCase):
     def test_no_arbitrary_files(self):
         with self.assertRaises(HTTPError) as e:urlopen(self.base+'/../BRAIN.md')
         self.assertEqual(e.exception.code,404);e.exception.close()
+    def test_page_files_are_served(self):
+        import re
+        page=urlopen(self.base+'/').read().decode()
+        paths=set(re.findall(r'(?:src|href)="(/[^"#]+)',page))
+        self.assertIn('/markdown.js',paths);self.assertIn('/theme.js',paths)
+        for path in paths:self.assertEqual(urlopen(self.base+path).status,200,path)
     def test_bundled_assets_only(self):
         r=urlopen(self.base+'/assets/fonts/cleft.woff2');self.assertEqual(r.headers['Content-Type'],'font/woff2');self.assertTrue(r.read(4)==b'wOF2')
         for path in ['/assets/%2e%2e/app.js','/assets/%2e%2e/%2e%2e/BRAIN.md','/assets/fonts/missing.woff2','/assets/fonts/','/assets/fonts/cleft.woff2/..','/assets//etc/passwd','/assets/..%2f..%2fBRAIN.md']:

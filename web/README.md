@@ -46,7 +46,17 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
   not include freehand drawing, shape editing, or the Excalidraw editor.
 - Open a card for its visual overview: Vision brief, Progress board, Brain
   source library, Structure map, release timeline, tool cards, or README guide.
-  Full document and Markdown source tabs preserve the complete record.
+  Each overview has a title block, the facts that the record states as
+  `Label: value`, and numbered sections. Full document and Markdown source
+  tabs preserve the complete record.
+- Inside the peek, the left column lists the records and the sections of the
+  open page. The path above the page goes back to an earlier document. Use
+  the left and right arrow keys, or the buttons at the bottom, to change
+  record.
+- Press Ctrl + K (Command + K on macOS) or select Jump to. One field reaches
+  each project, record, view, and theme.
+- The address keeps the selected project and the open record. A reload
+  returns to the same place.
 - Open a connected artifact to go deeper. Back returns to the previous record.
   Explore on canvas adds connected documents as movable nodes. Lines represent
   explicit links in the source files, not assumed relationships.
@@ -62,9 +72,11 @@ it does not sign out of GitHub. Stop the server with Ctrl+C.
 The look is a modern engraving: bone paper, ink, and one pigment for each
 record. Vision is Conquest (gilt), Progress is War (vermilion), Brain is
 Famine (indigo), and Structure is Death (verdigris). Names and icons carry
-the same meaning without colour. The moon or sun button in the left rail
-switches between the light and dark themes; without a choice, the app follows
-the system setting. Motion stops when the system asks for reduced motion.
+the same meaning without colour. The theme button in the left rail opens six
+themes: Bone and Ink, and one theme for each horse (White, Red, Black, and
+Pale). System follows the device setting. A test checks that text and
+pigments in each theme meet a 4.5:1 contrast ratio. Motion stops when the
+system asks for reduced motion.
 
 Fonts come from [fontzz](https://fontzz.vercel.app) and are served locally:
 Cleft (titles), Gravure (labels), Halden (interface), Vellum (reading), and
@@ -81,9 +93,11 @@ Discovery reads default branches, including archived repositories. A project
 needs at least two core records and either VISION or PROGRESS (legacy STATUS
 is supported). Missing records are reported. Truncated repository trees are
 reported as incomplete scans. Files larger than 512 KiB are not loaded.
-Markdown supports headings, lists, tables, fenced code, links, and simple
-expandable sections. Other HTML is shown as text. Nested Markdown formatting
-is limited; exact source is always available. PR comments are not scanned.
+Markdown supports headings, wrapped paragraphs, nested and numbered lists,
+task lists, tables, quotes, rules, fenced code, links, and simple expandable
+sections. Other HTML is shown as text. Images appear as links. Footnotes and
+reference-style links are not supported; exact source is always available.
+PR comments are not scanned.
 Connections currently use inline Markdown links, excluding code examples and
 comments. Reference-style and HTML links are not indexed. A document exposes
 up to 200 links; a project retains up to 4,000 link targets per scan. Only a

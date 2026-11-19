@@ -40,3 +40,23 @@ assert.deepEqual(tools('| Tool | Purpose |\n| --- | --- |\n| Python | Reader |\n
 const toolNames=preview('techstack','# Tech stack\n## Tools\n| Tool | Purpose |\n| --- | --- |\n| Python | Local reader |\n| GitHub CLI | Reads records |');
 assert.deepEqual(toolNames.items[0],{label:'Tools',text:'Python · GitHub CLI'},'Tool tables preview as names, not raw table rows');
 console.log('PASS: project search, source previews, artifact layouts, and tool tables');
+
+// Structured overviews: stated facts, tidy sections, and subsections.
+const {facts, tidy, split, tree} = require('../web/previews.js');
+assert.deepEqual(facts('# Progress\n\nUpdated: 2026-11-18 · Stage: pilot · Health: On track\n\n## Shipped\nOwner: Not a fact here'),[{label:'Updated',value:'2026-11-18'},{label:'Stage',value:'pilot'},{label:'Health',value:'On track'}]);
+assert.deepEqual(facts('# Vision\nOwner: A fictional team\nA sentence: with a colon, but long enough that it is prose and not a label at all.\n## Why'),[{label:'Owner',value:'A fictional team'}]);
+assert.deepEqual(facts('# Vision\nJust prose.'),[]);
+assert.equal(tidy('<details open>\n<summary>Latest day</summary>\n\nNext action: Review'),'Next action: Review');
+assert.equal(tidy('- Item\n\n</details>'),'- Item');
+assert.equal(tidy('<details>\n<summary>History</summary>\n### 2026-11-13\n- Old\n</details>\n'),'### 2026-11-13\n- Old');
+assert.equal(tidy('Intro\n<details>\n<summary>More</summary>\nHidden\n</details>\nOutro'),'Intro\n<details>\n<summary>More</summary>\nHidden\n</details>\nOutro','A disclosure inside a section stays');
+assert.deepEqual(split('Lead text\n### Technical details\n| A | B |\n| --- | --- |\n| 1 | 2 |\n### Gates\n- Owner review\n#### Note\nDeeper'),{lead:'Lead text',subs:[{title:'Technical details',body:'| A | B |\n| --- | --- |\n| 1 | 2 |'},{title:'Gates',body:'- Owner review\n#### Note\nDeeper'}]});
+assert.deepEqual(split('```\n### not a heading\n```'),{lead:'```\n### not a heading\n```',subs:[]});
+const withCount=detail('progress','# Progress\n## Shipped\n- One\n- Two\n  - Nested\n## Notes\nProse only\n## Tools\n| A | B |\n| --- | --- |\n| 1 | 2 |\n| 3 | 4 |');
+assert.deepEqual(withCount.sections.map(s=>[s.kind,s.count]),[['list',2],['prose',0],['table',2]]);
+assert.deepEqual(tree('app/ — operator workspace\n├── docs/   decisions\n│   └── notes.md # research\n\ntests/'),[{guide:'',path:'app/',note:'operator workspace'},{guide:'├── ',path:'docs/',note:'decisions'},{guide:'│   └── ',path:'notes.md',note:'research'},{guide:'',path:'tests/',note:''}]);
+const {lede} = require('../web/previews.js');
+assert.equal(lede('# Progress\n\nUpdated: 2026-11-18 · Stage: pilot\n\nA short note\nabout the record.\n## Shipped\n- One'),'A short note\nabout the record.');
+assert.equal(lede('# Progress\nNext action: Review\n## Shipped'),'Next action: Review');
+assert.equal(lede('## Only sections'),'');
+console.log('PASS: stated facts, tidy sections, subsections, and directory trees');

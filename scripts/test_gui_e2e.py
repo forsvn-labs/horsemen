@@ -182,9 +182,29 @@ try:
         browser('screenshot',str(args.output/(key+'-peek.png')))
         if key=='techstack':assert browser('eval','document.querySelectorAll(".tool-card").length').strip()=='2'
         browser('press','Escape')
+    browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
+    assert value('JSON.stringify(document.querySelector("#peek-records [aria-current=page]").dataset.record)')=='vision', 'The record list marks the open record'
+    assert value('document.querySelectorAll("#peek-outline button").length')>=2, 'The outline lists the sections'
+    assert value('JSON.stringify(document.querySelector("#peek-outline [aria-current]")===document.querySelector("#peek-outline button"))') is True, 'The outline starts on the first section'
+    assert value('JSON.stringify(location.hash)').endswith('&r=vision'), 'The address keeps the open record'
+    browser('press','ArrowRight');browser('wait','--fn','document.querySelector("#peek-title").textContent === "PROGRESS.md"')
+    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "STRUCTURE.md"')
+    assert value('JSON.stringify([...document.querySelectorAll(".tree-line")].map(e=>e.querySelector(".tree-note").textContent))')==['operator workspace','decisions and references','verification'], 'The map shows paths with their notes'
+    browser('click','[data-record="brain"]');browser('click','.connection-card:first-child')
+    browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
+    browser('click','#peek-meta button');assert 'BRAIN.md' in browser('get','text','#peek-title'), 'A path step goes back to that document'
+    browser('press','Escape')
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','changelog');browser('press','Enter')
+    browser('wait','--fn','document.querySelector("#peek-title").textContent === "CHANGELOG.md"')
+    assert browser('eval','document.querySelector("#palette").open').strip()=='false'
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','#peek[open]')
+    assert 'CHANGELOG.md' in browser('get','text','#peek-title') and 'alpha' in browser('get','text','#project-name'), 'A reload returns to the same project and record'
+    browser('press','Escape')
+    browser('wait','--fn','!document.querySelector("#peek").open && !location.hash.includes("&r=")')
     browser('click','#list-view')
     assert 'list' in browser('get','attr','#map','class')
     was_expanded=browser('get','attr','[data-card-toggle="brain"]','aria-expanded').strip()
+    browser('eval','document.querySelector("[data-card-toggle=brain]").scrollIntoView({block:"center"})')
     browser('click','[data-card-toggle="brain"]')
     assert browser('get','attr','[data-card-toggle="brain"]','aria-expanded').strip()!=was_expanded
     assert browser('eval','document.querySelector("#peek").open').strip()=='false', 'List-view toggle does not open the card'
@@ -220,14 +240,20 @@ try:
     browser('press','Escape')
     browser('set','viewport','1440','1100');browser('click','#fit');browser('screenshot',str(args.output/'desktop.png'))
     scheme=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
+    other='ember' if scheme=='light' else 'pale'
     browser('click','#theme-toggle')
-    other=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
-    assert {scheme,other}=={'light','dark'} and value('JSON.stringify(localStorage.getItem("horsemen-theme"))')==other, 'Theme switch changes and saves the theme'
+    assert value('document.querySelectorAll("#theme-menu [role=menuitemradio]").length')==7, 'System and six themes'
+    assert browser('get','attr','[data-theme-choice="system"]','aria-checked').strip()=='true'
+    browser('click',f'[data-theme-choice="{other}"]')
+    assert value('JSON.stringify([document.documentElement.dataset.theme,localStorage.getItem("horsemen-theme")])')==[other,other], 'Theme choice applies and is saved'
+    assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')!=scheme
     browser('screenshot',str(args.output/('desktop-'+other+'.png')))
-    browser('dblclick','[data-artifact="brain"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
-    browser('screenshot',str(args.output/('brain-peek-'+other+'.png')));browser('press','Escape')
-    browser('click','#theme-toggle')
-    assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')==scheme
+    browser('dblclick','[data-artifact="progress"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('screenshot',str(args.output/('progress-peek-'+other+'.png')));browser('press','Escape')
+    browser('click','#theme-toggle');browser('click','[data-theme-choice="system"]')
+    assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')==scheme and value('JSON.stringify(localStorage.getItem("horsemen-theme"))') is None, 'System follows the device again'
+    browser('press','Escape')
+    assert browser('eval','document.querySelector("#theme-menu").hidden').strip()=='true', 'Escape closes the theme menu'
     dock=value('JSON.stringify((()=>{const d=document.querySelector(".canvas-controls").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().bottom<=d.top)})())')
     assert dock, 'Fit keeps every card clear of the tool dock'
     browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#clear')
@@ -237,5 +263,11 @@ try:
     assert browser('get','text','#crumb').strip()==''
     assert not browser('errors').strip()
     print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, no browser errors.')
+except BaseException:
+    try:
+        browser('screenshot',str(args.output/'failure.png'))
+        print('At failure:',browser('eval','JSON.stringify({toggle:document.querySelector("[data-card-toggle=brain]")?.getBoundingClientRect(),card:document.querySelector("[data-artifact=brain]").getBoundingClientRect(),canvas:document.querySelector(".canvas").getBoundingClientRect(),scroll:[document.querySelector(".canvas").scrollTop,scrollY],footer:document.querySelector(".notice").getBoundingClientRect().top})'))
+    except Exception:pass
+    raise
 finally:
     release_scan.set();browser('close');server.shutdown();server.server_close();thread.join();(args.output/'output.txt').write_text('\n'.join(log))

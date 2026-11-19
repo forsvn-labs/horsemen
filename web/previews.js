@@ -45,16 +45,74 @@
     if(!items.length){const content=blocks.map(b=>excerpt(b)).find(Boolean);add('From the source',content)}
     return {title,items:items.slice(0,3)};
   }
+  /* Facts the source states as "Label: value" above the first section. Nothing is inferred. */
+  function facts(text){
+    const out=[],intro=(text||'').replace(/<!--[^]*?-->/g,'').split(/^##\s/m)[0];
+    for(const line of intro.split('\n')){
+      const parts=line.trim().split(/\s+·\s+/).map(part=>plain(part).match(/^([A-Z][A-Za-z ]{1,22}):\s+(\S.*)$/));
+      if(parts.every(m=>m&&m[2].length<=60&&!/^next action$/i.test(m[1])))for(const m of parts)out.push({label:m[1],value:m[2]});
+    }
+    return out.slice(0,6);
+  }
+  /* The opening text of a record, without its title and without the lines shown as facts. */
+  function lede(text){
+    const stated=new Set(facts(text).map(f=>f.label+': '));
+    return (text||'').replace(/<!--[^]*?-->/g,'').split(/^##\s/m)[0].split('\n').filter(line=>!/^#\s/.test(line)&&!(stated.size&&line.trim().split(/\s+·\s+/).every(part=>[...stated].some(label=>plain(part).startsWith(label))))).join('\n').trim();
+  }
+  /* A section can hold half of a disclosure that wraps several sections, or be wrapped whole. Both hide content for no reason. */
+  function tidy(body){
+    const lines=(body||'').split('\n'),isOpen=l=>/^<details(?: open)?>\s*$/.test(l),isClose=l=>/^<\/details>\s*$/.test(l),isSummary=l=>/^<summary>.*<\/summary>\s*$/.test(l);
+    let fence=false,depth=0,opens=0,closes=0,first=-1,last=-1,wraps=true;
+    lines.forEach((line,i)=>{
+      if(/^\s*```/.test(line))fence=!fence;
+      if(!line.trim())return;
+      if(first<0){first=i;if(fence||!isOpen(line))wraps=false}
+      if(!fence&&isOpen(line)){opens++;depth++}
+      else if(!fence&&isClose(line)){closes++;depth--;last=i}
+      else last=-1;
+      if(depth===0&&lines.slice(i+1).some(l=>l.trim()))wraps=false;
+    });
+    if(opens!==closes){fence=false;return lines.filter(line=>{if(/^\s*```/.test(line))fence=!fence;return fence||!(isOpen(line)||isClose(line)||isSummary(line))}).join('\n').trim()}
+    if(wraps&&opens&&last>first){const inner=lines.slice(first+1,last);const at=inner.findIndex(l=>l.trim());if(at>=0&&isSummary(inner[at]))inner.splice(at,1);return inner.join('\n').trim()}
+    return lines.join('\n').trim();
+  }
+  /* One level of subsections below a section. */
+  function split(body){
+    const lines=(body||'').split('\n');let fence=false,level=7;
+    for(const line of lines){if(/^\s*```/.test(line))fence=!fence;const m=!fence&&line.match(/^(#{3,6})\s+\S/);if(m)level=Math.min(level,m[1].length)}
+    const lead=[],subs=[];let current=null;fence=false;
+    for(const line of lines){
+      if(/^\s*```/.test(line))fence=!fence;
+      const m=!fence&&line.match(/^(#{3,6})\s+(.+)/);
+      if(m&&m[1].length===level){current={title:plain(m[2]),body:[]};subs.push(current)}else(current?current.body:lead).push(line);
+    }
+    return {lead:lead.join('\n').trim(),subs:subs.map(s=>({title:s.title,body:s.body.join('\n').trim()}))};
+  }
+  function shape(body){
+    let fence=false,count=0;
+    for(const line of body.split('\n')){if(/^\s*```/.test(line))fence=!fence;else if(!fence&&/^(?:[-*+]|\d+[.)])\s+\S/.test(line))count++}
+    if(count)return {kind:'list',count};
+    const rows=toolsTable(body).rows.length;
+    return rows?{kind:'table',count:rows}:{kind:'prose',count:0};
+  }
+  /* Directory listings: the drawn guide, the path, and the note beside it. */
+  function tree(text){
+    return (text||'').split('\n').filter(line=>line.trim()).map(line=>{
+      const guide=line.match(/^(?:[\s│├└─┬┼]|[|+`\\]-{2,}\s?|\|(?=\s))*/)[0],m=line.slice(guide.length).match(/^(.*?)(?:\s+(?:—|–|-|#|\/\/)\s+(.*)|\s{2,}(\S.*))?$/);
+      return {guide,path:m[1].trim(),note:(m[2]||m[3]||'').trim()};
+    });
+  }
   function detail(key,text){
     const layouts={vision:'brief',progress:'board',brain:'library',structure:'map',changelog:'timeline',techstack:'tools',readme:'guide'};
-    const sections=[];let current={title:'',body:''},fence=false;
-    for(const line of (text||'').split('\n')){
+    const sections=[];let current={title:'',body:''},fence=false;text=(text||'').replace(/<!--[^]*?-->/g,'');
+    for(const line of text.split('\n')){
       if(/^\s*```/.test(line))fence=!fence;
       const heading=!fence&&line.match(/^##\s+(.+)/);
       if(heading){sections.push(current);current={title:plain(heading[1]),body:''}}else current.body+=line+'\n';
     }
     sections.push(current);
-    return {layout:layouts[key]||'document',intro:sections.shift()?.body||'',sections:sections.filter(s=>s.body.trim()),title:plain((text||'').match(/^#\s+(.+)/m)?.[1]||'')};
+    const intro=sections.shift()?.body||'';
+    return {layout:layouts[key]||'document',intro,sections:sections.map(s=>({title:s.title,body:tidy(s.body)})).filter(s=>s.body).map(s=>({...s,...shape(s.body)})),title:plain(text.match(/^#\s+(.+)/m)?.[1]||'')};
   }
   function toolsTable(body){
     const lines=body.split('\n'),cells=line=>line.trim().replace(/^\||\|$/g,'').split('|').map(plain);
@@ -67,5 +125,5 @@
     return {headers:[],rows:[]};
   }
   function matchesProject(project,query){const hay=[project.name,project.repo,project.root].join(' ').toLocaleLowerCase();return query.trim().toLocaleLowerCase().split(/\s+/).every(word=>hay.includes(word))}
-  const api={preview,matchesProject,detail,toolsTable};if(typeof module!=='undefined')module.exports=api;else root.HorsemenPreview=api;
+  const api={preview,matchesProject,detail,toolsTable,facts,lede,tidy,split,shape,tree};if(typeof module!=='undefined')module.exports=api;else root.HorsemenPreview=api;
 })(globalThis);
