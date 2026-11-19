@@ -14,7 +14,7 @@ fixture data only.
 | Surface | Source | States checked |
 | --- | --- | --- |
 | Workspace app | `web/` | Rail, canvas, list view, peek with each record view, jump palette, theme menu |
-| Hosted sign-in page | `worker/src/index.js` (`page()`, `signInPage()`) | Signed out, light and dark, each type set |
+| Hosted sign-in page | `worker/src/index.js` (`page()`, `signInPage()`) | Signed out, light and dark, Engraved and Beacon type |
 
 Widths: desktop 1440 × 1000, tablet 820 × 1180, phone 390 × 844. Colour
 themes: Bone, White horse, Pale horse, Ink, Red horse, Black horse. Type
@@ -116,6 +116,9 @@ field is fast; colour tokens are complete and tested in six themes.
 
 ## Type sets
 
+Themes replaced the type sets on 2026-11-19; see
+[Style themes](#style-themes-2026-11-19). This section is the earlier record.
+
 The theme button and the Ctrl/Cmd + K field both choose a type set. The
 choice applies before first paint and is saved in the browser as
 `horsemen-type`. Each set changes fonts only, so every colour theme keeps its
@@ -216,6 +219,65 @@ Changes:
   list by default; the board is the second layout.
 - **Type:** five sizes (12, 14, 16.5, 20, and 26px). The theme test now fails
   on any text under 12px.
+
+## Style themes (2026-11-19)
+
+The owner asked for several themes, each with its own style. The account
+menu and Jump now show a gallery of eight themes. Method: Impeccable
+4.10.0, typeset guidance and the `audit` playbook, in one context with no
+sub-agents, on fictional fixtures. The owner's brief named each theme, so no
+direction roll ran.
+
+| Theme | Preloaded | Downloads on first view |
+| --- | --- | --- |
+| Engraved (default) | Cleft, Halden (54.6 KB) | Up to 5 files, 120.0 KB |
+| Modern | Beacon (26.1 KB) | Up to 2 files, 42.0 KB |
+| Editorial | Opaline, Folio (52.9 KB) | Up to 3 files, 68.8 KB |
+| Terminal | Diode (9.1 KB) | 1 file, 9.1 KB; text uses device monospace |
+| Swiss | Halden (27.7 KB) | Up to 2 files, 43.5 KB |
+| Blueprint | Tessera, Signal (44.4 KB) | 2 files, 44.4 KB |
+| Soft | Brioche, Mallow (71.0 KB) | Up to 3 files, 86.9 KB |
+| High contrast | Beacon (26.1 KB) | Up to 2 files, 42.0 KB |
+
+The type sets folded into the themes. Modern (Beacon) and High contrast
+(Beacon, 112.5% text) are the readable choices. A saved Modern or System type
+set opens the Modern theme. One choice is simpler than a theme plus a
+separate type control, and the type sets only changed fonts, which Modern and
+High contrast already cover.
+
+| # | Audit dimension | Score | Main point |
+| --- | --- | --- | --- |
+| 1 | Accessibility | 3 | Every theme and mode passes the contrast test; arrow keys move through the 2-column gallery in one line |
+| 2 | Performance | 3 | Only the active theme's fonts load; the gallery loads about 268 KB of preview fonts the first time it opens |
+| 3 | Theming | 4 | Every colour and shape is a token; no hard-coded colour outside the theme blocks |
+| 4 | Responsive design | 3 | Every theme and record view fits at 390px; Swiss and Editorial use the shared, smaller phone type scale |
+| 5 | Implementation integrity | 3 | Detector: 3 findings, 1 false positive and 2 that existed before |
+| | **Total** | **16/20** | **Good** |
+
+Detector findings (`impeccable detect` on `web/style.css` and
+`web/index.html`):
+
+- *Border accent on a rounded element*, Swiss cards: false positive. Swiss
+  cards have 0px corners; the heavy top rule is the Swiss section bar.
+- *Positioned child clipped by overflow container*, the record ⋯ menu inside
+  the record dialog: advisory, from before this change. The menu fits inside
+  the dialog.
+- *Cream palette*, Engraved Bone: from before this change. Bone paper is the
+  owner's chosen identity.
+
+Open items:
+
+| # | Severity | Finding | Recommendation |
+| --- | --- | --- | --- |
+| 1 | P2 | The gallery loads the preview fonts of every theme the first time it opens (about 268 KB, then cached). | If this matters on slow links, draw previews in the active theme's fonts and show only colour and shape. |
+| 2 | P3 | Arrow keys move through the gallery in reading order, not by row and column. | Add 2-D arrow movement in `web/app.js` menu keys. |
+| 3 | P3 | The search field clear button in Jump keeps the browser's blue colour in every theme. | Style `::-webkit-search-cancel-button` from tokens. |
+| 4 | P3 | Terminal uses monospace as its identity. Impeccable's craft floor calls that a costume on working screens; the owner's brief asked for it. | Keep it as an option, not a default. |
+
+Evidence: `node tests/test_gui_themes.cjs` (16 theme and mode variants),
+`python3 scripts/test_gui_e2e.py --output <dir>` (each theme applied,
+reloaded, font check, overflow check at 1440px and 390px, and screenshots
+`theme-<id>-home.png` and `theme-<id>-progress.png`).
 
 ## Reproduce
 

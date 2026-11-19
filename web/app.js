@@ -489,39 +489,57 @@ document.addEventListener('pointerdown',e=>{
   if(!accountMenu.hidden&&!e.target.closest('#menu,#menu-toggle'))toggleMenu(accountMenu,false);
   if(!$('#peek-menu').hidden&&!e.target.closest('#peek-menu,#peek-more'))toggleMenu($('#peek-menu'),false);
 });
-const themeChoices=[{id:'system',label:'System',note:'Follows this device'},...HorsemenThemes.themes];
-function applyTheme(choice){
-  if(choice!==undefined)try{if(choice==='system')localStorage.removeItem('horsemen-theme');else localStorage.setItem('horsemen-theme',choice)}catch{}
-  let saved=null;try{saved=localStorage.getItem('horsemen-theme')}catch{}
-  const id=HorsemenThemes.resolve(saved,themeQuery.matches),chosen=saved&&HorsemenThemes.resolve(saved,false)===HorsemenThemes.resolve(saved,true)?id:'system';
-  document.documentElement.dataset.theme=id;
-  for(const b of accountMenu.querySelectorAll('[data-theme-choice]'))b.setAttribute('aria-checked',b.dataset.themeChoice===chosen);
-  $('#theme-name').textContent=themeChoices.find(t=>t.id===chosen)?.label||'';
-  return id;
+/* Themes: one choice. The selected tile shows its options: Engraved palettes, or a mode for a theme with light and dark.
+   The default (Engraved, System palette, System mode) is not saved, so a later default can change it. */
+const T=HorsemenThemes,root=document.documentElement,paletteChoices=[{id:'system',label:'System',note:'Follows this device'},...T.themes];
+const modeChoices=[{id:'system',label:'System',icon:'device'},{id:'light',label:'Light',icon:'sun'},{id:'dark',label:'Dark',icon:'moon'}];
+const readSaved=key=>{try{return localStorage.getItem(key)}catch{return null}};
+const save=(key,value)=>{try{if(value==null)localStorage.removeItem(key);else localStorage.setItem(key,value)}catch{}};
+function themePrefs(){return {style:readSaved('horsemen-style'),type:readSaved('horsemen-type'),theme:readSaved('horsemen-theme'),mode:readSaved('horsemen-mode'),prefersDark:themeQuery.matches}}
+function applyTheme(choice={}){
+  if(choice.style!==undefined){save('horsemen-style',choice.style===T.styles[0].id?null:choice.style);save('horsemen-type',null)}
+  if(choice.theme!==undefined)save('horsemen-theme',choice.theme==='system'?null:choice.theme);
+  if(choice.mode!==undefined)save('horsemen-mode',choice.mode==='system'?null:choice.mode);
+  const prefs=themePrefs(),now=T.attributes(prefs),style=T.styles.find(s=>s.id===now.style);
+  root.dataset.style=now.style;root.dataset.mode=now.mode;if(now.theme)root.dataset.theme=now.theme;else delete root.dataset.theme;
+  const palette=prefs.theme&&T.resolve(prefs.theme,false)===T.resolve(prefs.theme,true)?now.theme||T.resolve(prefs.theme,false):'system';
+  const mode=style.modes.includes(prefs.mode)?prefs.mode:'system';
+  for(const b of accountMenu.querySelectorAll('[data-style-choice]'))b.setAttribute('aria-checked',b.dataset.styleChoice===now.style);
+  for(const b of accountMenu.querySelectorAll('[data-theme-choice]'))b.setAttribute('aria-checked',b.dataset.themeChoice===palette);
+  for(const b of accountMenu.querySelectorAll('[data-mode-choice]'))b.setAttribute('aria-checked',b.dataset.modeChoice===mode);
+  /* Previews show the mode that each theme would use now. */
+  for(const p of document.querySelectorAll('.theme-preview,.theme-chip')){
+    if(p.dataset.style==='engraved')p.dataset.swatch=T.resolve(prefs.theme,prefs.prefersDark);
+    else p.dataset.mode=T.resolveMode(p.dataset.style,prefs.mode,prefs.prefersDark);
+  }
+  $('#palette-row').hidden=!style.palettes;$('#mode-row').hidden=style.palettes||style.modes.length<2;
+  const detail=style.palettes?paletteChoices.find(t=>t.id===palette).label:style.modes.length>1?modeChoices.find(m=>m.id===mode).label:'';
+  $('#theme-name').textContent=style.label+(detail?' · '+detail:'');
+  return now;
 }
-/* Type sets change fonts only. The default set is not saved, so a later default can change it. */
-function applyType(choice){
-  if(choice!==undefined)try{if(choice===HorsemenThemes.types[0].id)localStorage.removeItem('horsemen-type');else localStorage.setItem('horsemen-type',choice)}catch{}
-  let saved=null;try{saved=localStorage.getItem('horsemen-type')}catch{}
-  const id=HorsemenThemes.resolveType(saved);
-  document.documentElement.dataset.type=id;
-  for(const b of accountMenu.querySelectorAll('[data-type-choice]'))b.setAttribute('aria-checked',b.dataset.typeChoice===id);
-  return id;
+/* A preview is a small card and a line of text, drawn by the theme's own tokens. */
+/* Previews show each theme as it would look now: Engraved in the current palette, others in the current mode. */
+function previewAttrs(s){const prefs=themePrefs();return 'data-style="'+s.id+'" '+(s.palettes?'data-swatch="'+T.resolve(prefs.theme,prefs.prefersDark)+'"':'data-mode="'+T.resolveMode(s.id,prefs.mode,prefs.prefersDark)+'"')}
+const themePreview=s=>'<span class="theme-preview" '+previewAttrs(s)+' aria-hidden="true"><span class="tp-card"><b class="tp-title"><i></i>Progress</b><span class="tp-line">Invite three operators</span></span></span>';
+const themeChip=s=>'<span class="theme-chip" '+previewAttrs(s)+' aria-hidden="true">Aa</span>';
+const radio=(attrs,label)=>{const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');for(const [k,v] of Object.entries(attrs))b.dataset[k]=v;b.setAttribute('aria-label',label);return b};
+for(const s of T.styles){
+  const b=radio({styleChoice:s.id},s.label+': '+s.note);b.className='theme-tile';b.title=s.note;
+  b.innerHTML=themePreview(s)+'<span class="tile-name"><span>'+escapeHTML(s.label)+'</span>'+icon('check')+'</span>';
+  b.onclick=()=>applyTheme({style:s.id});$('#menu .theme-gallery').append(b);
 }
-/* Colours are swatches with their names on hover and for screen readers; the selected name shows beside "Colours". */
-for(const t of themeChoices){
-  const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.dataset.themeChoice=t.id;b.setAttribute('aria-label',t.label+': '+t.note);b.title=t.label;
+/* Engraved palettes are swatches with their names on hover and for screen readers. */
+for(const t of paletteChoices){
+  const b=radio({themeChoice:t.id},t.label+': '+t.note);b.title=t.label;
   const chips=t.id==='system'?['bone','ink']:[t.id];
   b.innerHTML='<span class="swatch">'+chips.map(id=>'<span data-swatch="'+id+'"><i></i><i></i></span>').join('')+'</span>';
-  b.onclick=()=>applyTheme(t.id);$('#menu .swatches').append(b);
+  b.onclick=()=>applyTheme({style:'engraved',theme:t.id});$('#palette-row').append(b);
 }
-for(const t of HorsemenThemes.types){
-  const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.dataset.typeChoice=t.id;b.title=t.note;
-  /* The sample uses the set's own fonts. A font downloads only when the menu shows its sample. */
-  b.innerHTML='<span class="type-sample" data-type-sample="'+t.id+'" aria-hidden="true">Aa</span><span>'+escapeHTML(t.label)+'</span>';
-  b.onclick=()=>applyType(t.id);$('#menu .type-choices').append(b);
+for(const m of modeChoices){
+  const b=radio({modeChoice:m.id},m.id==='system'?'System: follows this device':m.label);
+  b.innerHTML=icon(m.icon)+'<span>'+m.label+'</span>';
+  b.onclick=()=>applyTheme({mode:m.id});$('#mode-row').append(b);
 }
-applyType();
 themeQuery.addEventListener('change',()=>applyTheme());applyTheme();
 
 /* Shortcut sheet: from Jump or the ? key. */
@@ -530,7 +548,7 @@ function openShortcuts(){closeMenus();if(palette.open)palette.close();if(!sheet.
 $('#close-shortcuts').onclick=()=>sheet.close();sheet.addEventListener('click',e=>{if(e.target===sheet)sheet.close()});
 window.addEventListener('keydown',e=>{if(e.key==='?'&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&!e.target.closest('input,textarea,select,[contenteditable=true]')&&!$('#peek').open&&!palette.open){e.preventDefault();sheet.open?sheet.close():openShortcuts()}});
 
-/* Jump: one field that reaches every project, record, view, theme, and type set. */
+/* Jump: one field that reaches every project, record, view, and theme. */
 const palette=$('#palette');let paletteShown=[],paletteAt=0;
 function paletteItems(){
   const items=[],leave=()=>{if($('#peek').open)$('#peek').close()},list=world.classList.contains('list'),one=selected.size===1?[...selected][0]:null;
@@ -549,9 +567,10 @@ function paletteItems(){
     {group:'Actions',icon:'refresh',label:'Refresh GitHub',hint:'Scan again',run:()=>{leave();scan()}},
     {group:'Actions',icon:'clear',label:'Clear workspace',hint:copy('Remove the scan from memory','Remove the scan from this tab'),run:()=>{leave();clearWorkspace()}});
   if(hosted&&projects[current])items.push({group:'Actions',icon:'link',label:'Copy link',hint:'Share',run:()=>$('#share-link')?.click()});
-  for(const t of HorsemenThemes.themes)items.push({group:'Themes',icon:t.scheme==='dark'?'moon':'sun',label:t.label,hint:t.note,run:()=>applyTheme(t.id)});
-  items.push({group:'Themes',icon:'sun',label:'System colours',hint:'Follows this device',run:()=>applyTheme('system')});
-  for(const t of HorsemenThemes.types)items.push({group:'Type',icon:'type',label:t.label+' type',hint:t.note,run:()=>applyType(t.id)});
+  const active=T.styles.find(st=>st.id===root.dataset.style);
+  for(const st of T.styles)items.push({group:'Themes',chip:themeChip(st),label:st.label+' theme',hint:st.note,run:()=>applyTheme({style:st.id})});
+  if(active.palettes)for(const t of paletteChoices)items.push({group:'Themes',icon:t.id==='system'?'device':t.scheme==='dark'?'moon':'sun',label:'Engraved palette: '+t.label,hint:t.note,run:()=>applyTheme({style:'engraved',theme:t.id})});
+  else if(active.modes.length>1)for(const m of modeChoices)items.push({group:'Themes',icon:m.icon,label:m.id==='system'?'System mode':m.label+' mode',hint:m.id==='system'?'Follows this device':active.label,run:()=>applyTheme({mode:m.id})});
   return items;
 }
 function renderPalette(){
@@ -561,7 +580,7 @@ function renderPalette(){
   paletteShown.forEach((item,i)=>{
     if(item.group!==group){group=item.group;list.append(Object.assign(document.createElement('p'),{className:'navlabel',textContent:group}))}
     const b=document.createElement('button');b.type='button';b.id='palette-option-'+i;b.setAttribute('role','option');b.setAttribute('aria-selected',i===paletteAt);b.tabIndex=-1;
-    b.innerHTML=icon(item.icon)+'<span>'+escapeHTML(item.label)+'</span><small>'+escapeHTML(item.hint)+'</small>';
+    b.innerHTML=(item.chip||icon(item.icon))+'<span>'+escapeHTML(item.label)+'</span><small>'+escapeHTML(item.hint)+'</small>';
     b.onclick=()=>{palette.close();item.run()};b.onpointermove=()=>{if(paletteAt!==i){paletteAt=i;markPalette()}};list.append(b);
   });
   if(!paletteShown.length)list.append(Object.assign(document.createElement('p'),{className:'palette-empty',textContent:'Nothing matches. Try a project, a record, “theme”, or “shortcuts”.'}));

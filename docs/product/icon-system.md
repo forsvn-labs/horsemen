@@ -102,10 +102,11 @@ contrast. The favicon uses lighter versions of the four pigments on ink.
 | `globe` | Public access |
 | `sun` | Light theme |
 | `moon` | Dark theme |
+| `device` | Mode that follows the device |
 | `share` | Share action |
 | `layers` | Record layers |
 | `branch` | Linked branch |
-| `type` | Type set choice |
+| `type` | Type (not used since themes replaced type sets) |
 
 ## Origin and limits
 
