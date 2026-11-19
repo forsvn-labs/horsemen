@@ -12,9 +12,13 @@ const hosted=!!window.HorsemenHosted, copy=(local,remote)=>hosted?remote:local;
 async function api(path,method='GET'){if(hosted)return HorsemenHosted.api(path,method);const r=await fetch(path,{method,headers:{'X-Horsemen-Session':session},cache:'no-store'});const data=await r.json();if(!r.ok)throw Error(data.error||'Request failed');return data}
 function showToast(message){$('#toast').textContent=message;$('#toast').hidden=false;setTimeout(()=>$('#toast').hidden=true,3500)}
 let peekTrail=[],peekRequest=0,peekMode='overview';
-let pendingLink=(m=>m?{p:m[1],r:m[2]}:null)(location.hash.match(/^#p=([a-f0-9]{24})(?:&r=([a-z]+))?$/));
+/* A link to open: a local #p=<id>&r=<record> hash, or in hosted mode a readable /owner/repo?record= share link. */
+let pendingLink=window.HorsemenHosted?.target?{target:HorsemenHosted.target,r:HorsemenHosted.target.record}:(m=>m?{p:m[1],r:m[2]}:null)(location.hash.match(/^#p=([a-f0-9]{24})(?:&r=([a-z]+))?$/));
+const linkMatches=p=>!!(p&&pendingLink)&&(pendingLink.target?HorsemenReader.matchesTarget(p,pendingLink.target):p.id===pendingLink.p);
 function syncHash(){
-  const p=projects[current],key=$('#peek').open?peekTrail[0]?.key:null,hash=p?'#p='+p.id+(Object.hasOwn(names,key||'')?'&r='+key:''):'';
+  const p=projects[current],key=$('#peek').open?peekTrail[0]?.key:null;
+  if(window.HorsemenHosted){if(!p)return;const u=new URL(HorsemenHosted.shareURL(p,Object.hasOwn(names,key||'')?key:null));if(location.pathname+location.search!==u.pathname+u.search||location.hash)try{history.replaceState(null,'',u.pathname+u.search)}catch{}return}
+  const hash=p?'#p='+p.id+(Object.hasOwn(names,key||'')?'&r='+key:''):'';
   if(location.hash!==hash)try{history.replaceState(null,'',hash||location.pathname)}catch{}
 }
 function setTab(source){setPeekMode(source?'source':'overview')}
@@ -186,7 +190,7 @@ if(foot)foot.textContent=r.error?names[b.dataset.artifact]+' · missing or unrea
 if(b.classList.contains('supporter')){
   b.querySelector('small').textContent=r.error?'Missing or unreadable':(HorsemenPreview.preview(b.dataset.artifact,r.content).items[0]?.text||'Empty record');
 }
-}installRecordLinks();refreshGraph();document.body.dataset.state='ready';loadCanvas();if(pendingLink?.p===p.id){const key=pendingLink.r;pendingLink=null;if(key&&records[key])openPeek(key,$('[data-artifact="'+key+'"]'))}}catch(e){if(version!==request)return;document.body.dataset.state='error';$('#scan-status').textContent=e.message}}
+}installRecordLinks();refreshGraph();document.body.dataset.state='ready';loadCanvas();if(linkMatches(p)){const key=pendingLink.r;pendingLink=null;if(key&&records[key])openPeek(key,$('[data-artifact="'+key+'"]'))}}catch(e){if(version!==request)return;document.body.dataset.state='error';$('#scan-status').textContent=e.message}}
 function previewHTML(key,record){
   if(record.error)return '<h2>Not available</h2><p>'+escapeHTML(record.error)+'</p>';
   const model=HorsemenPreview.preview(key,record.content);
@@ -208,8 +212,8 @@ function receiveProjects(found){
   const selected=projects[current]?.id;
   projects=found.sort((a,b)=>a.repo.localeCompare(b.repo)||a.root.localeCompare(b.root));
   const index=projects.findIndex(p=>p.id===selected);current=Math.max(0,index);renderProjects();
-  const wanted=pendingLink?projects.findIndex(p=>p.id===pendingLink.p):-1;
-  if(wanted>=0&&projects[current]?.id!==pendingLink.p)selectProject(wanted);
+  const wanted=pendingLink?projects.findIndex(linkMatches):-1;
+  if(wanted>=0&&!linkMatches(projects[current]))selectProject(wanted);
   else if(index<0&&projects.length)selectProject(0);
 }
 async function scan(){const run=++scanRun;clearRecords();projects=[];renderProjects();$('#connect').disabled=true;$('#crumb').textContent='';$('#privacy').textContent=copy('LOCAL','READ-ONLY');$('#account').textContent=copy('Local GitHub workspace','GitHub workspace');$('#project-name').textContent='Discovering your projects';$('#project-description').textContent=copy('Reading default branches. Your files stay on this machine.','Reading default branches. Horsemen stores none of your project data.');document.body.dataset.state='scanning';try{await api('/api/scan','POST');while(run===scanRun){const state=await api('/api/status');if(run!==scanRun)return;$('#account').textContent=state.account?'GitHub · '+state.account:copy('Local GitHub workspace','GitHub workspace');$('#scan-status').textContent=state.phase==='error'?'Discovery failed':state.completed+' / '+state.total+' repositories checked · '+state.projects.length+' projects found'+(state.phase==='scanning'?' · Scanning…':'');$('#issues').hidden=!state.issues.length;$('#issues').textContent=state.issues.map(i=>(i.repo?i.repo+': ':'')+i.message).join('\n');receiveProjects(state.projects);if(state.phase!=='scanning'){if(!projects.length){document.body.dataset.state=state.phase;$('#project-name').textContent=state.phase==='error'?'GitHub needs attention':'No Horsemen projects found';$('#project-description').textContent='Projects need at least two core records, including VISION or PROGRESS (legacy STATUS is supported).'}break}await new Promise(r=>setTimeout(r,hosted?200:1000))}}catch(e){if(run===scanRun){$('#scan-status').textContent=e.message;document.body.dataset.state='error'}}finally{if(run===scanRun)$('#connect').disabled=false}}
@@ -544,7 +548,7 @@ async function boot(){
       $('#account').textContent='GitHub · '+state.account;
       $('#scan-status').textContent=state.completed+' / '+state.total+' repositories checked · '+projects.length+' projects found · Last scan '+new Date(state.finished_at).toLocaleTimeString();
       $('#issues').hidden=!state.issues.length;$('#issues').textContent=state.issues.map(i=>(i.repo?i.repo+': ':'')+i.message).join('\n');
-      if(projects.length){await selectProject(Math.max(0,pendingLink?projects.findIndex(p=>p.id===pendingLink.p):0));return}
+      if(projects.length){await selectProject(Math.max(0,pendingLink?projects.findIndex(linkMatches):0));return}
     }
     await scan();
   }catch(e){$('#scan-status').textContent=e.message;document.body.dataset.state='error'}

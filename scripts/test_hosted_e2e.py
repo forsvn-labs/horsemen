@@ -165,6 +165,25 @@ try:
     cookies = browser('cookies')
     assert '__Host-horsemen=' not in cookies or 'ghu_' not in cookies
     browser('screenshot', str(args.output / '04-signed-out.png'))
+
+    # Share links: a signed-out visitor signs in and lands on the shared record.
+    browser('open', origin + '/example/alpha?record=brain')
+    assert value("document.body.innerText.includes('Sign in to open example/alpha')"), 'the sign-in page names the shared project'
+    browser('click', 'a.btn')
+    until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Research notebook')", 20)
+    assert value("location.pathname + location.search === '/example/alpha?record=brain'"), 'the shared link survives sign-in'
+    assert value("!!document.querySelector('#share-record') && !!document.querySelector('#share-link')"), 'copy link buttons exist'
+    browser('click', '#share-record')
+    until("['Link copied','Copy failed'].some(t => document.querySelector('#toast').textContent.includes(t))", 5)
+    browser('screenshot', str(args.output / '05-shared-record.png'))
+    browser('press', 'Escape')
+    until("location.pathname + location.search === '/example/alpha'", 5)
+    # A link to a repository this account cannot read says why.
+    browser('open', origin + '/example/private-elsewhere')
+    until("document.querySelector('#issues') && document.querySelector('#issues').textContent.includes('cannot open example/private-elsewhere')", 20)
+    browser('screenshot', str(args.output / '06-no-access.png'))
+    browser('click', '#sign-out')
+    until("document.body.innerText.includes('Sign in with GitHub')")
     print('Hosted E2E passed:', args.output)
 finally:
     try: browser('close')

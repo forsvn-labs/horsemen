@@ -216,3 +216,29 @@ test('a failed revalidation check keeps the saved project and reports an issue',
   const t = new R.ScanState(reader); t.restore(index, 'operator'); await t.revalidate();
   assert.equal(t.snapshot().projects.length, 1); assert.equal(t.snapshot().phase, 'partial');
 });
+
+/* Share links. Failure modes: unreadable or unsafe paths, reserved app paths,
+   unknown record names, roots with special characters, case differences in
+   repository names, and a shared repository that discovery reaches last. */
+test('share links round-trip between a project and a readable URL', () => {
+  const p = { repo: 'Example/Alpha', root: '' }, nested = { repo: 'example/mono', root: 'apps/web app' };
+  assert.equal(R.shareURL('https://h.test', p), 'https://h.test/Example/Alpha');
+  assert.equal(R.shareURL('https://h.test', p, 'progress'), 'https://h.test/Example/Alpha?record=progress');
+  assert.equal(R.shareURL('https://h.test', nested, 'brain'), 'https://h.test/example/mono?root=apps%2Fweb+app&record=brain');
+  assert.equal(R.shareURL('https://h.test', p, 'unknown'), 'https://h.test/Example/Alpha', 'unknown records are dropped');
+  const t = R.shareTarget(new URL('https://h.test/example/mono?root=apps%2Fweb+app&record=brain'));
+  assert.deepEqual(t, { repo: 'example/mono', root: 'apps/web app', record: 'brain' });
+  assert.ok(R.matchesTarget(nested, t)); assert.ok(R.matchesTarget(p, R.shareTarget(new URL('https://h.test/example/alpha'))), 'repository names ignore case');
+  assert.ok(!R.matchesTarget(p, R.shareTarget(new URL('https://h.test/example/alpha?root=x'))));
+  for (const bad of ['/', '/only', '/a/b/c', '/assets/icons', '/auth/login', '/api/x', '/gh/user', '/a%2Fb/c', '/-bad/x', '/a/..', '/a/b?record=Vision%22']) {
+    const t2 = R.shareTarget(new URL('https://h.test' + bad));
+    assert.ok(t2 === null || (t2.record === null && bad.includes('record')), bad);
+  }
+  assert.equal(R.shareTarget(new URL('https://h.test/a/b?record=Vision%22')).record, null);
+});
+
+test('discovery reads the shared repository first', () => {
+  const repos = ['a/one', 'example/alpha', 'b/two'].map(full_name => ({ full_name }));
+  assert.deepEqual(R.prioritize(repos, { repo: 'Example/ALPHA' }).map(r => r.full_name), ['example/alpha', 'a/one', 'b/two']);
+  assert.deepEqual(R.prioritize(repos, null).map(r => r.full_name), ['a/one', 'example/alpha', 'b/two']);
+});
