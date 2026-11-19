@@ -68,6 +68,7 @@ temp folder. When one is available, stop compares the project to it:
 | Structure | A folder at depth 1 or 2 was added, removed, or renamed, and STRUCTURE did not change | Update STRUCTURE |
 | Changelog | PROGRESS gained a `Shipped` bullet (including partly shipped), and CHANGELOG did not change (or does not exist) | Add the shipped part to CHANGELOG, creating the file if needed |
 | Vision | VISION changed since the last VISION reminder | Reuse the owner's agreement, check README, PROGRESS, and BRAIN for conflicts, and log an agreed direction change |
+| Publish | A record changed in this session, and its text differs from the remote default branch (`origin/HEAD`, as of the last fetch). It counts uncommitted, unpushed, and unmerged edits. Projects without a remote default branch are skipped | Commit and push when the project's rules allow, so readers of GitHub, such as the hosted viewer, see the change |
 | Lint | A record changed and `check` finds errors in it | Fix the listed errors |
 
 The task review and triggered rules go into one reminder under 1,200
