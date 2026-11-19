@@ -4,6 +4,8 @@ import importlib.util
 import json
 from pathlib import Path
 import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -23,6 +25,17 @@ class Distribution(unittest.TestCase):
         shutil.copytree(ROOT / "horsemen", self.source / "horsemen")
         shutil.copy2(ROOT / "LICENSE", self.source / "LICENSE")
         self.output = self.root / "artifacts"
+
+    def test_project_paths_work_in_a_renamed_checkout(self):
+        source = self.root / "renamed-checkout"
+        shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__"))
+        result = subprocess.run(
+            [sys.executable, "-B", str(source / "horsemen/scripts/horsemen.py"),
+             "check", str(source), "--json"], capture_output=True, text=True,
+        )
+        report = json.loads(result.stdout)
+        self.assertEqual(report["errors"], [])
+        self.assertEqual(result.returncode, 0)
 
     def test_archive_is_complete_and_reproducible(self):
         archive = distribution.build_skill(self.source, self.output)
