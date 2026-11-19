@@ -35,7 +35,10 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   new repositories are scanned again. Sign-out and Clear workspace remove the
   index. Discovery reads up to 12 repositories in parallel.
 - **Agents.** Agents update records the normal way: edit, commit, and push.
-  The viewer shows the default branch, so unpushed edits do not appear.
+  The viewer shows the default branch, so unpushed edits do not appear. The
+  Horsemen Stop hook reminds the agent when a record it changed has not
+  reached the remote default branch (see the Publish rule in
+  [hooks](../horsemen/references/hooks.md)).
 
 ## Deploy
 
