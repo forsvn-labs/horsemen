@@ -27,6 +27,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ├── tests/                  Distribution regression tests
 ├── pyproject.toml          CLI packaging; version comes from shared source
 ├── CONTRIBUTING.md         Setup, verification, and release procedure
+├── .impeccable/            Impeccable design-check settings (one intended-colour exception)
 └── .github/workflows/      Linux and macOS verification
 ```
 
