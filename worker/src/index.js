@@ -211,19 +211,22 @@ function safeNext(next) {
 }
 
 /* ---------------------------------------------------------------- public view
-   Anyone can read a public repository's records without signing in. Reads use the
-   GitHub App's client credentials, never a user token, and every read first checks
+   Anyone can read a public repository's records without signing in. Reads never use
+   a user token (see publicHeaders), and every read first checks
    that the repository is public. Public data is cached at the edge for a short time
    (branch heads and repository metadata) or a day (objects addressed by SHA). */
 const PUBLIC_ROUTES = [[new RegExp(`^/repos/${NAME}/${NAME}$`), []], ...ROUTES.filter(([pattern]) => pattern.source.startsWith('^\\/repos'))];
-const appHeaders = env => ({ authorization: 'Basic ' + btoa(env.GITHUB_CLIENT_ID + ':' + env.GITHUB_CLIENT_SECRET), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'horsemen-viewer' });
+/* GitHub refuses GitHub App client credentials on repository reads. Public reads use an optional
+   public-read token (a fine-grained token with no permissions, secret GITHUB_PUBLIC_TOKEN) for the
+   5,000/hour limit, or no credentials (60/hour per Cloudflare IP; the edge cache absorbs repeats). */
+const publicHeaders = env => ({ ...(env.GITHUB_PUBLIC_TOKEN ? { authorization: 'Bearer ' + env.GITHUB_PUBLIC_TOKEN } : {}), accept: 'application/vnd.github+json', 'x-github-api-version': '2022-11-28', 'user-agent': 'horsemen-viewer' });
 const cacheOf = env => env.CACHE || globalThis.caches?.default || null;
 const PASS = ['etag', 'x-ratelimit-limit', 'x-ratelimit-remaining'];
 async function publicFetch(env, origin, target, ttl) {
   const cache = cacheOf(env), key = `${origin}/__cache/pub${target}`;
   if (cache) { const hit = await cache.match(key); if (hit) return hit; }
   let res;
-  try { res = await fetch(apiBase(env) + target, { headers: appHeaders(env) }); } catch { return null; }
+  try { res = await fetch(apiBase(env) + target, { headers: publicHeaders(env) }); } catch { return null; }
   if (!res.ok) return res;
   const headers = { 'content-type': 'application/json; charset=utf-8', 'cache-control': `public, max-age=${ttl}` };
   for (const h of PASS) if (res.headers.get(h)) headers[h] = res.headers.get(h);

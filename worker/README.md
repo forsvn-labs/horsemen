@@ -45,8 +45,10 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
 - **Public view.** A link to a public repository, such as
   `https://horsemen.forsvn.com/hungv47/horsemen`, opens without sign-in. The
   Worker first checks that the repository is public, then reads it through
-  `/pub/...` with the GitHub App's client credentials, never a user token. It
-  reads only repository routes. Public data is cached at the edge: repository
+  `/pub/...` without any user token. It reads only repository routes. GitHub
+  allows 60 such requests an hour per Cloudflare IP; set the optional secret
+  `GITHUB_PUBLIC_TOKEN` (a fine-grained token with public read access and no
+  permissions) for 5,000 an hour. Public data is cached at the edge: repository
   details and branch heads for 60 seconds, objects addressed by SHA for a day.
   A repository made private stops working within 60 seconds. The browser
   keeps nothing for a public view. A signed-in user can add `?view=public` to

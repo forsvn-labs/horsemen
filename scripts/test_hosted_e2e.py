@@ -56,10 +56,10 @@ class FakeGitHub(BaseHTTPRequestHandler):
         if p == '/login/oauth/authorize':
             return self.send(302, None, {'Location': q['redirect_uri'][0] + '?code=fictional&state=' + q['state'][0]})
         auth = self.headers.get('Authorization', '')
-        if auth == 'Basic ' + base64.b64encode(b'Iv1.fictional:fictional').decode():
-            # App client credentials: public data only. example/open is public; example/alpha is private.
+        if auth == '':
+            # No credentials: public data only. example/open is public; example/alpha is private.
             world['app_calls'] += 1
-            if p == '/repos/example/alpha': return self.send(200, {'id': 1, 'full_name': 'example/alpha', 'private': True})
+            if p == '/repos/example/alpha': return self.send(404, {'message': 'Not Found'})
             if p == '/repos/example/open': return self.send(200, {'id': 9, 'full_name': 'example/open', 'default_branch': 'main', 'private': False, 'visibility': 'public', 'archived': False})
             if not p.startswith('/repos/example/open/'): return self.send(404, {'message': 'Not Found'})
             p = p.replace('/repos/example/open/', '/repos/example/alpha/', 1)
