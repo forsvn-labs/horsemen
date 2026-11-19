@@ -53,6 +53,15 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   A repository made private stops working within 60 seconds. The browser
   keeps nothing for a public view. A signed-in user can add `?view=public` to
   see what visitors see. Private repositories still need sign-in.
+- **Diagrams and images.** A fenced `mermaid` block shows as a diagram or
+  chart. The browser loads `web/vendor/mermaid.min.js` (Mermaid 12.3.0, MIT)
+  only when a record has one, and draws it with `securityLevel: "strict"`.
+  The CSP still blocks `eval` and inline scripts. A relative image link, such
+  as `![Board](docs/img/board.png)`, shows the image when the file is in the
+  repository at the scanned commit. The browser reads it through the same
+  read-only proxy and shows it from a `blob:` URL; SVG files load as images,
+  so their scripts never run. External images stay links. Images larger than
+  1 MiB stay links.
 - **Agents.** Agents update records the normal way: edit, commit, and push.
   The viewer shows the default branch, so unpushed edits do not appear. The
   Horsemen Stop hook reminds the agent when a record it changed has not

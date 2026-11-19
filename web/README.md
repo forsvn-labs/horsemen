@@ -172,7 +172,9 @@ is supported). Missing records are reported. Truncated repository trees are
 reported as incomplete scans. Files larger than 512 KiB are not loaded.
 Markdown supports headings, wrapped paragraphs, nested and numbered lists,
 task lists, tables, quotes, rules, fenced code, links, and simple expandable
-sections. Other HTML is shown as text. Images appear as links. Footnotes and
+sections. Fenced `mermaid` blocks show as diagrams and charts. Relative image
+links to PNG, JPEG, GIF, WebP, or SVG files up to 1 MiB show the image; other
+images appear as links. Other HTML is shown as text. Footnotes and
 reference-style links are not supported; exact source is always available.
 PR comments are not scanned.
 Connections currently use inline Markdown links, excluding code examples and

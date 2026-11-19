@@ -2,6 +2,10 @@
 
 ## 2026-11-19
 
+- Records now show Mermaid diagrams and charts in the colours of the active theme, with a View code toggle. A diagram that cannot be drawn shows its code and the reason. Images stored in the repository show in place when a record links to them; external images stay links. Works in the hosted viewer and the local app. [Hosted viewer](worker/README.md#how-it-works).
+
+- Public repositories open without sign-in. Anyone can read the canvas at a link such as [horsemen.forsvn.com/hungv47/horsemen](https://horsemen.forsvn.com/hungv47/horsemen). Private repositories still need sign-in, and nothing is stored. [PR #25](https://github.com/hungv47/horsemen/pull/25), [PR #26](https://github.com/hungv47/horsemen/pull/26).
+
 - Added eight style themes with a live gallery in the account menu and Jump: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, spacing, and colours, and loads only its own fonts. [PR #20](https://github.com/hungv47/horsemen/pull/20).
 
 - Made the workspace calm. The home shows the project list, one account menu, Jump, and Canvas or List; other tools moved to the menu, Jump, or keyboard shortcuts. Each record opens as one reading column, and Progress starts with the next action, then current work and shipped work by day. [Artifact views](docs/product/artifact-views.md). [PR #18](https://github.com/hungv47/horsemen/pull/18).
