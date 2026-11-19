@@ -8,7 +8,7 @@ const STATE = '__Host-horsemen-state';
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 const SECURITY = {
   'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY', 'strict-transport-security': 'max-age=31536000', 'permissions-policy': 'camera=(), microphone=(), geolocation=()',
@@ -192,7 +192,7 @@ async function proxy(env, request, session, path) {
 
 /* ---------------------------------------------------------------- app */
 /* Share links: /owner/repo with an optional ?root=&record= query. They carry no data. */
-const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'pub', 'healthz']);
+const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'pub', 'healthz', 'vendor']);
 const SHARE_PATH = /^\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9_.-]{1,100})\/?$/;
 function shareRepo(path) {
   const m = path.match(SHARE_PATH);
@@ -271,7 +271,7 @@ async function appPage(env, request, session, mode = 'hosted') {
   return respond(html, 200, { 'content-type': 'text/html; charset=utf-8' });
 }
 
-const STATIC = /^\/(?:[A-Za-z0-9_-]+\.(?:js|css)|assets\/(?:[A-Za-z0-9][A-Za-z0-9_-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*\.(?:svg|png|woff2|txt))$/;
+const STATIC = /^\/(?:[A-Za-z0-9_-]+\.(?:js|css)|vendor\/[A-Za-z0-9][A-Za-z0-9._-]*\.js|assets\/(?:[A-Za-z0-9][A-Za-z0-9_-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*\.(?:svg|png|woff2|txt))$/;
 async function staticFile(env, request, path) {
   if (!STATIC.test(path) || path.includes('..')) return respond('Not found.', 404);
   const res = await env.ASSETS.fetch(new Request(new URL(path, request.url)));

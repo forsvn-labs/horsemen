@@ -34,8 +34,19 @@ SOURCES = {
     'PROGRESS.md': '# Progress\nNext action: Invite three operators to the pilot.\n## Shipped\n- Search is available to the pilot group.',
     'BRAIN.md': '# Brain\n## Providers\n- [Research notebook](docs/research.md): interviews.',
     'STRUCTURE.md': '# Structure\n## Map\n```text\napp/ — workspace\n```',
-    'docs/research.md': '# Research notebook\nOperators need a clear next step.',
+    'docs/research.md': ('# Research notebook\nOperators need a clear next step.\n## Flow\n```mermaid\nflowchart LR\n  Operator --> Notebook[Research notebook]\n  Notebook --> Decision\n```\n'
+                         '## Interviews\n```mermaid\npie title Interviews\n  "Operators" : 6\n  "Builders" : 4\n```\n## Draft\n```mermaid\nflowchart LR\n  A[Open --> B\n```\n'
+                         '## Screens\n![Pilot board](img/board.png) ![Pilot logo](img/logo.svg)\n\n![Old screen](img/missing.png)'),
 }
+def png(width, height, rgb):
+    """A small solid PNG, built here so the fixture needs no binary file."""
+    import struct, zlib
+    chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data) & 0xffffffff)
+    rows = b''.join(b'\x00' + bytes(rgb) * width for _ in range(height))
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b'')
+# Fictional images: a PNG, and an SVG with a script that must never run. docs/img/missing.png does not exist.
+IMAGES = {'docs/img/board.png': png(48, 24, (51, 64, 122)),
+          'docs/img/logo.svg': b'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" onload="window.pwned=1"><script>window.pwned=1</script><circle cx="20" cy="20" r="18" fill="#a8301d"/></svg>'}
 UPDATED = '# Progress\nNext action: Publish the pilot results.\n## Shipped\n- Pilot results reached all operators.'
 world = {'app_calls': 0, 'rev': 'a' * 40, 'sources': dict(SOURCES), 'revoked': 0, 'tokens': 0, 'not_modified': 0}
 def sha(text): return hashlib.sha1(text.encode()).hexdigest()
@@ -77,6 +88,9 @@ class FakeGitHub(BaseHTTPRequestHandler):
         if p.startswith('/repos/example/alpha/git/blobs/'):
             for v in world['sources'].values():
                 if sha(v) == p.rsplit('/', 1)[1]: return self.send(200, {'encoding': 'base64', 'content': base64.b64encode(v.encode()).decode()})
+        if p.startswith('/repos/example/alpha/contents/') and p.split('/contents/', 1)[1] in IMAGES:
+            data = IMAGES[p.split('/contents/', 1)[1]]
+            return self.send(200, {'type': 'file', 'sha': hashlib.sha1(data).hexdigest(), 'size': len(data), 'encoding': 'base64', 'content': base64.b64encode(data).decode()})
         if p.startswith('/repos/example/alpha/contents/'):
             v = world['sources'].get(p.split('/contents/', 1)[1])
             if v: return self.send(200, {'type': 'file', 'sha': sha(v), 'size': len(v), 'encoding': 'base64', 'content': base64.b64encode(v.encode()).decode()})
@@ -143,6 +157,8 @@ try:
     until("document.querySelector('meta[name=horsemen-mode]')?.content==='hosted'")
     until("document.querySelector('#project-name')?.textContent==='alpha'")
     until("!document.querySelector('[data-artifact=progress]').disabled")
+    assert value("!window.mermaid && !document.querySelector('script[src*=mermaid]')"), 'Mermaid does not load before a page needs it'
+    browser('eval', 'window.__csp=[];document.addEventListener("securitypolicyviolation",e=>window.__csp.push(e.violatedDirective+" "+e.blockedURI))')
     assert value("document.querySelector('#account').textContent.includes('operator')")
     assert value("!document.querySelector('#privacy').hidden"), 'a private repository shows a lock next to its name'
     assert value("document.querySelector('#menu #choose-repos') && document.querySelector('#menu #sign-out') && !document.querySelector('.demo,.notice')"), 'hosted items sit in the account menu'
@@ -151,6 +167,20 @@ try:
     browser('screenshot', str(args.output / '02-project.png'))
     browser('dblclick', '[data-artifact="brain"]')
     until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Research notebook')")
+    # Diagrams and images in a linked document: Mermaid comes from /vendor through the Worker, images through the proxy.
+    browser('click', '.connection-card')
+    until("document.querySelectorAll('figure.diagram[data-state=drawn]').length===2 && document.querySelectorAll('figure.diagram[data-state=error]').length===1", 30)
+    assert value("JSON.stringify([...document.querySelectorAll('figure.diagram[data-state=drawn] .diagram-canvas')].map(c=>c.getAttribute('aria-label')))") == ['Flowchart', 'Pie chart: Interviews']
+    assert value("document.querySelector('figure.diagram[data-state=error] .diagram-error').textContent.startsWith('This diagram could not be drawn.')")
+    browser('eval', 'document.querySelector(".md-image").scrollIntoView({block:"center"})')
+    until("document.querySelectorAll('.md-image[data-state=shown]').length===2 && document.querySelectorAll('.md-image[data-state=error]').length===1", 20)
+    assert value("JSON.stringify([...document.querySelectorAll('.md-image[data-state=shown] img')].map(i=>[i.alt,i.src.startsWith('blob:'),i.naturalWidth>0]))") == [['Pilot board', True, True], ['Pilot logo', True, True]]
+    assert value("JSON.stringify(document.querySelector('.md-image[data-state=error] .md-image-note').textContent)") == 'Image not shown: The image is not in the repository at this commit.'
+    assert value("JSON.stringify([window.pwned ?? null, window.__csp])") == [None, []], 'no script ran from diagram or SVG source, and nothing broke the CSP'
+    browser('eval', 'document.querySelector("figure.diagram").scrollIntoView({block:"start"})')
+    browser('screenshot', str(args.output / '02b-diagrams.png'))
+    browser('eval', 'document.querySelector(".md-image").scrollIntoView({block:"center"})')
+    browser('screenshot', str(args.output / '02c-images.png'))
     browser('press', 'Escape')
     until("!document.querySelector('#peek').open")
     deadline = time.time() + 20  # The first check stores the ETag; the next one sends it.

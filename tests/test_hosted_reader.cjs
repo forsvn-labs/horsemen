@@ -9,7 +9,9 @@
    - blob decoding: bad base64, missing padding, non-UTF-8, BOM, size limits, wrong encoding
    - scan: empty repositories, truncated trees, provider failures, account changes,
      a clear during a scan, the 16-project cache, transient failures not cached
-   - documents: only links from loaded records can be opened */
+   - documents: only links from loaded records can be opened
+   - images: only registered image attachments load; types, sizes, content checks,
+     and decode errors match the Python reader */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
@@ -20,13 +22,18 @@ const root = path.resolve(__dirname, '..');
 function python(cases) {
   const code = `
 import json,sys
-from horsemen_core.gui import discover_roots
+import base64,hashlib
+from horsemen_core.gui import discover_roots, decode_image, ProviderError
 from horsemen_core.gui_links import connections
 from horsemen_core.legacy import sections
 out=[]
 for c in json.load(sys.stdin):
     if c['kind']=='links': out.append(connections(c['text'],c['source'],c['repo'],c['revision']))
     elif c['kind']=='sections': out.append(dict(sections(c['text'])))
+    elif c['kind']=='image':
+        try:
+            kind,data=decode_image(c['blob'],c['path']);out.append({'type':kind,'size':len(data),'sha':hashlib.sha256(data).hexdigest()})
+        except ProviderError as error: out.append({'error':str(error),'status':error.status})
     else: out.append(discover_roots(c['entries']))
 print(json.dumps(out))`;
   return JSON.parse(execFileSync('python3', ['-B', '-c', code], {
@@ -241,4 +248,58 @@ test('discovery reads the shared repository first', () => {
   const repos = ['a/one', 'example/alpha', 'b/two'].map(full_name => ({ full_name }));
   assert.deepEqual(R.prioritize(repos, { repo: 'Example/ALPHA' }).map(r => r.full_name), ['example/alpha', 'a/one', 'b/two']);
   assert.deepEqual(R.prioritize(repos, null).map(r => r.full_name), ['a/one', 'example/alpha', 'b/two']);
+});
+
+/* Images. Same fictional files as tests/test_gui_images.py. */
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(24)]);
+const SVG = Buffer.from('<?xml version="1.0"?>\n<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+const JPG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(16)]);
+const contents = (data, extra = {}) => ({ type: 'file', sha: 'e'.repeat(40), size: data.length, encoding: 'base64', content: data.toString('base64'), ...extra });
+const digest = bytes => require('node:crypto').createHash('sha256').update(bytes).digest('hex');
+
+test('image decoding matches the Python reader', () => {
+  const big = Buffer.concat([PNG, Buffer.alloc(R.MAX_IMAGE)]);
+  const cases = [
+    ['a.png', contents(PNG)], ['a.PNG', contents(PNG)], ['a.jpg', contents(JPG)], ['a.jpeg', contents(JPG)], ['a.svg', contents(SVG)],
+    ['a.gif', contents(Buffer.from('GIF87a0000'))], ['a.webp', contents(Buffer.from('RIFF\x10\x00\x00\x00WEBPVP8 ', 'latin1'))],
+    ['a.svg', contents(Buffer.from('﻿<!-- c -->\n<svg/>'))], ['a.png', contents(Buffer.from('GIF89a'))], ['a.svg', contents(Buffer.from('<html></html>'))],
+    ['a.png', contents(Buffer.alloc(0))], ['a.pdf', contents(Buffer.from('%PDF'))], ['a.png', contents(PNG, { size: R.MAX_IMAGE + 1 })],
+    ['a.png', { type: 'file', size: R.MAX_IMAGE, encoding: 'none', content: '' }], ['a.png', { type: 'file', size: 10, encoding: 'base64', content: '!bad!' }],
+    ['a.png', { type: 'file', size: 10, encoding: 'utf-8', content: 'x' }], ['a.png', { type: 'dir' }], ['a.png', []], ['a.png', contents(big)],
+    ['a.png', { type: 'file', size: 4, encoding: 'base64', content: 'YQ' }],
+  ];
+  const expected = python(cases.map(([p, blob]) => ({ kind: 'image', path: p, blob })));
+  for (const [i, [p, blob]] of cases.entries()) {
+    let actual;
+    try { const { type, bytes } = R.decodeImage(blob, p); actual = { type, size: bytes.length, sha: digest(bytes) }; }
+    catch (error) { assert.ok(error instanceof R.ProviderError, `case ${i}`); actual = { error: error.message, status: error.status }; }
+    assert.deepEqual(actual, expected[i], `case ${i} (${p})`);
+  }
+});
+
+test('images load only from registered image links at the pinned revision', async () => {
+  const f = fake(); const api = f.api;
+  const files = { 'img/flow.png': contents(PNG), 'img/logo.svg': contents(SVG), 'img/big.png': contents(PNG, { size: R.MAX_IMAGE + 1 }), 'docs/report.pdf': contents(Buffer.from('%PDF')) };
+  f.api = async p => {
+    if (p.includes('/git/blobs/')) { f.calls.push(p); return { encoding: 'base64', content: Buffer.from('# R\n![Flow](img/flow.png) ![Logo](img/logo.svg) ![Big](img/big.png) ![Gone](img/gone.png) ![Report](docs/report.pdf) [Doc](docs/d.md) ![Remote](https://example.com/x.png)').toString('base64') }; }
+    const m = p.match(/\/contents\/([^?]+)\?ref=/);
+    if (m && files[m[1]]) { f.calls.push(p); return files[m[1]]; }
+    if (m && m[1] === 'img/gone.png') throw new R.ProviderError('Repository or record is no longer accessible.', 404);
+    return api(p);
+  };
+  const s = state(f); await s.scanSync(); const id = s.snapshot().projects[0].id;
+  await assert.rejects(s.loadImage(id, 'f'.repeat(24)), /image linked from a loaded record/);
+  const links = Object.fromEntries((await s.loadProject(id)).records.vision.connections.map(l => [l.title, l]));
+  const image = await s.loadImage(id, links.Flow.id);
+  assert.equal(image.type, 'image/png'); assert.deepEqual(Buffer.from(image.bytes), PNG);
+  assert.ok(f.calls.at(-1).endsWith('/contents/img/flow.png?ref=' + 'a'.repeat(40)));
+  assert.equal((await s.loadImage(id, links.Logo.id)).type, 'image/svg+xml');
+  for (const name of ['Doc', 'Report', 'Remote']) await assert.rejects(s.loadImage(id, links[name].id), /image linked from a loaded record/, name);
+  await assert.rejects(s.loadImage(id, links.Big.id), /1 MiB/);
+  await assert.rejects(s.loadImage(id, links.Gone.id), /not in the repository at this commit/);
+  s.clear(); await assert.rejects(s.loadImage(id, links.Flow.id), /Scan again/);
+});
+
+test('the vendor folder is not a share link', () => {
+  assert.equal(R.shareTarget(new URL('https://h.test/vendor/mermaid.min.js')), null);
 });

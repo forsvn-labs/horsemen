@@ -6,7 +6,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 
 ```text
 ./
-├── web/                   GitHub canvas (local and hosted), Markdown rendering, themes, previews, and setup guide
+├── web/                   GitHub canvas (local and hosted), Markdown, diagrams (vendored Mermaid in web/vendor/), images, themes, previews, and setup guide
 │   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
 │   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks

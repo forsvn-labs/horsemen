@@ -12,6 +12,7 @@
 | skills.sh CLI (`skills`) | Agent skill installation | Node.js and npm through `npx` | Downloads Horsemen and prompts for agent and scope |
 | Cloudflare Workers, Wrangler 4.165.0 | Host the viewer at horsemen.forsvn.com | A Cloudflare account with the domain; Bun to install Wrangler | Serves the app and a read-only GitHub proxy; no database, KV, or logs. The edge cache holds public repository data briefly for public views |
 | GitHub App (user authorization) | Sign-in and repository access for the hosted viewer | The app settings as Worker secrets | Each user reads only repositories they can access and chose to install it on |
+| Mermaid 12.3.0 (MIT), vendored in `web/vendor/` | Diagrams and charts in records | No install; the browser loads it only when a record has a `mermaid` block | Draws flowcharts, sequence diagrams, and charts in the active theme |
 | Node.js 20+ | Hosted viewer and GUI tests | Node.js installation | Runs the reader parity, Worker, and view tests |
 | agent-browser | Browser checks | The `agent-browser` CLI | Drives the local and hosted apps against fake GitHub data |
 

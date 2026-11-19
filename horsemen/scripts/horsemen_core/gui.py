@@ -21,6 +21,39 @@ FILES = {'vision': 'VISION.md', 'progress': 'PROGRESS.md', 'brain': 'BRAIN.md',
 EXCLUDED = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor'}
 MAX_FILE = 512 * 1024
 
+# Repository images: GitHub's contents API returns inline base64 only for files up to 1 MB, so 1 MiB is the limit.
+IMAGE_TYPES = {'.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.gif':'image/gif', '.webp':'image/webp', '.svg':'image/svg+xml'}
+MAX_IMAGE = 1024 * 1024
+IMAGE_TOO_LARGE = 'Image is larger than 1 MiB. Open it on GitHub.'
+IMAGE_MISSING = 'The image is not in the repository at this commit.'
+
+def image_type(path):
+    return IMAGE_TYPES.get(PurePosixPath(path or '').suffix.lower())
+
+def _image_matches(kind, data):
+    if kind == 'image/png': return data.startswith(b'\x89PNG\r\n\x1a\n')
+    if kind == 'image/jpeg': return data.startswith(b'\xff\xd8\xff')
+    if kind == 'image/gif': return data[:6] in (b'GIF87a', b'GIF89a')
+    if kind == 'image/webp': return data[:4] == b'RIFF' and data[8:12] == b'WEBP'
+    return b'<svg' in data[:4096].lower()
+
+def decode_image(blob, path):
+    """Bytes and content type of a contents-API response. The bytes must match the file's image type."""
+    kind = image_type(path)
+    if not isinstance(blob, dict) or blob.get('type') != 'file': raise ProviderError('The linked path is not a readable file.', 422)
+    if not kind: raise ProviderError('The file is not a supported image type.', 415)
+    size = blob.get('size')
+    if not isinstance(size, int) or isinstance(size, bool) or size < 0: raise ProviderError('The linked path is not a readable file.', 422)
+    if size > MAX_IMAGE or blob.get('encoding') == 'none': raise ProviderError(IMAGE_TOO_LARGE, 413)
+    if blob.get('encoding') != 'base64' or not isinstance(blob.get('content'), str): raise ProviderError('Unsupported image encoding.')
+    encoded = re.sub(r'\s', '', blob['content'])
+    if len(encoded) > MAX_IMAGE * 2: raise ProviderError(IMAGE_TOO_LARGE, 413)
+    try: data = base64.b64decode(encoded, validate=True)
+    except ValueError as error: raise ProviderError('The image could not be decoded.') from error
+    if len(data) > MAX_IMAGE: raise ProviderError(IMAGE_TOO_LARGE, 413)
+    if not _image_matches(kind, data): raise ProviderError('The file does not match its image type.', 415)
+    return kind, data
+
 def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 class ProviderError(Exception):
@@ -137,6 +170,16 @@ class GitHubReader:
         nested=dict(project,files={'document':{'path':path,'size':blob.get('size'),'sha':blob.get('sha')}})
         return self.load_record(nested,'document',PurePosixPath(path).name,blob)
 
+    def load_image(self, project, link):
+        path=link['path']
+        if not image_type(path): raise ProviderError('The file is not a supported image type.', 415)
+        try: blob=self.api(f'/repos/{project["repo"]}/contents/{quote(path,safe="/")}?ref={project["revision"]}')
+        except ProviderError as error:
+            if error.status==404: raise ProviderError(IMAGE_MISSING,404) from error
+            raise
+        kind,data=decode_image(blob,path)
+        return {'type':kind,'bytes':data,'size':len(data)}
+
     def pull_request(self, project, number):
         if not re.fullmatch(r'[1-9][0-9]{0,8}', str(number)): raise ProviderError('Invalid PR number.', 400)
         data = self.api(f'/repos/{project["repo"]}/pulls/{number}')
@@ -228,6 +271,19 @@ class ScanState:
             self.register_links(key,[record])
         return record
 
+    def load_image(self, key, link_id):
+        """Bytes of an image that a loaded record links to, in the same repository at the scanned revision."""
+        with self.lock:generation=self.generation
+        project=self.project(key)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            link=copy.deepcopy(self.links.get(key,{}).get(link_id))
+            if not link or link['kind']!='attachment' or not image_type(link.get('path')):raise ProviderError('Open an image linked from a loaded record.',404)
+        image=self.reader.load_image(project,link)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+        return image
+
     def project(self, key):
         with self.lock:
             project=self.projects.get(key);account=self.data['account'];generation=self.generation
@@ -248,13 +304,18 @@ class ScanState:
 ASSET_NAME=re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
 ASSET_TYPES={'.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.txt':'text/plain; charset=utf-8'}
 
+# Repository images show as blob: URLs. Script stays same-origin only, with no eval.
+PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+# Image bytes never run as a document, even an SVG opened on its own.
+IMAGE_CSP="default-src 'none'; style-src 'unsafe-inline'; sandbox"
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_): pass  # No personal project paths or URLs in request logs.
-    def respond(self, status, body, kind='application/json'):
+    def respond(self, status, body, kind='application/json', csp=PAGE_CSP):
         raw = json.dumps(body).encode() if kind=='application/json' else body
         self.send_response(status);self.send_header('Content-Type',kind);self.send_header('Content-Length',str(len(raw)))
         self.send_header('Cache-Control','no-store');self.send_header('X-Content-Type-Options','nosniff');self.send_header('Referrer-Policy','no-referrer')
-        self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
+        self.send_header('Content-Security-Policy',csp)
         self.end_headers();self.wfile.write(raw)
     def allowed(self, api=False):
         host=self.headers.get('Host','');expected=f'127.0.0.1:{self.server.server_port}'
@@ -273,13 +334,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200,self.server.state.load_project(query.get('id',[''])[0]))
             if path=='/api/document':
                 return self.respond(200,self.server.state.load_document(query.get('id',[''])[0],query.get('link',[''])[0]))
+            if path=='/api/image':
+                image=self.server.state.load_image(query.get('id',[''])[0],query.get('link',[''])[0])
+                return self.respond(200,image['bytes'],image['type'],IMAGE_CSP)
             if path=='/api/pr':
                 project=self.server.state.project(query.get('project',[''])[0])
                 generation=self.server.state.generation
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
             if path.startswith('/assets/'):
                 # Bundled fonts and icons only: plain names, known types, no traversal or links.
                 parts=path[len('/assets/'):].split('/')

@@ -20,6 +20,7 @@ const env = (extra = {}) => ({
     const p = new URL(req.url).pathname;
     if (p === '/index.html' || p === '/') return new Response(indexHTML, { headers: { 'content-type': 'text/html' } });
     if (p === '/app.js') return new Response('/*app*/', { headers: { 'content-type': 'text/javascript' } });
+    if (p === '/vendor/mermaid.min.js') return new Response('/*mermaid*/', { headers: { 'content-type': 'text/javascript' } });
     return new Response('not found', { status: 404 });
   } },
   ...extra,
@@ -255,6 +256,19 @@ test('sign-in never redirects outside the app', async () => {
 test('reserved paths are not project links', async () => {
   for (const p of ['/assets/icons', '/api/x', '/gh/x', '/auth/x', '/a/b/c']) {
     const res = await call(p); assert.doesNotMatch(await res.text(), /Sign in to open/, p);
+  }
+});
+
+/* Diagrams and images. Failure modes: the Mermaid file served as a share link or
+   not at all; other vendor files or traversal served; images blocked by the CSP;
+   scripts allowed to use eval. */
+test('the Mermaid file is a static file, and the CSP allows blob images only', async () => {
+  const res = await call('/vendor/mermaid.min.js');
+  assert.equal(res.status, 200); assert.equal(await res.text(), '/*mermaid*/');
+  const csp = res.headers.get('content-security-policy');
+  assert.match(csp, /img-src 'self' blob:;/); assert.match(csp, /script-src 'self';/); assert.doesNotMatch(csp, /unsafe-eval|data:/);
+  for (const p of ['/vendor/README.md', '/vendor/mermaid.LICENSE.txt', '/vendor/mermaid.min.js.map', '/vendor/a/b.js', '/vendor/.hidden.js']) {
+    const r = await call(p); assert.equal(r.status, 404, p); assert.doesNotMatch(await r.text(), /Sign in to open/, p);
   }
 });
 
