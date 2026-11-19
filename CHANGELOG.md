@@ -2,6 +2,8 @@
 
 ## 2026-11-19
 
+- Each record type now opens in its own view. Progress groups work by day on a status board with proof links; Changelog is a release timeline; Vision, Brain, Structure, Tech stack, and README get a brief, library, map, cards, or guide. Each view has a list layout. Live on horsemen.forsvn.com and in the local app. [Artifact views](docs/product/artifact-views.md). [PR #7](https://github.com/hungv47/horsemen/pull/7).
+
 - Added a private local visual workspace: a canvas of each project's records, a peek with a layout for each record, section and record navigation, a jump field, and six themes. It runs from a source checkout and reads GitHub through the local sign-in. It is not a hosted service and has no public sharing. [Setup and limits](web/README.md). [PR #5](https://github.com/hungv47/horsemen/pull/5).
 
 ## 2026-11-17
