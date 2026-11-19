@@ -2,6 +2,8 @@
 
 ## 2026-11-19
 
+- Added eight style themes with a live gallery in the account menu and Jump: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, spacing, and colours, and loads only its own fonts. [PR #20](https://github.com/hungv47/horsemen/pull/20).
+
 - Made the workspace calm. The home shows the project list, one account menu, Jump, and Canvas or List; other tools moved to the menu, Jump, or keyboard shortcuts. Each record opens as one reading column, and Progress starts with the next action, then current work and shipped work by day. [Artifact views](docs/product/artifact-views.md). [PR #18](https://github.com/hungv47/horsemen/pull/18).
 
 - Added share links to the hosted viewer. Each project and record has a readable link, such as `horsemen.forsvn.com/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository sign in and open the same record. Links carry no data. [PR #16](https://github.com/hungv47/horsemen/pull/16).
