@@ -449,29 +449,49 @@ function applyTheme(choice){
   let saved=null;try{saved=localStorage.getItem('horsemen-theme')}catch{}
   const id=HorsemenThemes.resolve(saved,themeQuery.matches),chosen=saved&&HorsemenThemes.resolve(saved,false)===HorsemenThemes.resolve(saved,true)?id:'system';
   document.documentElement.dataset.theme=id;
-  for(const b of themeMenu.children)b.setAttribute('aria-checked',b.dataset.themeChoice===chosen);
+  for(const b of themeMenu.querySelectorAll('[data-theme-choice]'))b.setAttribute('aria-checked',b.dataset.themeChoice===chosen);
   return id;
 }
+/* Type sets change fonts only. The default set is not saved, so a later default can change it. */
+function applyType(choice){
+  if(choice!==undefined)try{if(choice===HorsemenThemes.types[0].id)localStorage.removeItem('horsemen-type');else localStorage.setItem('horsemen-type',choice)}catch{}
+  let saved=null;try{saved=localStorage.getItem('horsemen-type')}catch{}
+  const id=HorsemenThemes.resolveType(saved);
+  document.documentElement.dataset.type=id;
+  for(const b of themeMenu.querySelectorAll('[data-type-choice]'))b.setAttribute('aria-checked',b.dataset.typeChoice===id);
+  return id;
+}
+function menuGroup(label){const g=document.createElement('div');g.setAttribute('role','group');g.setAttribute('aria-label',label);g.innerHTML='<span class="menu-label" aria-hidden="true">'+escapeHTML(label)+'</span>';themeMenu.append(g);return g}
+const colourGroup=menuGroup('Colours'),typeGroup=menuGroup('Type');
 for(const t of [{id:'system',label:'System',note:'Follows this device'},...HorsemenThemes.themes]){
   const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.dataset.themeChoice=t.id;
   const chips=t.id==='system'?['bone','ink']:[t.id];
   b.innerHTML='<span class="swatch">'+chips.map(id=>'<span data-swatch="'+id+'"><i></i><i></i><i></i><i></i></span>').join('')+'</span><span class="theme-name">'+escapeHTML(t.label)+'<small>'+escapeHTML(t.note)+'</small></span>'+icon('check');
-  b.onclick=()=>applyTheme(t.id);themeMenu.append(b);
+  b.onclick=()=>applyTheme(t.id);colourGroup.append(b);
 }
+for(const t of HorsemenThemes.types){
+  const b=document.createElement('button');b.type='button';b.setAttribute('role','menuitemradio');b.dataset.typeChoice=t.id;
+  /* The sample uses the set's own fonts. A font downloads only when the menu shows its sample. */
+  b.innerHTML='<span class="type-sample" data-type-sample="'+t.id+'" aria-hidden="true">Aa</span><span class="theme-name">'+escapeHTML(t.label)+'<small>'+escapeHTML(t.note)+'</small></span>'+icon('check');
+  b.onclick=()=>applyType(t.id);typeGroup.append(b);
+}
+const menuItems=()=>[...themeMenu.querySelectorAll('[role=menuitemradio]')];
 function toggleThemeMenu(open=themeMenu.hidden){
   themeMenu.hidden=!open;$('#theme-toggle').setAttribute('aria-expanded',open);
-  if(open)(themeMenu.querySelector('[aria-checked=true]')||themeMenu.firstElementChild).focus();
+  if(open)(themeMenu.querySelector('[data-theme-choice][aria-checked=true]')||menuItems()[0]).focus();
 }
 $('#theme-toggle').onclick=()=>toggleThemeMenu();
 themeMenu.addEventListener('keydown',e=>{
-  const items=[...themeMenu.children],at=items.indexOf(document.activeElement);
+  const items=menuItems(),at=items.indexOf(document.activeElement);
   if(e.key==='Escape'){e.stopPropagation();toggleThemeMenu(false);$('#theme-toggle').focus()}
   else if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();e.stopPropagation();items[(at+(e.key==='ArrowDown'?1:-1)+items.length)%items.length].focus()}
+  else if(e.key==='Home'||e.key==='End'){e.preventDefault();e.stopPropagation();items[e.key==='Home'?0:items.length-1].focus()}
 });
 document.addEventListener('pointerdown',e=>{if(!themeMenu.hidden&&!e.target.closest('#theme-menu,#theme-toggle'))toggleThemeMenu(false)});
+applyType();
 themeQuery.addEventListener('change',()=>applyTheme());applyTheme();
 
-/* Jump: one field that reaches every project, record, view, and theme. */
+/* Jump: one field that reaches every project, record, view, theme, and type set. */
 const palette=$('#palette');let paletteShown=[],paletteAt=0;
 function paletteItems(){
   const items=[],leave=()=>{if($('#peek').open)$('#peek').close()},list=world.classList.contains('list');
@@ -482,6 +502,7 @@ function paletteItems(){
     {group:'Actions',icon:'collapse',label:'Collapse all linked branches',hint:'Canvas',run:()=>{leave();expandedConnections.clear();refreshGraph()}},
     {group:'Actions',icon:'refresh',label:'Refresh GitHub',hint:'Scan again',run:()=>{leave();scan()}});
   for(const t of HorsemenThemes.themes)items.push({group:'Themes',icon:t.scheme==='dark'?'moon':'sun',label:t.label,hint:t.note,run:()=>applyTheme(t.id)});
+  for(const t of HorsemenThemes.types)items.push({group:'Type',icon:'type',label:t.label+' type',hint:t.note,run:()=>applyType(t.id)});
   return items;
 }
 function renderPalette(){
@@ -494,7 +515,7 @@ function renderPalette(){
     b.innerHTML=icon(item.icon)+'<span>'+escapeHTML(item.label)+'</span><small>'+escapeHTML(item.hint)+'</small>';
     b.onclick=()=>{palette.close();item.run()};b.onpointermove=()=>{if(paletteAt!==i){paletteAt=i;markPalette()}};list.append(b);
   });
-  if(!paletteShown.length)list.append(Object.assign(document.createElement('p'),{className:'palette-empty',textContent:'Nothing matches. Try a project name, a record, or “theme”.'}));
+  if(!paletteShown.length)list.append(Object.assign(document.createElement('p'),{className:'palette-empty',textContent:'Nothing matches. Try a project name, a record, “theme”, or “type”.'}));
   markPalette();
 }
 function markPalette(){
@@ -535,4 +556,6 @@ document.addEventListener('horsemen:updated',event=>{
   const reload=()=>{if(projects[current]?.id!==next.id)return;selectProject(current);showToast('Updated to commit '+next.revision.slice(0,7)+'.')};
   if($('#peek').open){showToast('A new commit is ready. It loads when you close this record.');$('#peek').addEventListener('close',reload,{once:true})}else reload();
 });
+/* Phone: Fit would shrink canvas cards below reading size, so the list comes first. The canvas stays one tap away. */
+if(matchMedia('(max-width: 640px)').matches)setView(true);
 boot();

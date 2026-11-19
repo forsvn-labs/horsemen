@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const {themes, resolve} = require('../web/theme.js');
+const {themes, resolve, types, resolveType, preloads} = require('../web/theme.js');
 const css = fs.readFileSync(path.join(__dirname, '../web/style.css'), 'utf8');
 const tokens = id => {
   const block = css.match(new RegExp((id === themes[0].id ? ':root' : ':root\\[data-theme=' + id + '\\]') + ',\\[data-swatch=' + id + '\\]\\{([^}]*)\\}'));
@@ -35,4 +35,71 @@ assert.equal(resolve('light', true), 'bone');
 assert.equal(resolve(null, true), 'ink');
 assert.equal(resolve('nonsense', false), 'bone');
 assert.equal(resolve('system', true), 'ink');
-console.log('PASS: ' + themes.length + ' themes define every colour with readable contrast');
+
+// Type sets: every set works with every colour theme.
+const fontsDir = path.join(__dirname, '../web/assets/fonts');
+const notice = fs.readFileSync(path.join(fontsDir, 'NOTICE.txt'), 'utf8');
+const ofl = fs.readFileSync(path.join(fontsDir, 'OFL.txt'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, '../web/index.html'), 'utf8');
+const roles = ['display', 'label', 'ui', 'prose', 'mono'];
+const typeTokens = id => {
+  if (id === types[0].id) return tokens(themes[0].id);
+  const block = css.match(new RegExp(':root\\[data-type=' + id + '\\]\\{([^}]*)\\}'));
+  assert(block, 'style.css has a block for type set ' + id);
+  return Object.fromEntries([...block[1].matchAll(/--([\w-]+):\s*([^;]+)/g)].map(m => [m[1], m[2].trim()]));
+};
+const faces = Object.fromEntries([...css.matchAll(/@font-face\{([^}]*)\}/g)].map(m => {
+  const family = m[1].match(/font-family:([\w-]+)/)[1], file = m[1].match(/url\(\/assets\/fonts\/([\w-]+\.woff2)\)/)[1];
+  assert.match(m[1], /font-weight:100 900/, family + ' declares its variable weight range, so bold is not synthesized');
+  assert.match(m[1], /font-display:swap/, family + ' shows text while it loads');
+  return [family, file];
+}));
+const familiesOf = value => value.split(',').map(f => f.trim().replace(/"/g, ''));
+assert.equal(types[0].id, 'engraved', 'Engraved stays the default');
+assert.deepEqual(types.map(t => t.id).sort(), ['engraved', 'modern', 'system']);
+for (const type of types) {
+  assert(type.label && type.note, type.id + ' has a label and a note');
+  const t = typeTokens(type.id);
+  for (const role of roles) {
+    assert(t[role], type.id + ' defines --' + role);
+    assert.match(familiesOf(t[role]).at(-1), /^(serif|sans-serif|monospace|system-ui)$/, type.id + ' --' + role + ' ends with a generic family');
+  }
+  if (type.id !== types[0].id) for (const name of colours) assert(!(name in t), type.id + ' changes no colour, so every theme keeps its contrast');
+  const used = new Set(roles.flatMap(role => familiesOf(t[role])).filter(f => f in faces));
+  if (type.id === 'system') assert.equal(used.size, 0, 'System uses only device fonts and downloads nothing');
+  // Preload only fonts the active set uses.
+  for (const href of preloads(type.id)) {
+    const file = href.split('/').pop();
+    assert(Object.entries(faces).some(([family, f]) => f === file && used.has(family)), type.id + ' preloads ' + file + ', which it uses');
+  }
+  if (type.id === 'system') assert.deepEqual(preloads(type.id), []);
+  else assert(preloads(type.id).length >= 1, type.id + ' preloads its main font');
+  // Colour and type are independent: check the full matrix.
+  for (const theme of themes) {
+    const merged = {...tokens(theme.id), ...(type.id === types[0].id ? {} : t)};
+    for (const text of ['ink', 'ink-2']) check(contrast(merged[text], merged.surface) >= 4.5, `${theme.id} × ${type.id}: --${text} on --surface`);
+  }
+}
+assert.doesNotMatch(html, /rel="preload"[^>]*woff2/, 'index.html preloads no fixed fonts; theme.js preloads the active set');
+// Every bundled font is declared, credited, and licensed.
+const files = fs.readdirSync(fontsDir).filter(f => f.endsWith('.woff2')).sort();
+assert.deepEqual(Object.values(faces).sort(), files, 'Each font file has one @font-face');
+for (const [family, file] of Object.entries(faces)) {
+  assert(notice.includes(family), 'NOTICE.txt names ' + family);
+  assert(ofl.includes('Copyright 2026 The ' + family + ' Project Authors'), 'OFL.txt keeps the copyright line for ' + family);
+  assert(fs.readFileSync(path.join(fontsDir, file)).subarray(0, 4).toString() === 'wOF2', file + ' is WOFF2');
+}
+assert.equal(resolveType(null), 'engraved');
+assert.equal(resolveType('modern'), 'modern');
+assert.equal(resolveType('nonsense'), 'engraved');
+// Readable text everywhere: placeholders use body-text tokens, and no functional text is under 11px.
+assert.doesNotMatch(css, /[^-]color:var\(--ink-3\)/, '--ink-3 is for lines and marks only; it does not reach 4.5:1 for text');
+const small = [];
+for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) for (const size of m[2].matchAll(/(?:font:[^;]*?|font-size:)\s*([0-9.]+)px/g)) {
+  const selector = m[1].trim(), px = Number(size[1]);
+  const floor = /^(kbd|\.wordmark small)$/.test(selector) ? 10.5 : 11;
+  if (px < floor) small.push(selector + ' ' + px + 'px');
+}
+assert.deepEqual(small, [], 'Text meets the 11px floor (10.5px for key caps and the tagline)');
+assert.deepEqual(failures, [], 'Readable contrast in every theme and type set');
+console.log('PASS: ' + themes.length + ' themes × ' + types.length + ' type sets define every colour and font with readable contrast');

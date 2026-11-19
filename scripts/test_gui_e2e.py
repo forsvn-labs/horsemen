@@ -258,7 +258,15 @@ try:
     assert browser('eval','[...document.querySelectorAll(".connected-node:not([hidden]) strong")].some(e=>e.textContent === "Delivery")').strip()=='true', 'Exploring a deep document reveals its ancestor path'
     browser('click','#collapse-all');browser('click','#fit')
 
-    browser('set','viewport','390','844');browser('click','#fit')
+    browser('set','viewport','390','844')
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+    assert 'list' in browser('get','attr','#map','class'), 'A phone opens in List view, where cards stay readable'
+    browser('screenshot','--full',str(args.output/'mobile-list.png'))
+    browser('click','#theme-toggle')
+    menu=value('JSON.stringify((()=>{const r=document.querySelector("#theme-menu").getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return [r.top>=0,r.bottom<=innerHeight,!!top.closest("#theme-menu")]})())')
+    assert menu==[True,True,True], 'On a phone the theme menu opens on screen, above the page'
+    browser('press','Escape')
+    browser('click','#canvas-view');browser('click','#fit')
     assert browser('eval','document.documentElement.scrollWidth <= innerWidth').strip()=='true'
     browser('screenshot','--full',str(args.output/'mobile.png'))
     browser('dblclick','[data-artifact="brain"]')
@@ -279,7 +287,8 @@ try:
     scheme=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
     other='ember' if scheme=='light' else 'pale'
     browser('click','#theme-toggle')
-    assert value('document.querySelectorAll("#theme-menu [role=menuitemradio]").length')==7, 'System and six themes'
+    assert value('document.querySelectorAll("#theme-menu [data-theme-choice]").length')==7, 'System and six themes'
+    assert value('document.querySelectorAll("#theme-menu [role=group] [role=menuitemradio]").length')==10, 'Colours and type sets share one menu, in labelled groups'
     assert browser('get','attr','[data-theme-choice="system"]','aria-checked').strip()=='true'
     browser('click',f'[data-theme-choice="{other}"]')
     assert value('JSON.stringify([document.documentElement.dataset.theme,localStorage.getItem("horsemen-theme")])')==[other,other], 'Theme choice applies and is saved'
@@ -293,13 +302,46 @@ try:
     assert browser('eval','document.querySelector("#theme-menu").hidden').strip()=='true', 'Escape closes the theme menu'
     dock=value('JSON.stringify((()=>{const d=document.querySelector(".canvas-controls").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().bottom<=d.top)})())')
     assert dock, 'Fit keeps every card clear of the tool dock'
+    # Type sets: one choice for every colour theme. It is saved, and it loads before first paint.
+    browser('click','#theme-toggle')
+    assert value('document.querySelectorAll("#theme-menu [data-type-choice]").length')==3, 'Engraved, Modern, and System'
+    assert browser('get','attr','[data-type-choice="engraved"]','aria-checked').strip()=='true', 'Engraved is the default'
+    browser('click','[data-type-choice="modern"]')
+    assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['modern','modern'], 'Type choice applies and is saved'
+    assert browser('get','attr','[data-type-choice="modern"]','aria-checked').strip()=='true' and browser('get','attr','[data-type-choice="engraved"]','aria-checked').strip()=='false'
+    browser('press','Escape')
+    fonts='JSON.stringify(performance.getEntriesByType("resource").map(e=>e.name.split("/").pop()).filter(n=>n.endsWith(".woff2")).sort())'
+    head='JSON.stringify((()=>{const links=[...document.querySelectorAll("link[rel=preload][as=font]")],css=document.querySelector("link[rel=stylesheet]");return [links.map(l=>l.getAttribute("href")),links.every(l=>l.compareDocumentPosition(css)&Node.DOCUMENT_POSITION_FOLLOWING)]})())'
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','--fn','document.fonts.status === "loaded"')
+    assert value('JSON.stringify(document.documentElement.dataset.type)')=='modern', 'The type choice survives a reload'
+    assert value(head)==[['/assets/fonts/beacon.woff2'],True], 'Only the active set is preloaded, before the stylesheet'
+    assert 'Beacon' in value('JSON.stringify(getComputedStyle(document.querySelector("#project-name")).fontFamily)')
+    assert not set(value(fonts))&{'cleft.woff2','gravure.woff2','halden.woff2','vellum.woff2'}, 'Modern downloads no Engraved fonts'
+    browser('click','#fit');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('screenshot',str(args.output/'desktop-modern.png'))
+    browser('dblclick','[data-artifact="progress"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    assert browser('eval',fits).strip()=='true', 'Progress fits with the wider Modern letters'
+    browser('screenshot',str(args.output/'progress-peek-modern.png'));browser('press','Escape')
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','system type');browser('press','Enter')
+    assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['system','system'], 'Jump to reaches the type sets'
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','--fn','document.fonts.status === "loaded"')
+    assert value(head)==[[],True] and value(fonts)==[], 'System preloads and downloads no font files'
+    browser('click','#fit');browser('screenshot',str(args.output/'desktop-system.png'))
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','engraved type');browser('press','Enter')
+    assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['engraved',None], 'Engraved is the default again'
+    browser('click','#theme-toggle')
+    browser('focus','[data-theme-choice="system"]');browser('press','End')
+    assert value('JSON.stringify(document.activeElement.dataset.typeChoice)')=='system', 'End reaches the last menu item'
+    browser('press','ArrowDown')
+    assert value('JSON.stringify(document.activeElement.dataset.themeChoice)')=='system', 'Arrow keys wrap across both groups'
+    browser('press','Escape')
     browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#clear')
     browser('wait','--fn','document.body.dataset.state === "idle"')
     assert browser('get','text','#source-content').strip()==''
     assert browser('get','text','#peek-content').strip()==''
     assert browser('get','text','#crumb').strip()==''
     assert not browser('errors').strip()
-    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, no browser errors.')
+    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, themes and type sets, no browser errors.')
 except BaseException:
     try:
         browser('screenshot',str(args.output/'failure.png'))

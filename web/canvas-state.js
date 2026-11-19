@@ -16,7 +16,7 @@
   }
   function insideRect(node,rect){return node.x>=rect.x&&node.y>=rect.y&&node.x+node.w<=rect.x+rect.w&&node.y+node.h<=rect.y+rect.h}
   function branchControl({count=0,canLoad=false,expanded=false,loading=false}){
-    return {visible:Boolean(count||canLoad||expanded||loading),disabled:Boolean(loading),expanded:Boolean(expanded),label:loading?'Loading…':count?count+' links':'Links'};
+    return {visible:Boolean(count||canLoad||expanded||loading),disabled:Boolean(loading),expanded:Boolean(expanded),label:loading?'Loading…':count?count+(count===1?' link':' links'):'Links'};
   }
   function overlaps(a,b,gap=0){return a.x<b.x+b.w+gap&&a.x+a.w+gap>b.x&&a.y<b.y+b.h+gap&&a.y+a.h+gap>b.y}
   /* Places newly shown linked cards in blocks beside their parent. Cards in `fixed` never move.

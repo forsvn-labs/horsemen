@@ -72,6 +72,16 @@ test('signed-out visitors get the sign-in page with security headers', async () 
   assert.equal((await call('/gh/user')).status, 401);
 });
 
+test('the sign-in page uses the saved type set and real font weights', async () => {
+  const html = await (await call('/')).text();
+  assert.match(html, /<script src="\/theme.js"><\/script>/, 'theme.js applies the saved type set before first paint');
+  const faces = [...html.matchAll(/@font-face\{[^}]*\}/g)].map(m => m[0]);
+  assert.ok(faces.length >= 3);
+  for (const face of faces) assert.match(face, /font-weight:100 900/, 'variable fonts declare their weight range, so bold is not synthesized');
+  for (const type of ['modern', 'system']) assert.match(html, new RegExp(':root\\[data-type=' + type + '\\]'), 'the page has the ' + type + ' type set');
+  assert.doesNotMatch(html, /<script>/, 'no inline script: the CSP allows only same-origin script files');
+});
+
 test('login redirects to GitHub with a state bound to a short-lived cookie', async () => {
   const res = await call('/auth/login');
   assert.equal(res.status, 302);

@@ -24,6 +24,7 @@ const {branchControl}=require('../web/canvas-state.js');
 assert.equal(branchControl({count:0,canLoad:false}).visible,false);
 assert.deepEqual(branchControl({count:2,expanded:true}),{visible:true,disabled:false,expanded:true,label:'2 links'});
 assert.equal(branchControl({canLoad:true}).label,'Links');
+assert.equal(branchControl({count:1}).label,'1 link','One link is singular');
 assert.equal(branchControl({canLoad:true,loading:true}).disabled,true);
 
 console.log('PASS: branch visibility, selection, marquee bounds, and inline control states');
