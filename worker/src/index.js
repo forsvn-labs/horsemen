@@ -191,7 +191,7 @@ async function proxy(env, request, session, path) {
 }
 
 /* ---------------------------------------------------------------- app */
-/* Share links: /owner/repo with an optional ?root=&record= query. They carry no data. */
+/* Share links: /owner/repo with an optional ?root=&canvas=&node=&record= query. They carry no data. */
 const RESERVED = new Set(['assets', 'auth', 'api', 'gh', 'pub', 'healthz', 'vendor']);
 const SHARE_PATH = /^\/([A-Za-z0-9][A-Za-z0-9-]{0,38})\/([A-Za-z0-9_.-]{1,100})\/?$/;
 function shareRepo(path) {
@@ -200,12 +200,17 @@ function shareRepo(path) {
   return `${m[1]}/${m[2]}`;
 }
 /* The page to return to after sign-in: the home page or a share link, never another site or app route. */
+/* A canvas has the name of a canvas file; an element has a canvas element ID. Other values are dropped. */
+const NEXT_VALUE = { canvas: /^[a-z0-9][a-z0-9-]{0,63}$/, node: /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/ };
 function safeNext(next) {
   if (typeof next !== 'string' || next.length > 300 || !next.startsWith('/') || next.startsWith('//') || next.includes('\\')) return '/';
   let u; try { u = new URL(next, 'https://horsemen.invalid'); } catch { return '/'; }
   if (u.origin !== 'https://horsemen.invalid' || (u.pathname !== '/' && !shareRepo(u.pathname))) return '/';
   const query = new URLSearchParams();
-  for (const key of ['root', 'record']) { const v = u.searchParams.get(key); if (v && v.length <= 200) query.set(key, v); }
+  for (const key of ['root', 'canvas', 'node', 'record']) {
+    const v = u.searchParams.get(key);
+    if (v && v.length <= 200 && (!NEXT_VALUE[key] || NEXT_VALUE[key].test(v))) query.set(key, v);
+  }
   const qs = query.toString();
   return u.pathname + (qs ? '?' + qs : '');
 }

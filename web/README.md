@@ -1,7 +1,8 @@
 # Local GitHub workspace
 
 Open real Horsemen projects as a calm canvas. Double-click a record to read it
-or inspect its exact Markdown. The app reads GitHub; it does not edit files.
+or inspect its exact Markdown. Each record also opens as a canvas of its
+sections. The app reads GitHub; it does not edit files.
 
 From this source checkout, with Python 3.10+ and GitHub CLI installed:
 
@@ -25,27 +26,68 @@ See [the hosted viewer](../worker/README.md).
 The screen shows few controls. Everything else is in one of three places:
 the account menu, the Jump field, and the keyboard.
 
-- **Rail.** The rail lists your projects. A lock marks a private repository.
-  A search field appears when you have more than eight projects. Multiple
-  search words narrow the result. Nested project roots are separate entries.
+- **Rail.** The rail has the project switcher, then the canvases of the open
+  project: Home and each record that the project has. Select the switcher to
+  see your projects. A lock marks a private repository. A search field
+  appears when you have more than eight projects. Multiple search words
+  narrow the result. Nested project roots are separate entries. The Up and
+  Down arrow keys move in the list; Escape closes it. A project opens on the
+  canvas that you used last, until the page reloads. In hosted mode, the
+  list also has Connect a repository.
 - **Account menu.** Select your account name at the bottom of the rail. The
   menu holds Refresh GitHub (with the time of the last check), the theme
   gallery, and Clear workspace. In hosted mode it also holds Choose
   repositories and Sign out.
-- **Header.** The header shows the project name and one line: the
-  repository, when PROGRESS says it was updated, and the commit that the app
-  read. It has Jump, Canvas or List, and in hosted mode Copy link.
+- **Header.** The header names the open canvas: the project on Home, the
+  record on a record canvas. One line follows: the number of sections (on a
+  record canvas), the repository, when PROGRESS says it was updated, and the
+  commit that the app read. It has Jump, Canvas or List, and in hosted mode
+  Copy link.
 - **Jump.** Press Ctrl + K (Command + K on macOS) or select Jump. One field
-  reaches each record, linked document, project, canvas action, and theme. Canvas actions include Fit, Select tool, Hand tool, Open the
-  selected record, Collapse all linked branches, Reset layout, Refresh GitHub,
-  and Clear workspace.
+  reaches each record, canvas, linked document, project, canvas action, and
+  theme. Canvas actions include Fit, Select tool, Hand tool, Open the
+  selected card, Collapse all linked branches, Reset layout (on Home),
+  Refresh GitHub, and Clear workspace.
 - **Shortcuts.** Press `?` or choose Keyboard shortcuts in Jump to see every
   key.
 - The status line under the header shows only while discovery runs, after
   an error, or after Clear workspace. Problems with a repository show under
   it until they are fixed.
 
-### Canvas
+### Record canvases
+
+Select a record in the rail to open its canvas. The canvas is generated from
+the record each time. It needs no file, and the app saves nothing about it.
+
+- The canvas has one card for each second-level heading (`## Heading`), in
+  reading order, in three columns. A card shows the heading and a few lines
+  from that section. It shows a count when the section has two or more list
+  items or table rows. These are excerpts, not generated claims.
+- Each card has a stable ID: `s-` and the heading in lower-case letters,
+  digits, and hyphens, such as `s-in-progress`. A repeated heading gets `-2`,
+  `-3`. A record without second-level headings shows one card for the whole
+  record.
+- The layout is fixed. The same record gives the same canvas to each person,
+  and a new last section does not move the cards before it. You cannot move
+  a section card; a drag that starts on a card moves the canvas.
+- Click selects a card. Enter or double-click opens the reading view at that
+  section, over the canvas. The view uses the layout of the record when the
+  layout names the section; if not, it uses the full document. Close the
+  view to return to the same card.
+- List view shows the same cards in reading order. One click opens a card.
+- A record canvas has no connectors. Connectors between cards come with
+  saved canvas files, which are a later step of
+  [the canvas workspace design](../docs/product/canvas-workspace.md). Home
+  keeps its connectors between records and linked documents.
+- The address names the canvas and the selected card. In the local app it is
+  `#p=<project>&c=progress&n=s-shipped`; `&r=progress` is added while the
+  reading view is open. The hosted form is
+  `/owner/repo?canvas=progress&node=s-shipped`. A link to a section whose
+  heading changed opens the canvas and says that the section is not there.
+  Links from before canvases, such as `?record=progress`, open the record
+  over Home as before.
+
+### Home canvas
 
 - Each card shows the record name and a few key lines from the source. These
   are excerpts, not generated claims. The icon has the colour of the record.
@@ -72,7 +114,8 @@ the account menu, the Jump field, and the keyboard.
   pattern in [Excalidraw](https://plus.excalidraw.com/changelog); this app does
   not include freehand drawing, shape editing, or the Excalidraw editor.
 - On a screen 640px wide or less, the app opens in List view, so cards stay
-  readable. Select Canvas to see the map.
+  readable. Select Canvas to see the map. The project switcher sits beside
+  the app icon, and the canvases are one row that scrolls sideways.
 
 ### Record view
 
@@ -99,8 +142,8 @@ the account menu, the Jump field, and the keyboard.
   each step goes back. Use the left and right arrow keys, or the arrows at
   the end of the page, to change record.
 - On a phone, the record view fills the screen.
-- The address keeps the selected project and the open record. A reload
-  returns to the same place.
+- The address keeps the selected project, the open canvas, the selected
+  section card, and the open record. A reload returns to the same place.
 - Linked repository Markdown opens inside the app at the same scanned commit.
   External documents and other file types show the link and its source.
   Horsemen does not fetch their contents. Missing and unreadable files show
@@ -185,7 +228,7 @@ The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
-by the app. The browser stores only opaque project IDs, canvas positions, the theme, palette, and mode choices, and the layout choice for each record type.
+by the app. The browser stores only opaque project IDs, the positions of Home cards, the theme, palette, and mode choices, and the layout choice for each record type. It stores nothing about record canvases.
 In hosted mode, the browser also keeps a discovery index without record text; see
 [fast reloads](../worker/README.md#how-it-works).
 External images do not load automatically. Opening an external link leaves
@@ -208,6 +251,7 @@ node tests/test_gui_views.cjs
 node tests/test_gui_markdown.cjs
 node tests/test_gui_themes.cjs
 node tests/test_canvas_state.cjs
+node tests/test_canvas_sections.cjs
 python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check
 ```
 

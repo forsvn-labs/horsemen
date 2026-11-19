@@ -52,6 +52,10 @@ def main():
         # Hosted viewer: reader parity with Python, and the Worker's auth and proxy rules.
         if not shutil.which("node"): raise RuntimeError("hosted-tests need Node.js 20 or later")
         run("hosted-tests", ["node", "--test", "tests/test_hosted_reader.cjs", "worker/test/worker.test.js"])
+        # Viewer rules: generated canvases, canvas interaction, previews, views, Markdown, themes, and media.
+        run("viewer-rule-tests", ["node", "--test", "tests/test_canvas_sections.cjs", "tests/test_canvas_state.cjs",
+                                  "tests/test_gui_previews.cjs", "tests/test_gui_views.cjs", "tests/test_gui_markdown.cjs",
+                                  "tests/test_gui_themes.cjs", "tests/test_gui_media.cjs"])
         for suite in ("test_cli", "test_documents", "test_progress_layout", "test_techstack", "test_commands",
                       "test_brain", "test_records", "test_drive_adapter"):
             run(suite, [sys.executable, "-B", f"horsemen/scripts/{suite}.py"])

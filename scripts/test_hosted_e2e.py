@@ -137,7 +137,9 @@ def value(code):
 def until(code, seconds=30):
     deadline = time.time() + seconds
     while time.time() < deadline:
-        if value(code): return
+        try:
+            if value(code): return
+        except (AssertionError, ValueError): pass  # The page is between two documents (for example during sign-in). Try again.
         time.sleep(0.5)
     raise AssertionError('Timed out waiting for: ' + code + ' at ' + str(value('location.href+" | "+document.body.innerText.slice(0,300)')))
 
@@ -151,6 +153,7 @@ try:
     else: raise AssertionError('wrangler dev did not start')
 
     browser('open', origin)
+    desktop = [str(n) for n in value('JSON.stringify([innerWidth, innerHeight])')]  # The phone step returns to this size.
     assert value("document.body.innerText.includes('Sign in with GitHub')"), 'signed-out visitors see the sign-in page'
     browser('screenshot', str(args.output / '01-sign-in.png'))
     browser('click', 'a.btn')
@@ -186,7 +189,28 @@ try:
     deadline = time.time() + 20  # The first check stores the ETag; the next one sends it.
     while world['not_modified'] < 1 and time.time() < deadline: time.sleep(0.5)
     assert world['not_modified'] >= 1, 'an unchanged branch uses a conditional request'
+    # Canvases: the rail lists Home and each record; a record opens as a canvas of its sections, and the address names the place.
+    place = "JSON.stringify(location.pathname + location.search)"
+    shown = "JSON.stringify([canvasKey, [...selected], document.querySelector('#peek').open])"
+    assert value("JSON.stringify([...document.querySelectorAll('#canvases [data-canvas]')].map(b => b.dataset.canvas))") == ['home', 'vision', 'progress', 'brain', 'structure'], 'the rail lists Home and the records that are found'
+    assert value("JSON.stringify([document.querySelector('#workspace-name').textContent, document.querySelector('#connect-repo').href.includes('/apps/horsemen-fictional/installations/new')])") == ['alpha', True], 'the switcher names the project and leads to the page that adds a repository'
+    browser('focus', '[data-canvas="progress"]'); browser('press', 'Enter')
+    until("document.querySelector('#project-name').textContent === 'Progress' && document.querySelectorAll('.section-card').length === 1")
+    assert value(place) == '/example/alpha?canvas=progress', 'the address names the canvas'
+    browser('focus', '[data-node="s-shipped"]'); browser('press', 'Enter')
+    assert value(shown) == ['progress', ['s-shipped'], False] and value(place) == '/example/alpha?canvas=progress&node=s-shipped', 'Enter selects a card and the address names it'
+    browser('screenshot', str(args.output / '02d-canvas.png'))
+    browser('press', 'Enter')
+    until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Search is available')")
+    assert value(place) == '/example/alpha?canvas=progress&node=s-shipped&record=progress', 'the address keeps the canvas, the card, and the open record'
+    browser('press', 'Escape')
+    until("!document.querySelector('#peek').open && document.activeElement.dataset.node === 's-shipped' && location.search === '?canvas=progress&node=s-shipped'")
+    # A new commit reloads the open canvas and keeps the place.
     world['rev'] = 'b' * 40; world['sources']['PROGRESS.md'] = UPDATED
+    until("document.querySelector('[data-node=s-shipped]')?.innerText.includes('Pilot results reached all operators')", 30)
+    assert value(shown) == ['progress', ['s-shipped'], False] and value(place) == '/example/alpha?canvas=progress&node=s-shipped', 'a live update keeps the canvas and the selected card'
+    browser('click', '[data-canvas="home"]')
+    assert value(place) == '/example/alpha'
     until("document.querySelector('[data-artifact=progress]').innerText.includes('Publish the pilot results')", 30)
     assert value("document.querySelector('#project-description').textContent.includes('bbbbbbb')")
     browser('screenshot', str(args.output / '03-live-update.png'))
@@ -217,6 +241,29 @@ try:
     browser('screenshot', str(args.output / '05-shared-record.png'))
     browser('press', 'Escape')
     until("location.pathname + location.search === '/example/alpha'", 5)
+    # Canvas links: a signed-out visitor signs in and lands on the same canvas and card.
+    browser('click', '#menu-toggle'); browser('click', '#sign-out')
+    until("document.body.innerText.includes('Sign in with GitHub')")
+    link = '/example/alpha?canvas=progress&node=s-shipped'
+    browser('open', origin + link)
+    assert value("document.body.innerText.includes('Sign in to open example/alpha')")
+    browser('click', 'a.btn')
+    until("typeof canvasKey !== 'undefined' && document.body.dataset.state === 'ready' && canvasKey === 'progress' && selected.has('s-shipped')", 20)
+    assert value(place) == link and value("JSON.stringify(document.querySelector('#project-name').textContent)") == 'Progress', 'the canvas link survives sign-in'
+    assert value("JSON.stringify(document.activeElement.dataset.node)") == 's-shipped', 'the card a link names has focus'
+    browser('screenshot', str(args.output / '05b-shared-canvas.png'))
+    # The same link on a phone: the canvas is a list of its sections, and nothing scrolls sideways.
+    browser('set', 'viewport', '390', '844'); browser('eval', 'location.reload()')
+    until("typeof canvasKey !== 'undefined' && document.body.dataset.state === 'ready' && canvasKey === 'progress' && selected.has('s-shipped')", 20)
+    assert value("JSON.stringify([document.querySelector('#map').classList.contains('list'), document.documentElement.scrollWidth <= innerWidth, (r => r.scrollWidth <= r.clientWidth + 1)(document.querySelector('.rail')), [...document.querySelectorAll('.section-card')].every(e => e.getBoundingClientRect().right <= innerWidth)])") == [True, True, True, True], 'a canvas fits a phone as a list'
+    assert value(place) == link
+    browser('press', 'Enter')
+    until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Pilot results reached all operators')")
+    assert value("JSON.stringify((r => [Math.round(r.width), Math.round(r.height)])(document.querySelector('#peek').getBoundingClientRect()))") == [390, 844] and value(place) == link + '&record=progress', 'on a phone a section opens the reading view on the full screen'
+    browser('screenshot', str(args.output / '05c-shared-canvas-phone.png'))
+    browser('press', 'Escape')
+    until("!document.querySelector('#peek').open")
+    browser('set', 'viewport', *desktop)
     # A link to a repository this account cannot read says why.
     browser('open', origin + '/example/private-elsewhere')
     until("document.querySelector('#issues') && document.querySelector('#issues').textContent.includes('cannot open example/private-elsewhere')", 20)
@@ -231,6 +278,16 @@ try:
     assert value("localStorage.getItem('horsemen.discovery.v1') === null"), 'public view saves no index'
     assert value("location.pathname + location.search === '/example/open?record=progress'")
     browser('screenshot', str(args.output / '07-public-view.png'))
+    # Public view of a canvas link: the same canvas and card, with no sign-in and nothing saved.
+    public = '/example/open?canvas=vision&node=s-who-we-build-for'
+    browser('open', origin + public)
+    until("document.querySelector('meta[name=horsemen-mode]')?.content === 'public' && typeof canvasKey !== 'undefined' && document.body.dataset.state === 'ready' && canvasKey === 'vision' && selected.has('s-who-we-build-for')", 20)
+    assert value("JSON.stringify([...document.querySelectorAll('.section-card')].map(e => e.dataset.node))") == ['s-why-we-exist', 's-who-we-build-for']
+    assert value(place) == public and value("!document.querySelector('#connect-repo') && localStorage.getItem('horsemen.discovery.v1') === null"), 'public view keeps the canvas link, offers no repository page, and saves no index'
+    browser('press', 'Enter')
+    until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Independent builders')")
+    assert value(place) == public + '&record=vision'
+    browser('screenshot', str(args.output / '08-public-canvas.png'))
     assert world['app_calls'] > 0
     print('Hosted E2E passed:', args.output)
 finally:

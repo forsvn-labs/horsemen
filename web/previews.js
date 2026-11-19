@@ -134,7 +134,7 @@
   }
   function matchesProject(project,query){const hay=[project.name,project.repo,project.root].join(' ').toLocaleLowerCase();return query.trim().toLocaleLowerCase().split(/\s+/).every(word=>hay.includes(word))}
   const views=artifactViews();
-  const api={preview,matchesProject,detail,toolsTable,facts,lede,tidy,split,shape,tree,views};if(typeof module!=='undefined')module.exports=api;else{root.HorsemenPreview=api;root.HorsemenViews=views}
+  const api={preview,matchesProject,detail,toolsTable,facts,lede,tidy,split,shape,tree,plain,lines,views};if(typeof module!=='undefined')module.exports=api;else{root.HorsemenPreview=api;root.HorsemenViews=views}
 
   /* Artifact views. Each record type has a model read from its source and a view built from that model.
      Views show source excerpts only. Every item keeps its source line, so a reader can check the original.

@@ -8,6 +8,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ./
 ├── web/                   GitHub canvas (local and hosted), Markdown, diagrams (vendored Mermaid in web/vendor/), images, themes, previews, and setup guide
 │   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
+│   ├── canvas-sections.js Rules for the generated canvas of a record: sections, card IDs, layout, card text, and links
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
 │   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in and read-only proxy
@@ -47,6 +48,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Hosted speed benchmark: `python3 scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench`.
 - Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
+- Generated canvas rule checks: `node tests/test_canvas_sections.cjs`.
 - Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.

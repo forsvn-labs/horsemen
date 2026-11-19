@@ -234,7 +234,7 @@ test('share links round-trip between a project and a readable URL', () => {
   assert.equal(R.shareURL('https://h.test', nested, 'brain'), 'https://h.test/example/mono?root=apps%2Fweb+app&record=brain');
   assert.equal(R.shareURL('https://h.test', p, 'unknown'), 'https://h.test/Example/Alpha', 'unknown records are dropped');
   const t = R.shareTarget(new URL('https://h.test/example/mono?root=apps%2Fweb+app&record=brain'));
-  assert.deepEqual(t, { repo: 'example/mono', root: 'apps/web app', record: 'brain' });
+  assert.deepEqual(t, { repo: 'example/mono', root: 'apps/web app', record: 'brain', canvas: null, node: null });
   assert.ok(R.matchesTarget(nested, t)); assert.ok(R.matchesTarget(p, R.shareTarget(new URL('https://h.test/example/alpha'))), 'repository names ignore case');
   assert.ok(!R.matchesTarget(p, R.shareTarget(new URL('https://h.test/example/alpha?root=x'))));
   for (const bad of ['/', '/only', '/a/b/c', '/assets/icons', '/auth/login', '/api/x', '/gh/user', '/a%2Fb/c', '/-bad/x', '/a/..', '/a/b?record=Vision%22']) {
@@ -242,6 +242,29 @@ test('share links round-trip between a project and a readable URL', () => {
     assert.ok(t2 === null || (t2.record === null && bad.includes('record')), bad);
   }
   assert.equal(R.shareTarget(new URL('https://h.test/a/b?record=Vision%22')).record, null);
+});
+
+/* Canvas links. Failure modes: a link loses its canvas or element; an unknown
+   canvas or a bad element ID is trusted; an element without a record canvas is
+   kept; a link from before canvases changes its meaning. */
+test('share links carry a canvas and one element', () => {
+  const p = { repo: 'Example/Alpha', root: '' }, nested = { repo: 'example/mono', root: 'apps/web' };
+  assert.equal(R.shareURL('https://h.test', p, null, 'progress'), 'https://h.test/Example/Alpha?canvas=progress');
+  assert.equal(R.shareURL('https://h.test', p, null, 'progress', 's-shipped'), 'https://h.test/Example/Alpha?canvas=progress&node=s-shipped');
+  assert.equal(R.shareURL('https://h.test', nested, 'progress', 'progress', 's-shipped'), 'https://h.test/example/mono?root=apps%2Fweb&canvas=progress&node=s-shipped&record=progress');
+  assert.equal(R.shareURL('https://h.test', p, 'brain', 'home', 's-shipped'), 'https://h.test/Example/Alpha?record=brain', 'Home needs no canvas; an element needs a record canvas');
+  assert.equal(R.shareURL('https://h.test', p, null, 'boards', 'bad id'), 'https://h.test/Example/Alpha');
+  assert.equal(R.shareURL('https://h.test', p, null, 'vision', 'bad id'), 'https://h.test/Example/Alpha?canvas=vision');
+  const t = R.shareTarget(new URL('https://h.test/example/mono?root=apps%2Fweb&canvas=progress&node=s-shipped&record=progress'));
+  assert.deepEqual(t, { repo: 'example/mono', root: 'apps/web', record: 'progress', canvas: 'progress', node: 's-shipped' });
+  assert.deepEqual(R.shareTarget(new URL(R.shareURL('https://h.test', nested, 'brain', 'brain', 's-providers'))), { repo: 'example/mono', root: 'apps/web', record: 'brain', canvas: 'brain', node: 's-providers' }, 'a link survives a round trip');
+  const old = R.shareTarget(new URL('https://h.test/example/alpha?record=progress'));
+  assert.deepEqual([old.record, old.canvas, old.node], ['progress', null, null], 'a link from before canvases opens the record over Home');
+  for (const [query, canvas, node] of [['canvas=Progress&node=s-a', null, null], ['canvas=home&node=s-a', null, null], ['node=s-a', null, null], ['canvas=constructor', null, null],
+    ['canvas=vision&node=%3Cb%3E', 'vision', null], ['canvas=vision&node=' + 'a'.repeat(65), 'vision', null], ['canvas=vision&node=-x', 'vision', null]]) {
+    const found = R.shareTarget(new URL('https://h.test/example/alpha?' + query));
+    assert.deepEqual([found.canvas, found.node], [canvas, node], query);
+  }
 });
 
 test('discovery reads the shared repository first', () => {
