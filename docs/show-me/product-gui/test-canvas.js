@@ -1,0 +1,17 @@
+(() => {
+const assert=(v,m)=>{if(!v)throw Error(m)}, $=s=>document.querySelector(s);
+assert($('.canvas').dataset.mode==='infinite','Infinite canvas enabled');
+const pointer=(target,type,x,y,id=71)=>target.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:x,clientY:y,pointerId:id,pointerType:'mouse',button:0,buttons:type==='pointerup'?0:1}));
+const card=$('[data-artifact="vision"]'), before=card.getBoundingClientRect(), stage=$('.canvas');
+pointer(card,'pointerdown',before.x+60,before.y+50);pointer(window,'pointermove',before.x+160,before.y+110);pointer(window,'pointerup',before.x+160,before.y+110);
+const after=card.getBoundingClientRect();assert(Math.abs(after.x-before.x-100)<2,'Drag uses screen-space delta');assert(!$('#peek').open,'Drag does not open peek');
+const transform=$('#map').style.transform, r=stage.getBoundingClientRect();pointer(stage,'pointerdown',r.x+8,r.y+8);pointer(window,'pointermove',r.x+88,r.y+48);pointer(window,'pointerup',r.x+88,r.y+48);assert($('#map').style.transform!==transform,'Background pans');
+const oldZoom=parseInt($('#zoom-label').textContent);$('#zoom-in').click();assert(parseInt($('#zoom-label').textContent)>oldZoom,'Zoom increases');
+const scaled=card.getBoundingClientRect();pointer(card,'pointerdown',scaled.x+30,scaled.y+30,72);pointer(window,'pointermove',scaled.x+90,scaled.y+60,72);pointer(window,'pointerup',scaled.x+90,scaled.y+60,72);assert(Math.abs(card.getBoundingClientRect().x-scaled.x-60)<2,'Drag stays accurate while zoomed');
+const beforeSwitch=card.style.left; $('[data-project="1"]').click();assert(card.style.left!==beforeSwitch,'Projects have independent layout');$('[data-project="0"]').click();assert(card.style.left===beforeSwitch,'Project layout restored');
+$('#list-view').click();assert($('#map').classList.contains('list'),'List fallback');$('#canvas-view').click();assert(card.style.left===beforeSwitch,'Layout survives list view');
+$('#fit').click();for(const el of document.querySelectorAll('[data-artifact]')){const b=el.getBoundingClientRect(), c=stage.getBoundingClientRect();assert(b.x>=c.x-1&&b.right<=c.right+1&&b.y>=c.y-1&&b.bottom<=c.bottom+1,'Fit includes '+el.dataset.artifact)}
+const beforePinch=parseInt($('#zoom-label').textContent);const touch=(type,x,id)=>stage.dispatchEvent(new PointerEvent(type,{bubbles:true,clientX:r.x+x,clientY:r.y+80,pointerId:id,pointerType:'touch',button:0}));touch('pointerdown',100,81);touch('pointerdown',200,82);touch('pointermove',260,82);assert(parseInt($('#zoom-label').textContent)>beforePinch,'Pinch zoom');touch('pointerup',100,81);touch('pointerup',260,82);assert(evidenceGallery([{url:'not a URL',caption:'Bad'}])==='<div class="media-slots"></div>','Invalid media URL ignored');assert(evidenceGallery([{url:'https://example.com/before.png',caption:'Before'}]).includes('<img'),'PR media renderer');$('#reset-layout').click();assert(card.style.left==='0px','Reset layout');
+$('#changelog-evidence-example').click();assert($('#peek').open,'Real evidence example opens');assert($('#peek-content a[href*="github.com/hungv47/horsemen/pull/1"]'),'Actual PR evidence');assert($('#peek-content').textContent.includes('Screenshots'),'Screenshot evidence status');assert($('#peek-content').textContent.includes('not verified'),'Missing delivery proof explicit');$('#close-peek').click();
+return 'PASS: artifact drag, pan, scaled drag, zoom, isolated project layouts, list recovery, fit bounds, reset, real evidence and missing proof';
+})()

@@ -8,7 +8,7 @@ Horsemen keeps four Markdown records useful: why the project exists, what has
 shipped, where its knowledge lives, and where to find its parts. It works for
 software, business, research, and personal projects.
 
-One project, two ways to use it:
+Two interfaces are available today:
 
 | Use the agent skill to… | Use the CLI to… |
 | --- | --- |
@@ -20,6 +20,14 @@ Both use the same checker. The CLI has no runtime dependencies beyond Python
 3.10+ and optional Git. Default commands only read. Explicit single-record
 updates can save a local edit under an exclusive-writer contract. The CLI
 does not contact outside services.
+
+A [local visual workspace](web/README.md) reads your GitHub projects through
+an existing `gh` sign-in. Drag records and connected documents on an infinite
+canvas. Open tailored artifact overviews, follow linked repository Markdown,
+or inspect the complete source. Run `python3 scripts/serve_gui.py` from this checkout,
+then open <http://127.0.0.1:8787>. It is read-only and available from source;
+public sharing and hosted sign-in remain future work. The offline
+[design prototype](docs/show-me/product-gui/prototype.html) uses fictional data.
 
 ## Get started
 

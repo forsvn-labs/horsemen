@@ -11,7 +11,10 @@
 | GitHub Actions | Cross-platform verification | Repository workflow | Tests Linux/macOS with Python 3.10/3.14 |
 | skills.sh CLI (`skills`) | Agent skill installation | Node.js and npm through `npx` | Downloads Horsemen and prompts for agent and scope |
 
-No web frontend, server, database, hosted service, or background worker.
+The optional source-only GUI uses static HTML, CSS, and JavaScript with a
+Python standard-library HTTP server bound to loopback. GitHub CLI (`gh`) supplies
+the existing github.com sign-in. Four reader workers discover repositories;
+there is no database or hosted service. See [local setup](web/README.md).
 Provider helpers exist in the skill but have no live account connection by default.
 
 ## Runtime connections

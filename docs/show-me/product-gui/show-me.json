@@ -1,0 +1,49 @@
+{
+  "title": "Horsemen visual workspace",
+  "summary": "Explore the infinite canvas and try artifact dragging, pan, zoom, and evidence peeks.",
+  "views": [
+    {
+      "id": "canvas-options",
+      "label": "Canvas options",
+      "question": "How should an operator move through a project?",
+      "updated": "2026-11-18",
+      "keyPoints": [
+        "Start aligned, then drag artifacts anywhere on an infinite canvas.",
+        "Pan, scroll or pinch to zoom, and use Fit to recover the whole project. Layouts are saved per demo project.",
+        "Changelog separates delivery evidence, PR and commit references, and screenshots."
+      ],
+      "blocks": [
+        {
+          "type": "svg",
+          "src": "canvas-options.svg",
+          "editable": "canvas-options.excalidraw",
+          "title": "Canvas alternatives"
+        },
+        {
+          "type": "note",
+          "text": "[Open the interactive prototype](prototype.html). Switch projects, open each artifact, inspect its source, and preview selected sharing."
+        }
+      ],
+      "sources": [
+        {
+          "label": "GUI requirements",
+          "href": "../../product/gui-requirements.md"
+        },
+        {
+          "label": "Design rationale",
+          "href": "DESIGN.md"
+        }
+      ]
+    }
+  ],
+  "log": [
+    {
+      "date": "2026-11-18",
+      "change": "Added an infinite canvas with saved layouts and a source-backed ship evidence example."
+    },
+    {
+      "date": "2026-11-18",
+      "change": "Created the project atlas prototype and three editable canvas concepts."
+    }
+  ]
+}
