@@ -42,6 +42,15 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   link carries no data: the visitor needs GitHub access to the repository, and
   the app must be installed on it. Otherwise the page says so. Agents can write
   these links in reports without any API.
+- **Public view.** A link to a public repository, such as
+  `https://horsemen.forsvn.com/hungv47/horsemen`, opens without sign-in. The
+  Worker first checks that the repository is public, then reads it through
+  `/pub/...` with the GitHub App's client credentials, never a user token. It
+  reads only repository routes. Public data is cached at the edge: repository
+  details and branch heads for 60 seconds, objects addressed by SHA for a day.
+  A repository made private stops working within 60 seconds. The browser
+  keeps nothing for a public view. A signed-in user can add `?view=public` to
+  see what visitors see. Private repositories still need sign-in.
 - **Agents.** Agents update records the normal way: edit, commit, and push.
   The viewer shows the default branch, so unpushed edits do not appear. The
   Horsemen Stop hook reminds the agent when a record it changed has not
@@ -97,8 +106,8 @@ opens a fictional project, detects a new commit, and signs out. It needs
   A reload makes one branch check for each repository; unchanged branches
   return 304 and do not count against the GitHub rate limit (5,000 requests
   an hour).
-- Links work only for people with GitHub access to the repository. Public
-  links for anyone would need stored share settings, not stored records.
+- Links to private repositories work only for people with GitHub access.
+  Public links to private repositories would need stored share settings.
 - Private PR image attachments open on GitHub; the viewer does not load them.
 - Cloudflare's free plan allows 100,000 Worker requests a day. Each GitHub
   read is one request.
