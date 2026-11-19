@@ -643,6 +643,9 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 :root[data-style=terminal] .artifact:hover:not(:disabled){border-style:solid;border-color:var(--ink-2)}
 :root[data-style=terminal] .segmented button[aria-pressed=true]{background:var(--ink);color:var(--ground);box-shadow:none}
 :root[data-style=terminal] .wires path{stroke-dasharray:4 4}
+/* Monospace link badges are wider: keep the small-card title clear of them. */
+:root[data-style=terminal] .has-link-control .cardhead{padding-right:100px}
+:root[data-style=terminal] .supporter .cardhead b{font-size:.875rem;letter-spacing:0}
 
 /* Swiss: heavy black bars over sections and cards, a red mark for the active choice, a big masthead. */
 :root[data-style=swiss] .heading h1{font-size:1.875rem;line-height:1.05}
