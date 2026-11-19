@@ -25,8 +25,9 @@ A [local visual workspace](web/README.md) reads your GitHub projects through
 an existing `gh` sign-in. Drag records and connected documents on an infinite
 canvas. Open tailored artifact overviews, follow linked repository Markdown,
 or inspect the complete source. Run `python3 scripts/serve_gui.py` from this checkout,
-then open <http://127.0.0.1:8787>. It is read-only and available from source;
-public sharing and hosted sign-in remain future work. The offline
+then open <http://127.0.0.1:8787>. It is read-only and available from source.
+A [hosted, read-only viewer](worker/README.md) with GitHub sign-in is in
+preview; it stores no project data. Public sharing remains future work. The offline
 [design prototype](docs/show-me/product-gui/prototype.html) uses fictional data.
 
 ## Get started
