@@ -68,7 +68,11 @@ try:
     browser('wait','--fn','projects.length === 2')
     assert 'alpha' in browser('get','text','#project-name'), 'New results must preserve selection'
 
-    assert 'PRIVATE' in browser('get','text','#privacy')
+    assert value('JSON.stringify([document.querySelector("#privacy").hidden,document.querySelector("#privacy").textContent])')==[False,'Private repository'], 'A private repository shows a lock next to its name'
+    assert value('JSON.stringify(!document.querySelector(".legend,.canvas-hint,.canvas-controls,#search,#clear-button,.notice"))') is True, 'No legend, hint lines, tool dock, or second search field'
+    assert value('JSON.stringify(document.querySelectorAll(".topbar button,.topbar a").length)')<=3, 'The header has at most three actions'
+    assert value('JSON.stringify(document.querySelector(".project-search").hidden)') is True, 'Project search appears only for long lists'
+    assert value('JSON.stringify(!document.body.innerText.match(/Conquest|Famine|Campaign|pinned/))') is True, 'Cards carry no rider lore or Git jargon'
     browser('click','[data-artifact="vision"]')
     original_position=value('JSON.stringify(position("brain"))')
     browser('click','[data-card-toggle="brain"]')
@@ -100,12 +104,14 @@ try:
     assert camera_after['z']==camera_before['z'] and camera_after['y']==camera_before['y']-40, 'Wheel pans without zoom'
     browser('eval','document.querySelector(".canvas").dispatchEvent(new WheelEvent("wheel",{deltaY:-40,ctrlKey:true,clientX:700,clientY:500,bubbles:true,cancelable:true}))')
     assert value('camera.z')>camera_before['z'], 'Ctrl-wheel zooms'
-    browser('click','#hand-tool')
+    browser('press','h')
+    assert value('JSON.stringify(document.querySelector(".canvas").dataset.tool)')=='hand', 'H chooses the Hand tool'
     camera_before=value('JSON.stringify(camera)');before=value('JSON.stringify(position("vision"))')
     box=value('JSON.stringify((()=>{const r=document.querySelector("[data-artifact=vision]").getBoundingClientRect();return {x:r.x,y:r.y}})())')
     drag_points((box['x']+40,box['y']+40),(box['x']+70,box['y']+60))
     assert value('JSON.stringify(position("vision"))')==before and value('camera.x')>camera_before['x'], 'Hand pans over a card without moving it'
-    browser('click','#select-tool');browser('click','#fit')
+    browser('press','v');browser('click','#fit')
+    assert value('JSON.stringify(document.querySelector(".canvas").dataset.tool)')=='select', 'V chooses the Select tool'
     browser('focus','[data-artifact="vision"]')
     browser('eval','document.querySelector("[data-artifact=vision]").dispatchEvent(new KeyboardEvent("keydown",{key:" ",code:"Space",bubbles:true,cancelable:true}))')
     before=value('JSON.stringify(position("vision"))');camera_before=value('JSON.stringify(camera)')
@@ -122,6 +128,7 @@ try:
     assert value('JSON.stringify(position("vision"))')==before, 'Escape cancels an unfinished drag'
 
 
+    browser('eval','document.querySelector(".project-search").hidden=false')
     browser('fill','#project-search','no-match')
     assert 'No matching projects' in browser('get','text','#no-projects')
     assert browser('eval','document.querySelectorAll("[data-project]").length').strip()=='0'
@@ -130,25 +137,31 @@ try:
     assert 'Help small teams' in browser('get','text','[data-artifact="vision"]')
     assert 'Invite three operators' in browser('get','text','[data-artifact="progress"]')
     browser('fill','#project-search','')
+    browser('eval','document.querySelector("#project-search").blur()')
+    assert value('JSON.stringify(document.querySelector(".project-search").hidden)') is True, 'Search hides again when the query is empty'
     browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
     assert 'Help small teams' in browser('get','text','#peek-content')
-    browser('click','#document-tab');assert 'Actual source.' in browser('get','text','#peek-content')
-    browser('click','#source-tab');assert '# Record' in browser('get','text','#source-content')
+    assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Vision', 'The record view names the record'
+    assert value('JSON.stringify(!document.querySelector("#peek .detail-eyebrow,#peek .overview-seal,#peek .peek-tabs,#peek .peek-note,#peek .view-help"))') is True, 'No kicker, seal, tabs, hint line, or helper text'
+    browser('click','.more-bar [data-peek-mode="document"]');assert 'Actual source.' in browser('get','text','#peek-content'), 'The full document is one click away'
+    browser('click','#peek-more');browser('click','#show-source');assert '# Record' in browser('get','text','#source-content')
+    browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="rich"]')
+    assert value('JSON.stringify(Boolean(document.querySelector("#peek-content [data-layout=brief]")))') is True, 'The menu returns to the record layout'
     browser('press','Escape')
     browser('dblclick','[data-artifact="brain"]')
     assert browser('eval','Boolean(document.querySelector("[data-layout=library]"))').strip()=='true'
     browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
     browser('screenshot',str(args.output/'brain-peek.png'))
-    browser('click','.connection-card:first-child')
+    browser('click','.connection-grid li:first-child .connection-card')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
     assert 'Operators need a clear next step.' in browser('get','text','#peek-content')
     browser('eval','document.querySelector(".connection-card").scrollIntoView({block:"center"})')
     browser('click','.connection-card')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "decision.md"')
     browser('click','#peek-back');assert 'research.md' in browser('get','text','#peek-title')
-    browser('click','#peek-back');assert 'BRAIN.md' in browser('get','text','#peek-title')
-    browser('click','.connection-card:last-child')
-    assert 'have not been loaded' in browser('get','text','#peek-content')
+    browser('click','#peek-back');assert 'Brain' in browser('get','text','#peek-title')
+    browser('click','.connection-grid li:last-child .connection-card')
+    assert 'does not load its contents' in browser('get','text','#peek-content')
     browser('click','#peek-back')
     browser('click','.connections-heading button')
     assert browser('eval','document.querySelectorAll(".connected-node").length').strip()=='2'
@@ -156,8 +169,8 @@ try:
     assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
     browser('click','[data-card-toggle="brain"]')
     assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='2'
-    browser('click','#collapse-all')
-    assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0'
+    browser('press','Shift+C')
+    assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0', 'Shift + C collapses all linked branches'
     browser('click','[data-card-toggle="brain"]');browser('click','#fit')
     overlap_check='JSON.stringify((()=>{const cards=[...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).map(e=>({id:e.dataset.artifact,x:position(e.dataset.artifact)[0],y:position(e.dataset.artifact)[1],w:e.offsetWidth,h:e.offsetHeight}));const hits=[];for(const a of cards)for(const b of cards)if(a.id<b.id&&HorsemenCanvas.overlaps(a,b,0))hits.push(a.id+"/"+b.id);return hits})())'
     assert value(overlap_check)==[], 'Expanded links do not overlap any card'
@@ -175,34 +188,38 @@ try:
     browser('press','Escape')
     browser('dblclick','[data-artifact="readme"]');assert 'missing' in browser('get','text','#peek-content')
     browser('press','Escape')
-    for key,layout in [('vision','brief'),('progress','board'),('structure','map'),('changelog','timeline'),('techstack','tools')]:
+    for key,layout in [('vision','brief'),('progress','progress-list'),('structure','map'),('changelog','timeline'),('techstack','tools')]:
         browser('dblclick',f'[data-artifact="{key}"]')
         assert browser('eval',f'Boolean(document.querySelector("[data-layout={layout}]"))').strip()=='true'
         browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
         browser('screenshot',str(args.output/(key+'-peek.png')))
-        if key=='techstack':assert browser('eval','document.querySelectorAll(".tool-card").length').strip()=='2'
+        if key=='techstack':assert browser('eval','document.querySelectorAll(".tool-row").length').strip()=='2', 'Tech stack is a compact table'
         browser('press','Escape')
     # Artifact views: status board, proof links, exact dates, source lines, and a saved list choice.
     browser('dblclick','[data-artifact="progress"]');browser('wait','#peek[open]')
-    assert value('document.querySelectorAll("#peek-content .day.latest .lane").length')==4, 'Progress shows four status lanes'
+    order=value('JSON.stringify([...document.querySelectorAll("#peek-content .lead, #peek-content .part-title")].map(e=>e.textContent.replace(/L[0-9]+$/,"").trim().slice(0,12)))')
+    assert order[:4]==['Next actionI','Now','Up next','Shipped'], 'Progress reads: next action, now, up next, shipped ('+str(order)+')'
+    assert 'Export' in value('JSON.stringify(document.querySelector("#peek-content [data-outline=Now]").textContent)'), 'Now holds work in progress'
+    assert value('JSON.stringify([...document.querySelectorAll("#peek-content .part.shipped .day")].map(d=>d.dataset.day))')==['2026-11-18','2026-11-10'], 'Shipped work is grouped by day, newest first'
+    assert value('JSON.stringify(document.querySelector("#peek-content .part.shipped .chip.pr").getAttribute("href"))')=='https://github.com/example/alpha/pull/12', 'Proof links are small chips'
+    browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="rich"]')
+    assert value('document.querySelectorAll("#peek-content .day.latest .lane").length')==4, 'The optional board shows four status lanes'
     assert value('document.querySelectorAll("#peek-content details.day").length')==1, 'Earlier days fold'
     assert value('JSON.stringify(document.querySelector("#peek-content .lane[data-status=shipped] .chip.pr").getAttribute("href"))')=='https://github.com/example/alpha/pull/12', 'Shipped items link to their PR'
     assert value('JSON.stringify(document.querySelector("#peek-content .lane[data-status=progress] time").getAttribute("title"))')=='2026-11-12', 'Relative dates keep the exact date'
     assert value('JSON.stringify([...document.querySelectorAll("#peek-content a.src")].every(a=>/[?]plain=1#L[0-9]+$/.test(a.href)))') is True, 'Source links point to exact lines'
-    browser('click','[data-view-choice="list"]')
-    assert value('document.querySelectorAll("#peek-content .rows-list .row").length')==7, 'List view has one row for each item'
     browser('press','Escape');browser('dblclick','[data-artifact="progress"]');browser('wait','#peek[open]')
-    assert value('Boolean(document.querySelector("#peek-content .rows-list"))') is True, 'The list choice is saved'
-    browser('click','[data-record="vision"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "VISION.md"')
-    assert value('Boolean(document.querySelector("#peek-content .path-step"))') is True, 'Each record type keeps its own choice'
-    assert value('Boolean(document.querySelector("#peek-content .open-panel"))') is True, 'Vision shows open questions'
-    browser('click','[data-record="progress"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "PROGRESS.md"')
-    browser('click','[data-view-choice="rich"]')
-    assert value('localStorage.getItem("horsemen-peek-views")')=={'progress':'rich'}
-    browser('click','#document-tab');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
-    browser('click','#source-tab');assert '<summary>Latest day' in browser('get','text','#source-content'), 'Markdown source stays exact'
-    browser('click','#reading-tab')
-    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "STRUCTURE.md"')
+    assert value('Boolean(document.querySelector("#peek-content .board4"))') is True, 'The board choice is saved'
+    browser('click','[data-record="vision"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Vision"')
+    assert value('Boolean(document.querySelector("#peek-content .items.path"))') is True, 'Each record type keeps its own choice'
+    assert 'Pricing for teams' in value('JSON.stringify(document.querySelector("#peek-content [data-outline=\'Open questions\']").textContent)'), 'Vision shows open questions'
+    browser('click','[data-record="progress"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Progress"')
+    browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
+    assert value('localStorage.getItem("horsemen-peek-views")')=={'vision':'rich','progress':'list'}, 'The browser saves one layout choice for each record type'
+    browser('click','#peek-more');browser('click','#show-document');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
+    browser('click','#peek-more');browser('click','#show-source');assert '<summary>Latest day' in browser('get','text','#source-content'), 'Markdown source stays exact'
+    browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
+    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Structure"')
     assert value('JSON.stringify(document.querySelector("[data-copy]").dataset.copy)')=='python3 scripts/serve_gui.py'
     assert value('JSON.stringify(document.querySelector(".tree-path a").getAttribute("href"))')=='https://github.com/example/alpha/tree/'+'a'*40+'/app/', 'Tree paths open on GitHub'
     assert value('JSON.stringify(document.querySelector(".tree .tag.start").textContent)')=='start here'
@@ -211,22 +228,35 @@ try:
     browser('press','Escape')
     browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
     assert value('JSON.stringify(document.querySelector("#peek-records [aria-current=page]").dataset.record)')=='vision', 'The record list marks the open record'
-    assert value('document.querySelectorAll("#peek-outline button").length')>=2, 'The outline lists the sections'
+    assert value('JSON.stringify(document.querySelector("#peek-records").textContent)')=='VisionProgressBrainStructureREADMEChangelogTech stack', 'The record list is compact: names only'
+    browser('set','viewport','1440','520');browser('wait','--fn','!document.querySelector("#peek-outline-nav").hidden')
+    assert value('document.querySelectorAll("#peek-outline button").length')>=4, 'A long record lists its sections'
     assert value('JSON.stringify(document.querySelector("#peek-outline [aria-current]")===document.querySelector("#peek-outline button"))') is True, 'The outline starts on the first section'
+    browser('set','viewport','1440','1100');browser('wait','--fn','document.querySelector("#peek-outline-nav").hidden')
     assert value('JSON.stringify(location.hash)').endswith('&r=vision'), 'The address keeps the open record'
-    browser('press','ArrowRight');browser('wait','--fn','document.querySelector("#peek-title").textContent === "PROGRESS.md"')
-    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "STRUCTURE.md"')
+    browser('press','ArrowRight');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Progress"')
+    browser('click','#peek-prev');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Vision"')
+    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Structure"')
     assert value('JSON.stringify([...document.querySelectorAll(".tree-line")].map(e=>e.querySelector(".tree-note").textContent))')==['operator workspace','decisions and references','verification'], 'The map shows paths with their notes'
-    browser('click','[data-record="brain"]');browser('click','.connection-card:first-child')
+    browser('click','[data-record="brain"]');browser('click','.connection-grid li:first-child .connection-card')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
-    browser('click','#peek-meta button');assert 'BRAIN.md' in browser('get','text','#peek-title'), 'A path step goes back to that document'
+    browser('click','#peek-meta button');assert 'Brain' in browser('get','text','#peek-title'), 'A path step goes back to that document'
     browser('press','Escape')
     browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','changelog');browser('press','Enter')
-    browser('wait','--fn','document.querySelector("#peek-title").textContent === "CHANGELOG.md"')
+    browser('wait','--fn','document.querySelector("#peek-title").textContent === "Changelog"')
     assert browser('eval','document.querySelector("#palette").open').strip()=='false'
     browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','#peek[open]')
-    assert 'CHANGELOG.md' in browser('get','text','#peek-title') and 'alpha' in browser('get','text','#project-name'), 'A reload returns to the same project and record'
+    assert 'Changelog' in browser('get','text','#peek-title') and 'alpha' in browser('get','text','#project-name'), 'A reload returns to the same project and record'
     browser('press','Escape')
+    assert value('JSON.stringify(getComputedStyle(document.querySelector("#scan-status")).display)')=='none', 'The status line hides when discovery is done and nothing needs attention'
+    # Shortcut sheet: from ? and from Jump.
+    browser('focus','.canvas');browser('press','?');browser('wait','#shortcuts[open]')
+    assert 'Collapse all linked branches' in browser('get','text','#shortcuts'), 'The shortcut sheet lists the canvas keys'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#shortcuts").open')
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','shortcuts');browser('press','Enter');browser('wait','#shortcuts[open]');browser('press','Escape')
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','hand tool');browser('press','Enter')
+    assert value('JSON.stringify(document.querySelector(".canvas").dataset.tool)')=='hand', 'Jump reaches the canvas tools'
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','select tool');browser('press','Enter')
     browser('wait','--fn','!document.querySelector("#peek").open && !location.hash.includes("&r=")')
     browser('click','#list-view')
     assert 'list' in browser('get','attr','#map','class')
@@ -248,7 +278,7 @@ try:
     calls=len(server.state.reader.api.calls)
     browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
     assert not any('/git/trees/' in p for p in server.state.reader.api.calls[calls:])
-    browser('dblclick','[data-artifact="brain"]');browser('click','.connection-card:first-child')
+    browser('dblclick','[data-artifact="brain"]');browser('click','.connection-grid li:first-child .connection-card')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')
     browser('eval','document.querySelector(".connection-card").scrollIntoView({block:"center"})')
     browser('click','.connection-card')
@@ -256,29 +286,33 @@ try:
     browser('eval','document.querySelector(".connections-heading button").scrollIntoView({block:"center"})')
     browser('click','.connections-heading button')
     assert browser('eval','[...document.querySelectorAll(".connected-node:not([hidden]) strong")].some(e=>e.textContent === "Delivery")').strip()=='true', 'Exploring a deep document reveals its ancestor path'
-    browser('click','#collapse-all');browser('click','#fit')
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','collapse');browser('press','Enter')
+    assert browser('eval','document.querySelectorAll(".connected-node:not([hidden])").length').strip()=='0', 'Jump collapses all linked branches'
+    browser('click','#fit')
 
     browser('set','viewport','390','844')
     browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
     assert 'list' in browser('get','attr','#map','class'), 'A phone opens in List view, where cards stay readable'
     browser('screenshot','--full',str(args.output/'mobile-list.png'))
-    browser('click','#theme-toggle')
-    menu=value('JSON.stringify((()=>{const r=document.querySelector("#theme-menu").getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return [r.top>=0,r.bottom<=innerHeight,!!top.closest("#theme-menu")]})())')
-    assert menu==[True,True,True], 'On a phone the theme menu opens on screen, above the page'
+    browser('click','#menu-toggle')
+    menu=value('JSON.stringify((()=>{const r=document.querySelector("#menu").getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return [r.top>=0,r.bottom<=innerHeight,r.left>=0,r.right<=innerWidth,!!top.closest("#menu")]})())')
+    assert menu==[True,True,True,True,True], 'On a phone the menu opens on screen, above the page'
     browser('press','Escape')
     browser('click','#canvas-view');browser('click','#fit')
     assert browser('eval','document.documentElement.scrollWidth <= innerWidth').strip()=='true'
     browser('screenshot','--full',str(args.output/'mobile.png'))
     browser('dblclick','[data-artifact="brain"]')
     browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    assert value('JSON.stringify((r=>[Math.round(r.width),Math.round(r.height)])(document.querySelector("#peek").getBoundingClientRect()))')==[390,844], 'On a phone the record view fills the screen'
     browser('screenshot',str(args.output/'mobile-brain-peek.png'))
     browser('press','Escape')
     fits='document.querySelector(".peek-content").scrollWidth <= document.querySelector(".peek-content").clientWidth'
     for key in ['progress','vision','structure','changelog','techstack']:
         browser('eval',f'openPeek("{key}",document.querySelector("[data-artifact={key}]"))');browser('wait','#peek[open]')
         assert browser('eval',fits).strip()=='true', key+' fits a phone without sideways scrolling'
-        browser('click','[data-view-choice="list"]');assert browser('eval',fits).strip()=='true', key+' list fits a phone'
-        browser('click','[data-view-choice="rich"]')
+        other='rich' if key=='progress' else 'list'
+        browser('click','#peek-more');browser('click',f'#peek-menu [data-view-choice="{other}"]');assert browser('eval',fits).strip()=='true', key+' second layout fits a phone'
+        browser('click','#peek-more');browser('click',f'#peek-menu [data-view-choice="{"list" if other=="rich" else "rich"}"]')
         if key=='progress':
             browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
             browser('screenshot',str(args.output/'mobile-progress-peek.png'))
@@ -286,9 +320,10 @@ try:
     browser('set','viewport','1440','1100');browser('click','#fit');browser('screenshot',str(args.output/'desktop.png'))
     scheme=value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')
     other='ember' if scheme=='light' else 'pale'
-    browser('click','#theme-toggle')
-    assert value('document.querySelectorAll("#theme-menu [data-theme-choice]").length')==7, 'System and six themes'
-    assert value('document.querySelectorAll("#theme-menu [role=group] [role=menuitemradio]").length')==10, 'Colours and type sets share one menu, in labelled groups'
+    browser('click','#menu-toggle')
+    assert value('document.querySelectorAll("#menu [data-theme-choice]").length')==7, 'System and six themes'
+    assert value('document.querySelectorAll("#menu [role=group] [role=menuitemradio]").length')==10, 'Colours and type sets share one menu, in labelled groups'
+    assert value('JSON.stringify([...document.querySelectorAll("#menu [role=menuitem]")].map(b=>b.id))')==['connect','clear'], 'The menu holds Refresh GitHub and Clear workspace'
     assert browser('get','attr','[data-theme-choice="system"]','aria-checked').strip()=='true'
     browser('click',f'[data-theme-choice="{other}"]')
     assert value('JSON.stringify([document.documentElement.dataset.theme,localStorage.getItem("horsemen-theme")])')==[other,other], 'Theme choice applies and is saved'
@@ -296,15 +331,16 @@ try:
     browser('screenshot',str(args.output/('desktop-'+other+'.png')))
     browser('dblclick','[data-artifact="progress"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
     browser('screenshot',str(args.output/('progress-peek-'+other+'.png')));browser('press','Escape')
-    browser('click','#theme-toggle');browser('click','[data-theme-choice="system"]')
+    browser('click','#menu-toggle');browser('click','[data-theme-choice="system"]')
     assert value('JSON.stringify(getComputedStyle(document.documentElement).colorScheme)')==scheme and value('JSON.stringify(localStorage.getItem("horsemen-theme"))') is None, 'System follows the device again'
     browser('press','Escape')
-    assert browser('eval','document.querySelector("#theme-menu").hidden').strip()=='true', 'Escape closes the theme menu'
-    dock=value('JSON.stringify((()=>{const d=document.querySelector(".canvas-controls").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>e.getBoundingClientRect().bottom<=d.top)})())')
-    assert dock, 'Fit keeps every card clear of the tool dock'
+    assert browser('eval','document.querySelector("#menu").hidden').strip()=='true', 'Escape closes the menu'
+    browser('click','#fit')
+    dock=value('JSON.stringify((()=>{const d=document.querySelector(".zoom").getBoundingClientRect();return [...document.querySelectorAll("[data-artifact]")].filter(e=>!e.hidden).every(e=>{const r=e.getBoundingClientRect();return r.bottom<=d.top||r.right<=d.left})})())')
+    assert dock, 'Fit keeps every card clear of the zoom control'
     # Type sets: one choice for every colour theme. It is saved, and it loads before first paint.
-    browser('click','#theme-toggle')
-    assert value('document.querySelectorAll("#theme-menu [data-type-choice]").length')==3, 'Engraved, Modern, and System'
+    browser('click','#menu-toggle')
+    assert value('document.querySelectorAll("#menu [data-type-choice]").length')==3, 'Engraved, Modern, and System'
     assert browser('get','attr','[data-type-choice="engraved"]','aria-checked').strip()=='true', 'Engraved is the default'
     browser('click','[data-type-choice="modern"]')
     assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['modern','modern'], 'Type choice applies and is saved'
@@ -329,23 +365,25 @@ try:
     browser('click','#fit');browser('screenshot',str(args.output/'desktop-system.png'))
     browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','engraved type');browser('press','Enter')
     assert value('JSON.stringify([document.documentElement.dataset.type,localStorage.getItem("horsemen-type")])')==['engraved',None], 'Engraved is the default again'
-    browser('click','#theme-toggle')
-    browser('focus','[data-theme-choice="system"]');browser('press','End')
-    assert value('JSON.stringify(document.activeElement.dataset.typeChoice)')=='system', 'End reaches the last menu item'
+    browser('click','#menu-toggle')
+    assert value('JSON.stringify(document.activeElement.dataset.themeChoice)')=='system', 'The menu opens on the chosen colour'
+    browser('press','End')
+    assert value('JSON.stringify(document.activeElement.id)')=='clear', 'End reaches the last menu item'
     browser('press','ArrowDown')
-    assert value('JSON.stringify(document.activeElement.dataset.themeChoice)')=='system', 'Arrow keys wrap across both groups'
+    assert value('JSON.stringify(document.activeElement.id)')=='connect', 'Arrow keys wrap across every group'
     browser('press','Escape')
-    browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#clear')
+    assert value('JSON.stringify([document.querySelector("#menu").hidden,document.activeElement.id])')==[True,'menu-toggle'], 'Escape closes the menu and returns focus'
+    browser('dblclick','[data-artifact="vision"]');browser('press','Escape');browser('click','#menu-toggle');browser('click','#clear')
     browser('wait','--fn','document.body.dataset.state === "idle"')
     assert browser('get','text','#source-content').strip()==''
     assert browser('get','text','#peek-content').strip()==''
-    assert browser('get','text','#crumb').strip()==''
+    assert browser('get','text','#project-name').strip()=='Workspace cleared'
     assert not browser('errors').strip()
     print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, themes and type sets, no browser errors.')
 except BaseException:
     try:
         browser('screenshot',str(args.output/'failure.png'))
-        print('At failure:',browser('eval','JSON.stringify({toggle:document.querySelector("[data-card-toggle=brain]")?.getBoundingClientRect(),card:document.querySelector("[data-artifact=brain]").getBoundingClientRect(),canvas:document.querySelector(".canvas").getBoundingClientRect(),scroll:[document.querySelector(".canvas").scrollTop,scrollY],footer:document.querySelector(".notice").getBoundingClientRect().top})'))
+        print('At failure:',browser('eval','JSON.stringify({toggle:document.querySelector("[data-card-toggle=brain]")?.getBoundingClientRect(),card:document.querySelector("[data-artifact=brain]").getBoundingClientRect(),canvas:document.querySelector(".canvas").getBoundingClientRect(),scroll:[document.querySelector(".canvas").scrollTop,scrollY],title:document.querySelector("#peek-title").textContent})'))
     except Exception:pass
     raise
 finally:

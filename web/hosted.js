@@ -144,16 +144,23 @@
     try { await fetch('/auth/logout', { method: 'POST', headers: headers(), cache: 'no-store' }); } finally { signedOut(); }
   }
 
-  /* Hosted controls in the left rail: choose repositories and sign out. */
+  /* Hosted controls in the account menu: choose repositories, copy link, and sign out. */
   function decorate() {
-    const rail = document.querySelector('.workspace');
-    if (rail && !document.getElementById('hosted-controls')) {
-      const box = document.createElement('div'); box.id = 'hosted-controls'; box.className = 'hosted-controls';
-      const choose = document.createElement('a'); choose.className = 'btn'; choose.id = 'choose-repos'; choose.textContent = 'Choose repositories';
+    const github = document.querySelector('#menu [data-menu-group=github]');
+    const item = (tag, id, icon, label) => {
+      const el = document.createElement(tag); el.id = id; el.setAttribute('role', 'menuitem');
+      if (tag === 'button') el.type = 'button';
+      el.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#' + icon + '"/></svg><span></span>'; el.querySelector('span').textContent = label;
+      return el;
+    };
+    if (github && !document.getElementById('choose-repos')) {
+      const choose = item('a', 'choose-repos', 'layers', 'Choose repositories');
       choose.rel = 'noopener'; choose.target = '_blank'; choose.hidden = !installURL; if (installURL) choose.href = installURL;
-      const out = document.createElement('button'); out.className = 'btn'; out.id = 'sign-out'; out.type = 'button'; out.textContent = 'Sign out';
-      out.addEventListener('click', signOut);
-      box.append(choose, out); rail.after(box);
+      github.append(choose);
+      const group = document.createElement('div'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Session'); group.id = 'hosted-controls';
+      const out = item('button', 'sign-out', 'back', 'Sign out'); out.addEventListener('click', signOut);
+      group.append(out);
+      document.querySelector('#menu-note')?.before(group);
     }
     /* Copy link: the address bar always holds the readable link for the open project and record. */
     const copyLink = async () => {
@@ -161,18 +168,16 @@
       catch { window.showToast?.('Copy failed. Copy the link from the address bar.'); }
     };
     const shareButton = (id, label, cls) => {
-      const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = cls; b.title = 'Copy a link to share. People who open it need GitHub access.';
+      const b = document.createElement('button'); b.type = 'button'; b.id = id; b.className = cls; b.title = 'Copy link. People who open it need GitHub access.';
       b.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#link"/></svg><span></span>'; b.querySelector('span').textContent = label;
       b.addEventListener('click', copyLink); return b;
     };
     const actions = document.querySelector('.heading-actions');
     if (actions && !document.getElementById('share-link')) actions.prepend(shareButton('share-link', 'Copy link', 'btn share-link'));
     const close = document.getElementById('close-peek');
-    if (close && !document.getElementById('share-record')) close.before(shareButton('share-record', 'Copy link', 'btn share-record'));
-    const tag = document.querySelector('.demo');
-    if (tag?.parentElement) tag.parentElement.replaceChildren(Object.assign(document.createElement('span'), { className: 'demo', textContent: 'Read-only viewer' }), 'Nothing stored. Open source. Self-hostable.');
-    const notice = document.querySelector('.notice p:last-child');
-    if (notice) notice.textContent = 'Read-only. Horsemen reads your records from GitHub when you open them and stores none of your project data. Open projects check for new commits every minute.';
+    if (close && !document.getElementById('share-record')) { const b = shareButton('share-record', 'Copy link', 'icon-btn share-record'); b.setAttribute('aria-label', 'Copy link'); close.parentElement.prepend(b); }
+    const note = document.getElementById('menu-note');
+    if (note) note.textContent = 'Read-only. Nothing stored on the server. Open projects check for new commits every minute.';
   }
   fetch('/api/session', { headers: headers(), cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(info => {
     if (!info) return;

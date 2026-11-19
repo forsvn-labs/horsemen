@@ -26,9 +26,17 @@
       from('Shipped',/^shipped$|^delivered$/i);from('Gates / blockers',/gates|blockers|blocked/i);
       if(items.length<3)from('In progress',/in progress|up next|ready to/i);
     }else if(key==='brain'){
-      from('Knowledge sources',/providers|destinations|sources/i);from('Access',/access|permissions/i);from('Save rules',/save|cleanup/i);
+      /* A provider table becomes its provider names, not raw table text. */
+      const sources=section(/providers|destinations|sources/i),table=sources&&toolsTable(sources.body.join('\n'));
+      if(table&&table.rows.length){const at=Math.max(0,table.headers.findIndex(h=>/provider|service|tool|source/i.test(h)));add('Knowledge sources',table.rows.map(r=>plain(r[at]||'')).filter(Boolean).join(' · '))}
+      else from('Knowledge sources',/providers|destinations|sources/i);
+      from('Access',/access|permissions/i);from('Save rules',/save|cleanup/i);
     }else if(key==='structure'){
-      from('Project map',/^map$|tree|layout|repository|structure/i);from('Start here',/read before|entry|start/i);from('Commands',/commands/i);
+      /* A tree becomes its top-level paths: the children of the project folder, or every path of a flat list. */
+      const map=section(/^map$|tree|layout|repository|structure/i),fence=map&&map.body.join('\n').match(/```[^\n]*\n([\s\S]*?)\n\s*```/);
+      if(fence){const nodes=tree(fence[1]).map(n=>({...n,path:n.path.split(/\s+/)[0]})),depth=n=>n.guide.length,rooted=nodes.length>1&&!nodes[0].guide&&nodes.slice(1).every(n=>n.guide),rest=rooted?nodes.slice(1):nodes,top=Math.min(...rest.map(depth));add('Project map',rest.filter(n=>depth(n)===top).map(n=>n.path).join(' · '))}
+      else from('Project map',/^map$|tree|layout|repository|structure/i);
+      from('Start here',/read before|entry|start/i);from('Commands',/commands/i);
     }else if(key==='changelog'){
       const release=blocks.find(b=>b.heading&&b.heading!==title&&b.body.some(l=>l.trim()));
       if(release)add(release.heading,excerpt(release));
@@ -526,108 +534,136 @@
     }
     const dayLabel=d=>d.latest?'Latest day':d.date||'Undated';
 
-    /* ---- HTML pieces ---- */
+    /* ---- HTML pieces ----
+       Calm reading surface: one column, plain section titles, small proof chips, quiet source links.
+       The record name and its stated facts sit in the peek header, so views start with content. */
     const A=(href,cls,label,title)=>'<a class="'+cls+'" href="'+esc(href)+'" target="_blank" rel="noopener noreferrer"'+(title?' title="'+esc(title)+'"':'')+'>'+label+'</a>';
     const time=(iso,now)=>{const r=relative(iso,now);return r?'<time datetime="'+r.iso+'" title="'+r.iso+'">'+esc(r.text)+'</time>':''};
     const chips=proof=>proof&&proof.length?'<span class="proof">'+proof.map(p=>A(p.href,'chip '+p.kind,esc(p.label),p.href)).join('')+'</span>':'';
     const src=(ctx,line)=>{const u=sourceLink(ctx.url,line);return u?A(u,'src','L'+line,'Open line '+line+' in the source'):''};
     const when=(i,now)=>i.date?'<span class="when">'+(i.dateLabel?esc(i.dateLabel)+' ':'')+time(i.date,now)+'</span>':i.when?'<span class="when">'+esc(i.when)+'</span>':'';
-    const EYEBROW={vision:'I · Conquest · Direction',progress:'II · War · Campaign',brain:'III · Famine · Knowledge',structure:'IV · Death · Skeleton',readme:'Supporting record · The front door',changelog:'Supporting record · Delivery proof',techstack:'Supporting record · How the parts fit'};
-    const RICH={vision:'Brief',progress:'Board',brain:'Library',structure:'Map',changelog:'Timeline',techstack:'Cards',readme:'Guide'};
+    /* Two layouts for each type: the first is the default. Progress reads best as a list; the board is the option. */
+    const LAYOUTS={progress:{list:'List',rich:'Board',first:'list'},vision:{rich:'Brief',list:'List',first:'rich'},brain:{rich:'Sources',list:'List',first:'rich'},structure:{rich:'Map',list:'List',first:'rich'},changelog:{rich:'Releases',list:'List',first:'rich'},techstack:{rich:'Table',list:'List',first:'rich'},readme:{rich:'Document',list:'List',first:'rich'}};
     const LAYOUT={vision:'brief',progress:'board',brain:'library',structure:'map',changelog:'timeline',techstack:'tools',readme:'guide'};
-    const HELP={
-      progress:'The latest day comes first. Each item links to its proof and to its line in the source.',
-      changelog:'Releases are newest first. Chips link to the pull requests, commits, and releases that the source names.',
-      vision:'The owner’s direction, in the owner’s words. Open questions and decisions are at the end.',
-      brain:'Where knowledge lives and how to reach it. A link is not access to its contents.',
-      structure:'Select a path to open it on GitHub. Select Copy to copy a command.',
-      techstack:'One card for each tool or service, as the source lists it.',
-      readme:'The front door: what this is, what you get, and how to start.'
-    };
-    function toggle(key,mode){
-      const rich=RICH[key]||'Sections';
-      return '<div class="segmented view-toggle" role="group" aria-label="Layout" data-view-toggle>'+[['rich',rich],['list','List']].map(([v,label])=>'<button type="button" data-view-choice="'+v+'" aria-pressed="'+(mode===v)+'">'+label+'</button>').join('')+'</div>';
-    }
-    function header(key,record,ctx,title){
-      const stated=facts(record.content||''),seal=['vision','progress','brain','structure'].includes(key)?'<svg class="overview-seal" aria-hidden="true"><use href="/assets/icons/seals.svg#seal-'+key+'"/></svg>':'';
-      const list=stated.map(f=>{const lead=f.value.match(/^(\d{4}-\d{2}-\d{2})\s*(.*)$/),exact=lead&&isoDate(lead[1]);return '<div><dt>'+esc(f.label)+'</dt><dd>'+(exact?time(exact,ctx.now)+(lead[2]?' <small>'+esc(lead[2])+'</small>':''):esc(f.value))+'</dd></div>'});
-      if(ctx.links)list.push('<div><dt>Links</dt><dd>'+ctx.links+'</dd></div>');
-      return '<header class="page-head">'+seal+'<div class="detail-eyebrow">'+esc(EYEBROW[key]||'Connected document')+'</div><h2>'+esc(title||record.name||'Untitled')+'</h2>'+(list.length?'<dl class="facts">'+list.join('')+'</dl>':'')+'<div class="view-bar">'+toggle(key,ctx.mode)+(HELP[key]?'<p class="view-help">'+esc(HELP[key])+'</p>':'')+'</div></header>';
-    }
-    const open=(key,mode,extra='')=>'<div class="artifact-overview views views-'+(LAYOUT[key]||'document')+extra+'" data-layout="'+(LAYOUT[key]||'document')+'" data-density="'+mode+'">';
-    const generic=(list,ctx)=>list.length?'<div class="blocks rows">'+list.map(s=>'<section class="block'+(/boundar|never|access|permission/i.test(s.title)?' boundary':'')+'" data-outline="'+esc(s.title)+'"><header class="block-head"><h3 class="block-title">'+esc(s.title)+'</h3>'+src(ctx,s.line)+'</header><div class="block-body">'+block(s.raw,ctx.url)+'</div></section>').join('')+'</div>':'';
-    const textItem=(i,ctx,cls='')=>'<li class="'+cls+'">'+(i.name?'<strong>'+inline(i.name,ctx.url)+'</strong> ':'')+'<span>'+inline(i.text,ctx.url)+'</span>'+(i.body?block(i.body,ctx.url):'')+'<span class="item-meta">'+when(i,ctx.now)+chips(i.proof)+src(ctx,i.line)+'</span></li>';
-    const capNote=ctx=>ctx.skipped?'<p class="cap-note">'+ctx.skipped+' more items are in the Full document.</p>':'';
+    const layouts=key=>LAYOUTS[key]||{rich:'Sections',list:'List',first:'rich'};
+    const open=(key,mode,layout)=>{const l=layout||LAYOUT[key]||'document';return '<div class="view view-'+l+'" data-layout="'+l+'" data-density="'+mode+'">'};
+    const part=(title,body,ctx,line,cls='')=>'<section class="part'+(cls?' '+cls:'')+'" data-outline="'+esc(title)+'"><h3 class="part-title">'+esc(title)+(line?src(ctx,line):'')+'</h3>'+body+'</section>';
+    const generic=(list,ctx)=>list.map(s=>part(s.title,'<div class="prose">'+block(s.raw,ctx.url)+'</div>',ctx,s.line)).join('');
+    const meta=(...bits)=>{const html=bits.filter(Boolean).join('');return html?'<span class="item-meta">'+html+'</span>':''};
+    const textItem=(i,ctx,tag='')=>'<li class="item">'+tag+'<span class="item-line">'+(i.name?'<strong class="item-name">'+inline(i.name,ctx.url)+'</strong> ':'')+'<span class="item-text">'+inline(i.text,ctx.url)+'</span></span>'+(i.body?'<div class="item-body">'+block(i.body,ctx.url)+'</div>':'')+meta(when(i,ctx.now),chips(i.proof),src(ctx,i.line))+'</li>';
+    const items=(list,ctx,tag='ul',cls='items')=>list.length?'<'+tag+' class="'+cls+'">'+list.map(i=>textItem(i,ctx)).join('')+'</'+tag+'>':'';
+    const capNote=ctx=>ctx.skipped?'<p class="cap-note">'+ctx.skipped+' more items are in the full document.</p>':'';
     const take=ctx=>{if(ctx.budget>0){ctx.budget--;return true}ctx.skipped++;return false};
+    const lead=(label,html,ctx,line,outline)=>'<div class="lead" data-outline="'+esc(outline||label||'In short')+'">'+(label?'<p class="lead-label">'+esc(label)+'</p>':'')+'<div class="lead-text">'+html+'</div>'+src(ctx,line)+'</div>';
+    const STATUS={shipped:'Shipped',progress:'In progress',next:'Up next',attention:'Needs attention'};
+    const tag=(status,text)=>'<span class="tag" data-status="'+status+'">'+esc(text||STATUS[status]||status)+'</span>';
 
-    /* ---- Views ---- */
+    /* ---- Progress ---- */
     function itemCard(i,ctx,lane){
       if(!take(ctx))return '';
       const ev=i.evidence?'<details class="evidence"><summary>Evidence</summary><div>'+inline(i.evidence.text,ctx.url)+' '+src(ctx,i.evidence.line)+'</div></details>':'';
-      return '<li class="item" data-status="'+lane+'">'+(i.name||when(i,ctx.now)?'<div class="item-head">'+(i.name?'<strong class="item-name">'+inline(i.name,ctx.url)+'</strong>':'')+when(i,ctx.now)+'</div>':'')+(i.text?'<div class="item-text">'+inline(i.text,ctx.url)+'</div>':'')+(i.body?'<div class="item-body">'+block(i.body,ctx.url)+'</div>':'')+'<div class="item-meta">'+chips(i.proof)+ev+src(ctx,i.line)+'</div></li>';
+      return '<li class="item" data-status="'+lane+'">'+(i.name||when(i,ctx.now)?'<span class="item-line">'+(i.name?'<strong class="item-name">'+inline(i.name,ctx.url)+'</strong>':'')+'</span>':'')+(i.text?'<div class="item-text">'+inline(i.text,ctx.url)+'</div>':'')+(i.body?'<div class="item-body">'+block(i.body,ctx.url)+'</div>':'')+meta(when(i,ctx.now),chips(i.proof),ev,src(ctx,i.line))+'</li>';
     }
-    function board(d,ctx,compactEmpty){
-      const lanes=Object.keys(LANE_LABEL).filter(l=>!compactEmpty||d.lanes[l].length);
-      let html='<div class="board4">'+lanes.map(l=>'<section class="lane" data-status="'+l+'"><header class="lane-head"><h4 class="lane-title">'+LANE_LABEL[l]+'</h4><span class="lane-count">'+d.lanes[l].length+'</span></header>'+(d.lanes[l].length?'<ul class="lane-items">'+d.lanes[l].map(i=>itemCard(i,ctx,l)).join('')+'</ul>':'<p class="lane-empty">Nothing listed for this day.</p>')+'</section>').join('')+'</div>';
-      if(d.decisions.length)html+='<section class="day-extra"><h4 class="extra-title">Decisions</h4><ul>'+d.decisions.map(i=>textItem(i,ctx)).join('')+'</ul></section>';
-      if(d.orphanProof.length)html+='<section class="day-extra"><h4 class="extra-title">Other proof</h4><ul>'+d.orphanProof.map(o=>'<li><strong>'+esc(o.name)+'</strong> <span>'+inline(o.text,ctx.url)+'</span><span class="item-meta">'+chips(o.proof)+src(ctx,o.line)+'</span></li>').join('')+'</ul></section>';
-      for(const n of d.notes)html+='<section class="day-extra note"><h4 class="extra-title">'+esc(n.title||'Notes')+' '+src(ctx,n.line)+'</h4><div class="block-body">'+block(n.text,ctx.url)+'</div></section>';
+    /* One row in the reading list. Attention items say why in a small tag. */
+    function progressItem(i,ctx,lane,showTag){
+      if(!take(ctx))return '';
+      const label=lane==='attention'&&i.name&&/^(gates?|blocked|blockers?|risks?)$/i.test(i.name)?i.name:null;
+      return '<li class="item" data-status="'+lane+'">'+(showTag?tag(lane,label):'')+'<span class="item-line">'+(i.name&&!label?'<strong class="item-name">'+inline(i.name,ctx.url)+'</strong> ':'')+(i.text?'<span class="item-text">'+inline(i.text,ctx.url)+'</span>':'')+'</span>'+(i.body?'<div class="item-body">'+block(i.body,ctx.url)+'</div>':'')+meta(lane==='shipped'?'':when(i,ctx.now),chips(i.proof),src(ctx,i.line))+'</li>';
+    }
+    function dayExtras(d,ctx){
+      let html='';
+      if(d.decisions.length)html+='<div class="day-extra"><h5 class="extra-title">Decisions</h5>'+items(d.decisions,ctx)+'</div>';
+      if(d.orphanProof.length)html+='<div class="day-extra"><h5 class="extra-title">Other proof</h5><ul class="items">'+d.orphanProof.map(o=>'<li class="item"><span class="item-line"><strong class="item-name">'+esc(o.name)+'</strong> <span class="item-text">'+inline(o.text,ctx.url)+'</span></span>'+meta(chips(o.proof),src(ctx,o.line))+'</li>').join('')+'</ul></div>';
+      for(const n of d.notes)html+='<div class="day-extra note"><h5 class="extra-title">'+esc(n.title||'Notes')+src(ctx,n.line)+'</h5><div class="prose">'+block(n.text,ctx.url)+'</div></div>';
       if(d.tracking)html+='<p class="day-tracking">Task tracking: '+inline(d.tracking,ctx.url)+'</p>';
       return html;
     }
-    function progressView(record,ctx){
+    const dayHead=(d,ctx,tagName='h4')=>'<'+tagName+' class="day-title">'+(d.date?time(d.date,ctx.now)+' <small>'+d.date+'</small>':d.latest?'Latest day':'Undated')+'</'+tagName+'>';
+    /* Default Progress layout: next action, then what is happening now, then shipped work by day. */
+    function progressList(record,ctx){
+      const m=progress(record.content,ctx.url);if(m.empty&&!m.next)return null;
+      const [latest,...earlier]=m.days;
+      let html=open('progress','list','progress-list');
+      if(m.next)html+=lead('Next action',inline(m.next.text,ctx.url),ctx,m.next.line);
+      if(latest){
+        const now=[...latest.lanes.progress.map(i=>[i,'progress']),...latest.lanes.attention.map(i=>[i,'attention'])];
+        if(now.length)html+=part('Now','<ul class="items">'+now.map(([i,l])=>progressItem(i,ctx,l,true)).join('')+'</ul>',ctx);
+        if(latest.lanes.next.length)html+=part('Up next','<ul class="items">'+latest.lanes.next.map(i=>progressItem(i,ctx,'next',false)).join('')+'</ul>',ctx);
+      }
+      const days=m.days.map(d=>({d,list:d===latest?d.lanes.shipped.map(i=>[i,'shipped']):Object.entries(d.lanes).flatMap(([l,is])=>is.map(i=>[i,l]))})).filter(x=>x.list.length||(x.d!==latest&&(x.d.decisions.length||x.d.notes.length)));
+      const dayHTML=({d,list})=>'<section class="day'+(d===latest?' latest':'')+'"'+(d.date?' data-day="'+d.date+'"':'')+'>'+dayHead(d,ctx)+(list.length?'<ul class="items">'+list.map(([i,l])=>progressItem(i,ctx,l,l!=='shipped')).join('')+'</ul>':'')+(d===latest?'':dayExtras(d,ctx))+'</section>';
+      if(days.length){
+        const shown=days.slice(0,4),rest=days.slice(4);
+        html+='<section class="part shipped" data-outline="Shipped"><h3 class="part-title">Shipped</h3>'+shown.map(dayHTML).join('')+(rest.length?'<details class="fold earlier"><summary>'+rest.length+(rest.length===1?' earlier day':' earlier days')+'</summary>'+rest.map(dayHTML).join('')+'</details>':'')+'</section>';
+      }
+      if(latest){const extra=dayExtras(latest,ctx);if(extra)html+='<section class="part" data-outline="Notes"><h3 class="part-title">Notes</h3>'+extra+'</section>'}
+      if(m.roadmap.length)html+=part('Coming up','<ul class="items">'+m.roadmap.map(r=>'<li class="item">'+tag('plan',r.tier)+'<span class="item-line"><span class="item-text">'+inline(r.text,ctx.url)+'</span></span>'+meta(chips(r.proof),src(ctx,r.line))+'</li>').join('')+'</ul>',ctx);
+      return html+capNote(ctx)+'</div>';
+    }
+    function board(d,ctx,compactEmpty){
+      const lanes=Object.keys(STATUS).filter(l=>!compactEmpty||d.lanes[l].length);
+      return '<div class="board4">'+lanes.map(l=>'<section class="lane" data-status="'+l+'"><h4 class="lane-title"><span>'+STATUS[l]+'</span> <span class="lane-count">'+d.lanes[l].length+'</span></h4>'+(d.lanes[l].length?'<ul class="lane-items">'+d.lanes[l].map(i=>itemCard(i,ctx,l)).join('')+'</ul>':'<p class="lane-empty">Nothing listed.</p>')+'</section>').join('')+'</div>'+dayExtras(d,ctx);
+    }
+    function progressBoard(record,ctx){
       const m=progress(record.content,ctx.url);if(m.empty)return null;
       const [latest,...earlier]=m.days;
-      let html=open('progress','rich')+header('progress',record,ctx,m.title);
-      if(m.next)html+='<div class="detail-hero" data-outline="Next action"><span>Next action</span><p>'+inline(m.next.text,ctx.url)+'</p>'+src(ctx,m.next.line)+'</div>';
-      if(latest)html+='<section class="day latest" data-outline="Latest day"><header class="day-head"><h3 class="day-title">Latest day</h3>'+(latest.date?'<span class="day-when">'+time(latest.date,ctx.now)+'<small>'+latest.date+'</small></span>':'')+'</header>'+board(latest,ctx,false)+'</section>';
-      if(earlier.length)html+='<section class="days" data-outline="Earlier days"><h3 class="group-title">Earlier days <small>'+earlier.length+'</small></h3>'+earlier.map(d=>{
+      let html=open('progress','rich');
+      if(m.next)html+=lead('Next action',inline(m.next.text,ctx.url),ctx,m.next.line);
+      if(latest)html+='<section class="part day latest" data-outline="Latest day"><h3 class="part-title">Latest day'+(latest.date?' <small>'+time(latest.date,ctx.now)+'</small>':'')+'</h3>'+board(latest,ctx,false)+'</section>';
+      if(earlier.length)html+='<section class="part days" data-outline="Earlier days"><h3 class="part-title">Earlier days</h3>'+earlier.map(d=>{
         const n=count(d),shipped=d.lanes.shipped.length;
-        return '<details class="day fold"><summary><span class="day-title">'+(d.date?time(d.date,ctx.now):'Undated')+'</span>'+(d.date?'<code class="day-date">'+d.date+'</code>':'')+'<small>'+(shipped?shipped+' shipped':n+(n===1?' item':' items'))+'</small></summary><div class="day-body">'+board(d,ctx,true)+'</div></details>';
+        return '<details class="day fold"><summary>'+dayHead(d,ctx,'span')+'<span class="fold-count">'+(shipped?shipped+' shipped':n+(n===1?' item':' items'))+'</span></summary><div class="day-body">'+board(d,ctx,true)+'</div></details>';
       }).join('')+'</section>';
       if(m.roadmap.length){
         const tiers=[...new Set(m.roadmap.map(r=>r.tier))];
-        html+='<section class="roadmap" data-outline="Coming up"><h3 class="group-title">Coming up</h3><div class="road-lanes">'+tiers.map(t=>'<section class="road-lane"><h4 class="lane-title">'+esc(t)+'</h4><ul>'+m.roadmap.filter(r=>r.tier===t).map(r=>'<li><span>'+inline(r.text,ctx.url)+'</span><span class="item-meta">'+chips(r.proof)+src(ctx,r.line)+'</span></li>').join('')+'</ul></section>').join('')+'</div></section>';
+        html+='<section class="part roadmap" data-outline="Coming up"><h3 class="part-title">Coming up</h3><div class="board4">'+tiers.map(t=>'<section class="lane"><h4 class="lane-title">'+esc(t)+'</h4><ul class="lane-items">'+m.roadmap.filter(r=>r.tier===t).map(r=>'<li class="item"><div class="item-text">'+inline(r.text,ctx.url)+'</div>'+meta(chips(r.proof),src(ctx,r.line))+'</li>').join('')+'</ul></section>').join('')+'</div></section>';
       }
       return html+capNote(ctx)+'</div>';
     }
+
+    /* ---- Other records ---- */
     function changelogView(record,ctx){
       const m=changelog(record.content,ctx.url);if(m.empty)return null;
-      let html=open('changelog','rich')+header('changelog',record,ctx,m.title)+(m.lede?'<div class="lede">'+block(m.lede.text,ctx.url)+'</div>':'')+'<div class="timeline releases">';
+      let html=open('changelog','rich')+(m.lede?'<div class="intro prose">'+block(m.lede.text,ctx.url)+'</div>':'');
       for(const r of m.releases){
         let group=null,list='';
-        for(const e of r.entries){if(!take(ctx))continue;if(e.group!==group){group=e.group;if(group)list+='<li class="release-group">'+esc(group)+'</li>'}list+='<li class="release-item"><span>'+inline(e.text,ctx.url)+'</span>'+(e.body?block(e.body,ctx.url):'')+'<span class="item-meta">'+chips(e.proof)+src(ctx,e.line)+'</span></li>'}
-        html+='<section class="timeline-entry release" data-outline="'+esc(r.title)+'"><header class="release-head">'+(r.version?'<span class="version">'+esc(r.version)+'</span>':'')+'<h3 class="block-title">'+esc(r.date?r.title.replace(r.version||'\u0000','').replace(r.date,'').replace(/^[\s\-–—·:]+|[\s\-–—·:]+$/g,'')||r.date:r.title)+'</h3>'+(r.date?'<span class="when">'+time(r.date,ctx.now)+'</span>':'')+src(ctx,r.line)+'</header>'+(list?'<ul class="release-items">'+list+'</ul>':'<p class="lane-empty">No entries under this heading.</p>')+'</section>';
+        for(const e of r.entries){if(!take(ctx))continue;if(e.group!==group){group=e.group;if(group)list+='<li class="item-group">'+esc(group)+'</li>'}list+='<li class="item"><span class="item-line"><span class="item-text">'+inline(e.text,ctx.url)+'</span></span>'+(e.body?'<div class="item-body">'+block(e.body,ctx.url)+'</div>':'')+meta(chips(e.proof),src(ctx,e.line))+'</li>'}
+        const name=r.date?r.title.replace(r.version||'\u0000','').replace(r.date,'').replace(/^[\s\-–—·:]+|[\s\-–—·:]+$/g,''):r.title;
+        html+='<section class="part release" data-outline="'+esc(r.title)+'"><h3 class="part-title">'+(r.version?'<span class="version">'+esc(r.version)+'</span>':'')+(name?'<span>'+esc(name)+'</span>':'')+(r.date?'<small>'+time(r.date,ctx.now)+' · '+r.date+'</small>':'')+src(ctx,r.line)+'</h3>'+(list?'<ul class="items">'+list+'</ul>':'<p class="empty-note">No entries under this heading.</p>')+'</section>';
       }
-      return html+'</div>'+capNote(ctx)+'</div>';
+      return html+capNote(ctx)+'</div>';
     }
     function visionView(record,ctx){
       const m=vision(record.content,ctx.url);if(m.empty)return null;
-      const S=m.sections,prose=(role,cls='')=>S[role]?'<section class="brief-card '+cls+'" data-outline="'+esc(S[role].title)+'"><header class="block-head"><h3 class="block-title">'+esc(S[role].title)+'</h3>'+src(ctx,S[role].line)+'</header><div class="block-body">'+block(S[role].raw,ctx.url)+'</div></section>':'';
-      const list=(role,items,cls,tag='ul')=>S[role]&&items.length?'<section class="brief-list '+cls+'" data-outline="'+esc(S[role].title)+'"><header class="block-head"><h3 class="block-title">'+esc(S[role].title)+'</h3>'+src(ctx,S[role].line)+'</header><'+tag+'>'+items.map(i=>textItem(i,ctx)).join('')+'</'+tag+'></section>':prose(role);
-      let html=open('vision','rich')+header('vision',record,ctx,m.title);
-      if(m.declaration)html+='<div class="detail-hero declaration" data-outline="In short"><span>In short</span>'+block(m.declaration.text,ctx.url)+src(ctx,m.declaration.line)+'</div>';
-      html+='<div class="brief-grid">'+prose('why')+prose('world')+'</div>'+prose('who','wide');
-      html+=list('beliefs',m.beliefs,'beliefs','ol');
-      if(S.path)html+=m.path.length?'<section class="brief-list path" data-outline="'+esc(S.path.title)+'"><header class="block-head"><h3 class="block-title">'+esc(S.path.title)+'</h3>'+src(ctx,S.path.line)+'</header><ol class="path-steps">'+m.path.map(p=>'<li class="path-step"><span class="path-stage">'+esc(p.stage||'Step')+'</span><span>'+inline(p.text,ctx.url)+'</span>'+src(ctx,p.line)+'</li>').join('')+'</ol></section>':prose('path');
-      html+=list('never',m.never,'boundary')+prose('sustain','wide');
-      if(m.bets.length||m.questions.length||S.bets||S.questions){
-        html+='<section class="open-panel" data-outline="Still open"><h3 class="group-title">Still open</h3><p class="view-help">Bets are not proven yet. Questions wait for a decision.</p><div class="open-grid">'+[['bets',m.bets],['questions',m.questions]].filter(([r])=>S[r]).map(([r,items])=>'<section><h4 class="lane-title">'+esc(S[r].title)+' '+src(ctx,S[r].line)+'</h4>'+(items.length?'<ul>'+items.map(i=>textItem(i,ctx)).join('')+'</ul>':block(S[r].raw,ctx.url))+'</section>').join('')+'</div></section>';
-      }
-      if(S.changes)html+='<section class="decisions-log" data-outline="'+esc(S.changes.title)+'"><h3 class="group-title">'+esc(S.changes.title)+' '+src(ctx,S.changes.line)+'</h3>'+(m.changes.length?'<div class="timeline">'+m.changes.map(c=>'<div class="timeline-entry"><span class="when">'+(c.date?time(c.date,ctx.now):'Undated')+'</span><div>'+inline(c.text,ctx.url)+'</div>'+src(ctx,c.line)+'</div>').join('')+'</div>':block(S.changes.raw,ctx.url))+'</section>';
+      const S=m.sections,used=new Set();
+      const prose=role=>{if(!S[role]||used.has(role))return '';used.add(role);return part(S[role].title,'<div class="prose">'+block(S[role].raw,ctx.url)+'</div>',ctx,S[role].line)};
+      const list=(role,list,tagName='ul')=>{if(!S[role]||used.has(role))return '';if(!list.length)return prose(role);used.add(role);return part(S[role].title,items(list,ctx,tagName),ctx,S[role].line)};
+      let html=open('vision','rich');
+      /* The purpose sentence leads: the declaration, or a short Why section. */
+      if(m.declaration)html+=lead('',block(m.declaration.text,ctx.url),ctx,m.declaration.line,'Purpose');
+      else if(S.why&&S.why.raw.trim().length<360){html+=lead('',block(S.why.raw,ctx.url),ctx,S.why.line,S.why.title);used.add('why')}
+      html+=prose('who')+prose('why')+prose('world')+list('beliefs',m.beliefs,'ol');
+      if(S.path&&m.path.length){used.add('path');html+=part(S.path.title,'<ol class="items path">'+m.path.map(p=>'<li class="item">'+tag('plan',p.stage||'Step')+'<span class="item-line"><span class="item-text">'+inline(p.text,ctx.url)+'</span></span>'+meta(src(ctx,p.line))+'</li>').join('')+'</ol>',ctx,S.path.line)}else html+=prose('path');
+      html+=list('never',m.never)+prose('sustain')+list('bets',m.bets)+list('questions',m.questions);
+      if(S.changes){used.add('changes');html+=part(S.changes.title,m.changes.length?'<ul class="items">'+m.changes.map(c=>'<li class="item"><span class="item-line"><span class="item-text">'+inline(c.text,ctx.url)+'</span></span>'+meta(c.date?'<span class="when">'+time(c.date,ctx.now)+'</span>':'',src(ctx,c.line))+'</li>').join('')+'</ul>':'<div class="prose">'+block(S.changes.raw,ctx.url)+'</div>',ctx,S.changes.line)}
       return html+generic(m.other,ctx)+'</div>';
+    }
+    /* One source with its access line: route, account, scope, and location, then when access was checked. */
+    function sourceItem(p,ctx){
+      const access=p.fields.map(f=>'<span><span class="sr">'+esc(f.label)+': </span>'+inline(f.value,ctx.url)+'</span>').join('<span aria-hidden="true"> · </span>');
+      return '<li class="item source"><span class="item-line"><strong class="item-name">'+esc(p.title)+'</strong>'+(p.role?' <span class="tag">'+esc(p.role)+'</span>':'')+'</span>'+(access?'<p class="access">'+access+'</p>':p.text?'<p class="access">'+inline(p.text,ctx.url)+'</p>':'')+meta(p.hasVerified?(p.verified?'<span class="badge ok">Verified '+time(p.verified,ctx.now)+'</span>':'<span class="badge warn">Not verified</span>'):'',chips(p.proof),src(ctx,p.line))+'</li>';
     }
     function brainView(record,ctx){
       const m=brain(record.content,ctx.url);if(m.empty)return null;
-      const card=(p,cls)=>'<section class="provider-card '+cls+'">'+(p.role?'<span class="provider-role">'+esc(p.role)+'</span>':'')+'<h4>'+esc(p.title)+'</h4>'+(p.fields.length?'<dl>'+p.fields.map(f=>'<dt>'+esc(f.label)+'</dt><dd>'+inline(f.value,ctx.url)+'</dd>').join('')+'</dl>':p.text?'<p>'+inline(p.text,ctx.url)+'</p>':'')+'<div class="item-meta">'+(p.hasVerified?(p.verified?'<span class="badge ok">Verified '+time(p.verified,ctx.now)+'</span>':'<span class="badge warn">Not verified</span>'):'')+chips(p.proof)+src(ctx,p.line)+'</div></section>';
-      let html=open('brain','rich')+header('brain',record,ctx,m.title)+(m.lede?'<div class="lede">'+block(m.lede.text,ctx.url)+'</div>':'');
-      if(m.providers.length||m.sourcesNote)html+='<section class="library" data-outline="Sources"><h3 class="group-title">Sources</h3>'+(m.sourcesNote?'<div class="block-body sources-note">'+block(m.sourcesNote.text,ctx.url)+src(ctx,m.sourcesNote.line)+'</div>':'')+(m.providers.length?'<div class="provider-grid">'+m.providers.map(p=>card(p,'')).join('')+'</div>':'')+'</section>';
+      const sources=list=>'<ul class="items sources">'+list.map(p=>sourceItem(p,ctx)).join('')+'</ul>';
+      let html=open('brain','rich')+(m.lede?'<div class="intro prose">'+block(m.lede.text,ctx.url)+'</div>':'');
+      if(m.providers.length||m.sourcesNote)html+=part('Sources',(m.sourcesNote?'<div class="prose">'+block(m.sourcesNote.text,ctx.url)+'</div>':'')+(m.providers.length?sources(m.providers):''),ctx);
       html+='<div data-connections-slot></div>';
-      if(m.shelves.length)html+='<section class="library" data-outline="What lives where"><h3 class="group-title">What lives where</h3><div class="provider-grid shelves">'+m.shelves.map(p=>card(p,'shelf')).join('')+'</div></section>';
-      if(m.steps.length)html+='<section class="brief-list" data-outline="How to find things"><h3 class="group-title">How to find things</h3><ol class="steps">'+m.steps.map(i=>textItem(i,ctx)).join('')+'</ol></section>';
-      if(m.saves.cards)html+='<section class="library" data-outline="Where to save"><h3 class="group-title">Where to save '+src(ctx,m.saves.line)+'</h3><div class="provider-grid">'+m.saves.cards.map(p=>card(p,'shelf')).join('')+'</div>'+(m.saves.notes.length?'<ul class="plain-list">'+m.saves.notes.map(i=>textItem(i,ctx)).join('')+'</ul>':'')+'</section>';
-      for(const r of m.rules)html+='<section class="block boundary rule" data-outline="'+esc(r.title)+'"><header class="block-head"><h3 class="block-title">'+esc(r.title)+'</h3>'+src(ctx,r.line)+'</header><div class="block-body">'+(r.items.length?'<ul>'+r.items.map(i=>textItem(i,ctx)).join('')+'</ul>':block(r.raw,ctx.url))+'</div></section>';
-      if(m.questions.length)html+='<section class="open-panel" data-outline="Still open"><h3 class="group-title">Still open</h3><ul>'+m.questions.map(i=>textItem(i,ctx)).join('')+'</ul></section>';
+      if(m.shelves.length)html+=part('What lives where',sources(m.shelves),ctx);
+      if(m.steps.length)html+=part('How to find things',items(m.steps,ctx,'ol'),ctx);
+      if(m.saves.cards)html+=part('Where to save',sources(m.saves.cards)+items(m.saves.notes,ctx),ctx,m.saves.line);
+      for(const r of m.rules)html+=part(r.title,r.items.length?items(r.items,ctx):'<div class="prose">'+block(r.raw,ctx.url)+'</div>',ctx,r.line);
+      if(m.questions.length)html+=part('Open questions',items(m.questions,ctx),ctx);
       return html+generic(m.other,ctx)+'</div>';
     }
     function commandsHTML(list,ctx){return list.length?'<ul class="commands">'+list.map(c=>'<li><code>'+esc(c.text)+'</code><button type="button" class="copy" data-copy="'+esc(c.text)+'" aria-label="Copy '+esc(c.text)+'">Copy</button>'+src(ctx,c.line)+'</li>').join('')+'</ul>':''}
@@ -636,54 +672,57 @@
     }
     function structureView(record,ctx){
       const m=structure(record.content,ctx.url);if(m.empty)return null;
-      let html=open('structure','rich')+header('structure',record,ctx,m.title)+(m.lede?'<div class="lede">'+block(m.lede.text,ctx.url)+'</div>':'');
-      if(m.readFirst.length)html+='<section class="detail-hero start" data-outline="Read first"><span>Read first</span><ul>'+m.readFirst.map(i=>textItem(i,ctx)).join('')+'</ul></section>';
-      html+='<div class="blocks rows">'+m.trees.map(t=>'<section class="block directory" data-outline="'+esc(t.title)+'"><header class="block-head"><h3 class="block-title">'+esc(t.title)+'</h3>'+src(ctx,t.line)+'</header><div class="block-body">'+treeHTML(t)+'</div></section>').join('')+'</div>';
-      if(m.commands.length)html+='<section class="commands-panel" data-outline="Commands"><h3 class="group-title">Commands</h3>'+commandsHTML(m.commands,ctx)+'</section>';
-      for(const f of m.flows)html+='<section class="flow-panel" data-outline="'+esc(f.title)+'"><h3 class="group-title">'+esc(f.title)+' '+src(ctx,f.line)+'</h3><ol class="flow">'+f.edges.map(([a,b])=>'<li><span>'+esc(a)+'</span><i aria-hidden="true">→</i><span>'+esc(b)+'</span></li>').join('')+'</ol></section>';
-      for(const t of m.tables)html+='<section class="block wide" data-outline="'+esc(t.title)+'"><header class="block-head"><h3 class="block-title">'+esc(t.title)+'</h3>'+src(ctx,t.line)+'</header><dl class="pairs">'+t.rows.map(r=>'<div><dt>'+inline(r.cells[0]||'',ctx.url)+'</dt><dd>'+inline(r.cells.slice(1).join(' · '),ctx.url)+'</dd></div>').join('')+'</dl></section>';
+      let html=open('structure','rich')+(m.lede?'<div class="intro prose">'+block(m.lede.text,ctx.url)+'</div>':'');
+      if(m.readFirst.length)html+=part('Read first',items(m.readFirst,ctx),ctx);
+      html+=m.trees.map(t=>part(t.title,treeHTML(t),ctx,t.line,'directory')).join('');
+      if(m.commands.length)html+=part('Commands',commandsHTML(m.commands,ctx),ctx);
+      for(const f of m.flows)html+=part(f.title,'<ol class="flow">'+f.edges.map(([a,b])=>'<li><span>'+esc(a)+'</span><i aria-hidden="true">→</i><span>'+esc(b)+'</span></li>').join('')+'</ol>',ctx,f.line);
+      for(const t of m.tables)html+=part(t.title,'<dl class="pairs">'+t.rows.map(r=>'<div><dt>'+inline(r.cells[0]||'',ctx.url)+'</dt><dd>'+inline(r.cells.slice(1).join(' · '),ctx.url)+'</dd></div>').join('')+'</dl>',ctx,t.line);
       return html+generic(m.other,ctx)+'</div>';
     }
+    /* A compact table: one row for each tool, one column for each field the source names. */
     function techstackView(record,ctx){
       const m=techstack(record.content,ctx.url);if(m.empty)return null;
-      let html=open('techstack','rich')+header('techstack',record,ctx,m.title)+(m.lede?'<div class="lede">'+block(m.lede.text,ctx.url)+'</div>':'');
-      if(m.gaps.length)html+='<section class="block card warning gaps" data-outline="To verify"><header class="block-head"><h3 class="block-title">To verify</h3></header><ul>'+m.gaps.map(i=>textItem(i,ctx)).join('')+'</ul></section>';
+      let html=open('techstack','rich')+(m.lede?'<div class="intro prose">'+block(m.lede.text,ctx.url)+'</div>':'');
+      if(m.gaps.length)html+=part('To verify',items(m.gaps,ctx),ctx);
       for(const g of m.groups){
-        html+='<section class="tool-group" data-outline="'+esc(g.title)+'"><h3 class="group-title">'+esc(g.title)+' <small>'+g.cards.length+'</small> '+src(ctx,g.line)+'</h3><div class="tool-grid">'+g.cards.map(c=>take(ctx)?'<section class="tool-card'+(c.unknown?' unknown':'')+'"><div class="tool-top"><div class="tool-mark" aria-hidden="true">'+esc(c.name.slice(0,2).toUpperCase())+'</div>'+(c.version?'<span class="version">'+esc(c.version)+'</span>':'')+(c.unknown?'<span class="badge warn">Not confirmed</span>':'')+'</div><h4>'+esc(c.name)+'</h4><dl>'+c.fields.map(f=>'<dt>'+esc(f.label)+'</dt><dd>'+inline(f.value,ctx.url)+'</dd>').join('')+'</dl><div class="item-meta">'+src(ctx,c.line)+'</div></section>':'').join('')+'</div>'+(g.notes.trim()?'<div class="block-body tool-notes">'+block(g.notes,ctx.url)+'</div>':'')+'</section>';
+        const cols=[...new Set(g.cards.flatMap(c=>c.fields.map(f=>f.label)))],version=g.cards.some(c=>c.version);
+        const rows=g.cards.filter(()=>take(ctx)).map(c=>'<tr class="tool-row'+(c.unknown?' unknown':'')+'"><th scope="row">'+esc(c.name)+(c.unknown?' <span class="badge warn">Not confirmed</span>':'')+'</th>'+(version?'<td class="num">'+esc(c.version||'')+'</td>':'')+cols.map(label=>'<td>'+inline(c.fields.find(f=>f.label===label)?.value||'',ctx.url)+'</td>').join('')+'<td class="src-cell">'+src(ctx,c.line)+'</td></tr>').join('');
+        html+=part(g.title,'<div class="table-wrap"><table class="stack"><thead><tr><th scope="col">Tool</th>'+(version?'<th scope="col">Version</th>':'')+cols.map(c=>'<th scope="col">'+esc(c)+'</th>').join('')+'<th scope="col"><span class="sr">Source line</span></th></tr></thead><tbody>'+rows+'</tbody></table></div>'+(g.notes.trim()?'<div class="prose">'+block(g.notes,ctx.url)+'</div>':''),ctx,g.line);
       }
-      if(m.evidence.length)html+='<section class="brief-list" data-outline="Evidence"><h3 class="group-title">Evidence</h3><ul>'+m.evidence.map(i=>textItem(i,ctx)).join('')+'</ul></section>';
+      if(m.evidence.length)html+=part('Evidence',items(m.evidence,ctx),ctx);
       return html+generic(m.other,ctx)+capNote(ctx)+'</div>';
     }
+    /* README reads best as the document itself. The title is in the header, so it is not repeated. */
     function readmeView(record,ctx){
-      const m=readme(record.content,ctx.url);if(m.empty)return null;
-      let html=open('readme','rich')+header('readme',record,ctx,m.title);
-      if(m.pitch)html+='<div class="detail-hero" data-outline="What this is"><span>What this is</span>'+block(m.pitch.text,ctx.url)+src(ctx,m.pitch.line)+'</div>';
-      if(m.gets.length)html+='<section class="gets" data-outline="What you get"><h3 class="group-title">What you get</h3><ul class="get-grid">'+m.gets.map(i=>textItem(i,ctx,'get')).join('')+'</ul></section>';
-      if(m.steps.length)html+='<ol class="guide-steps">'+m.steps.map(s=>'<li class="guide-step" data-outline="'+esc(s.title)+'"><header class="block-head"><h3 class="block-title">'+esc(s.title)+'</h3>'+src(ctx,s.line)+'</header><div class="block-body">'+block(s.raw,ctx.url)+'</div>'+commandsHTML(m.commands.filter(c=>c.line>s.line&&s.raw.includes(c.text)),ctx)+'</li>').join('')+'</ol>';
-      html+=generic(m.other,ctx);
-      if(m.records.length)html+='<section class="brief-list" data-outline="Project records"><h3 class="group-title">Project records</h3><ul class="plain-list">'+m.records.map(i=>textItem(i,ctx)).join('')+'</ul></section>';
-      return html+'</div>';
+      const text=withoutTitle(record.content);if(!text.trim())return null;
+      return open('readme','rich')+'<div class="prose document">'+block(text,ctx.url)+'</div></div>';
     }
+    /* The first H1 is the page title. The peek header shows the name, so the body leaves it out. */
+    function withoutTitle(text){const lines=String(text||'').split('\n'),at=lines.findIndex(l=>l.trim());return at>=0&&/^#\s/.test(lines[at])?lines.slice(at+1).join('\n'):String(text||'')}
     function listView(key,record,ctx){
-      const list=rows(key,record.content,ctx.url),title=scan(record.content).title;
-      let html=open(key,'list',' list-density')+header(key,record,ctx,title)+'<div class="rows-list">',group=null,shown=0;
+      const list=rows(key,record.content,ctx.url);
+      let html=open(key,'list','rows')+'<div class="rows-list">',group=null,shown=0;
       for(const r of list){
         if(shown>=LIST_LIMIT){ctx.skipped++;continue}shown++;
-        if(r.group!==group){if(group!==null)html+='</ol></section>';group=r.group;html+='<section class="rows-group"'+(group?' data-outline="'+esc(group)+'"':'')+'>'+(group?'<h3 class="rows-group-title">'+esc(group)+(r.groupDate&&r.groupDate!==group?' '+time(r.groupDate,ctx.now):r.groupDate?' <small>'+time(r.groupDate,ctx.now)+'</small>':'')+'</h3>':'')+'<ol class="rows">'}
-        const tag=r.status?'<span class="pill" data-status="'+r.status+'">'+esc(r.tag||LANE_LABEL[r.status]||r.status)+'</span>':r.tag?'<span class="pill">'+esc(r.tag)+'</span>':'';
-        html+='<li class="row"'+(r.status?' data-status="'+r.status+'"':'')+'>'+tag+'<span class="row-main"><strong>'+esc(r.label)+'</strong>'+(r.text?' <span class="row-text">'+esc(r.text)+'</span>':'')+'</span><span class="row-meta">'+(r.date?time(r.date,ctx.now):r.when?'<span class="when">'+esc(r.when)+'</span>':'')+chips(r.proof)+(r.copy?'<button type="button" class="copy" data-copy="'+esc(r.copy)+'" aria-label="Copy '+esc(r.copy)+'">Copy</button>':'')+src(ctx,r.line)+'</span></li>';
+        if(r.group!==group){if(group!==null)html+='</ol></section>';group=r.group;html+='<section class="rows-group"'+(group?' data-outline="'+esc(group)+'"':'')+'>'+(group?'<h3 class="part-title">'+esc(group)+(r.groupDate&&r.groupDate!==group?' <small>'+time(r.groupDate,ctx.now)+'</small>':r.groupDate?' <small>'+time(r.groupDate,ctx.now)+'</small>':'')+'</h3>':'')+'<ol class="rows">'}
+        const label=r.status?tag(r.status,r.tag):r.tag?'<span class="tag">'+esc(r.tag)+'</span>':'';
+        html+='<li class="row"'+(r.status?' data-status="'+r.status+'"':'')+'>'+label+'<span class="row-main"><strong>'+esc(r.label)+'</strong>'+(r.text?' <span class="row-text">'+esc(r.text)+'</span>':'')+'</span><span class="row-meta">'+(r.date?time(r.date,ctx.now):r.when?'<span class="when">'+esc(r.when)+'</span>':'')+chips(r.proof)+(r.copy?'<button type="button" class="copy" data-copy="'+esc(r.copy)+'" aria-label="Copy '+esc(r.copy)+'">Copy</button>':'')+src(ctx,r.line)+'</span></li>';
       }
       if(group!==null)html+='</ol></section>';
       return html+'</div>'+capNote(ctx)+'</div>';
     }
-    const VIEWS={progress:progressView,changelog:changelogView,vision:visionView,brain:brainView,structure:structureView,techstack:techstackView,readme:readmeView};
-    /* HTML for a record, or null when the record does not follow its template and the generic overview fits better. */
+    const VIEWS={progress:progressBoard,changelog:changelogView,vision:visionView,brain:brainView,structure:structureView,techstack:techstackView,readme:readmeView};
+    const defaultMode=key=>layouts(key).first;
+    /* HTML for a record, or null when the record does not follow its template and the plain document reads better.
+       Progress: "list" is the reading list (default) and "rich" is the board. Other types: "rich" is their own layout. */
     function render(key,record,opts={}){
       if(!record||record.error||typeof record.content!=='string')return null;
-      const mode=opts.mode==='list'?'list':'rich',ctx={url:record.url,now:opts.now??Date.now(),mode,links:opts.links||0,budget:RICH_LIMIT,skipped:0};
+      const mode=opts.mode==='list'||opts.mode==='rich'?opts.mode:defaultMode(key),ctx={url:record.url,now:opts.now??Date.now(),mode,links:opts.links||0,budget:RICH_LIMIT,skipped:0};
+      if(key==='progress'&&mode==='list')return progressList(record,ctx);
       if(mode==='list')return listView(key,record,ctx);
       return VIEWS[key]?VIEWS[key](record,ctx):null;
     }
-    return {isoDate,relative,proofKind,linksIn,sourceLink,prRef,progress,changelog,vision,brain,structure,techstack,readme,rows,render,toggle};
+    return {isoDate,relative,proofKind,linksIn,sourceLink,prRef,progress,changelog,vision,brain,structure,techstack,readme,rows,render,layouts,defaultMode,withoutTitle};
   }
 })(globalThis);
