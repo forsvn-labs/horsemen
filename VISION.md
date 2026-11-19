@@ -1,6 +1,6 @@
 # Vision
 
-Owner: Hung · Confirmed: 2026-11-18 for an open-source, self-hosted GUI alongside the skill and CLI
+Owner: Hung · Confirmed: 2026-11-19 for the canvas workspace, with the design and all its proposed answers approved
 
 Horsemen makes project context easy to carry from one working session to the next.
 
