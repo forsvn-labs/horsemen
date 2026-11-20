@@ -7,7 +7,7 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Build slice 2a of the canvas workspace (canvas files shown in the browser) and finish the agent tools. The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
+Next action: Check the first canvas file (`.horsemen/canvas/roadmap.canvas`) on the live site, then finish the agent tools (pull request #32) and slices 2b (embeds and tables) and 4a (editing in the browser), which agents are building. The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
 
 ## Shipped
 
@@ -39,7 +39,7 @@ Next action: Build slice 2a of the canvas workspace (canvas files shown in the b
 
 ## In progress
 
-- **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 (record canvases) shipped. The owner chose to build all slices now. Later slices add canvas files, editing by people and agents, and tools for agents.
+- **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 (record canvases) shipped. Slice 2a (canvas files drawn in the browser, read-only) is merged in [PR #33](https://github.com/hungv47/horsemen/pull/33) and deployed; the live check with a real canvas file is next. The owner chose to build all slices now. Later slices add canvas files, editing by people and agents, and tools for agents.
 
 ### Technical details
 
