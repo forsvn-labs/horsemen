@@ -247,6 +247,37 @@
     return { type: kind, bytes };
   }
 
+  /* CSV and TSV tables that a canvas or a record names. Same rules and messages as decode_table in horsemen_core.gui.
+     The app splits the text into rows (canvas-table.js). XLSX is not read. */
+  const TABLE_TYPES = { '.csv': 'csv', '.tsv': 'tsv' }, MAX_TABLE = MAX_IMAGE;
+  const TABLE_TOO_LARGE = 'The table is larger than 1 MiB. Open it on GitHub.', TABLE_MISSING = 'The table is not in the repository at this commit.';
+  const TABLE_NOT_TEXT = 'The table is not UTF-8 text. Open it on GitHub.', TABLE_LFS = 'Stored in Git LFS; not shown. Open it on GitHub.', TABLE_TYPE = 'The file is not a CSV or TSV table.';
+  function tableType(path) {
+    const name = String(path || '').split('/').pop(), dot = name.lastIndexOf('.');
+    return dot > 0 ? TABLE_TYPES[name.slice(dot).toLowerCase()] || null : null;
+  }
+  const LFS = Array.from('version https://git-lfs.github.com/spec/', c => c.charCodeAt(0));
+  function decodeTable(blob, path) {
+    const kind = tableType(path);
+    if (!blob || typeof blob !== 'object' || Array.isArray(blob) || blob.type !== 'file') throw new ProviderError('The linked path is not a readable file.', 422);
+    if (!kind) throw new ProviderError(TABLE_TYPE, 415);
+    const size = blob.size;
+    if (typeof size !== 'number' || !Number.isInteger(size) || size < 0) throw new ProviderError('The linked path is not a readable file.', 422);
+    if (size > MAX_TABLE || blob.encoding === 'none') throw new ProviderError(TABLE_TOO_LARGE, 413);
+    if (blob.encoding !== 'base64' || typeof blob.content !== 'string') throw new ProviderError('Unsupported table encoding.');
+    const encoded = blob.content.replace(/\s/g, '');
+    if (encoded.length > MAX_TABLE * 2) throw new ProviderError(TABLE_TOO_LARGE, 413);
+    if (encoded.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new ProviderError('The table could not be decoded.');
+    let bytes;
+    try { bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0)); } catch { throw new ProviderError('The table could not be decoded.'); }
+    if (bytes.length > MAX_TABLE) throw new ProviderError(TABLE_TOO_LARGE, 413);
+    if (bytes.length >= LFS.length && LFS.every((x, i) => bytes[i] === x)) throw new ProviderError(TABLE_LFS, 415);
+    let text;
+    try { text = new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new ProviderError(TABLE_NOT_TEXT, 415); }
+    if (text.includes('\u0000')) throw new ProviderError(TABLE_NOT_TEXT, 415);
+    return { text, format: kind, size: bytes.length };
+  }
+
   const without = (obj, key) => Object.fromEntries(Object.entries(obj).filter(([k]) => k !== key));
   /* A project without its file lists, for the project list and a loaded project. */
   const publicProject = project => without(without(project, 'files'), 'canvases');
@@ -327,6 +358,14 @@
       catch (error) { if (error instanceof ProviderError && error.status === 404) throw new ProviderError(IMAGE_MISSING, 404); throw error; }
       const { type, bytes } = decodeImage(blob, path);
       return { type, bytes, size: bytes.length };
+    }
+    async loadTable(project, link) {
+      const path = link.path;
+      if (!tableType(path)) throw new ProviderError(TABLE_TYPE, 415);
+      let blob;
+      try { blob = await this.api(`/repos/${project.repo}/contents/${quote(path, '/')}?ref=${project.revision}`); }
+      catch (error) { if (error instanceof ProviderError && error.status === 404) throw new ProviderError(TABLE_MISSING, 404); throw error; }
+      return decodeTable(blob, path);
     }
     async pullRequest(project, number) {
       if (!/^[1-9][0-9]{0,8}$/.test(String(number))) throw new ProviderError('Invalid PR number.', 400);
@@ -427,6 +466,16 @@
       const image = await this.reader.loadImage(project, clone(link));
       if (generation !== this.generation) throw new ProviderError('Discovery changed. Open the project again.', 409);
       return image;
+    }
+    /* Text of a CSV or TSV file that a loaded record or canvas links to, at the scanned revision. */
+    async loadTable(key, linkId) {
+      const generation = this.generation, project = await this.project(key);
+      if (generation !== this.generation) throw new ProviderError('Discovery changed. Open the project again.', 409);
+      const link = this.links.get(key)?.get(linkId);
+      if (!link || link.kind !== 'attachment' || !tableType(link.path)) throw new ProviderError('Open a table linked from a loaded record or canvas.', 404);
+      const table = await this.reader.loadTable(project, clone(link));
+      if (generation !== this.generation) throw new ProviderError('Discovery changed. Open the project again.', 409);
+      return table;
     }
     async pullRequest(key, number) {
       const generation = this.generation, project = await this.project(key);
@@ -551,6 +600,6 @@
     ? [...repos.filter(r => r.full_name.toLowerCase() === target.repo.toLowerCase()), ...repos.filter(r => r.full_name.toLowerCase() !== target.repo.toLowerCase())]
     : repos;
 
-  const api = { MAX_CANVASES, discoverCanvases, canvasLinks, MAX_IMAGE, imageType, decodeImage, shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
+  const api = { MAX_CANVASES, discoverCanvases, canvasLinks, MAX_IMAGE, imageType, decodeImage, MAX_TABLE, tableType, decodeTable, shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenReader = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -27,7 +27,7 @@ function python(cases) {
   const code = `
 import json,sys
 import base64,hashlib
-from horsemen_core.gui import discover_roots, discover_canvases, decode_image, ProviderError
+from horsemen_core.gui import discover_roots, discover_canvases, decode_image, decode_table, ProviderError
 from horsemen_core.gui_links import connections, canvas_links
 from horsemen_core.legacy import sections
 out=[]
@@ -39,6 +39,9 @@ for c in json.load(sys.stdin):
     elif c['kind']=='image':
         try:
             kind,data=decode_image(c['blob'],c['path']);out.append({'type':kind,'size':len(data),'sha':hashlib.sha256(data).hexdigest()})
+        except ProviderError as error: out.append({'error':str(error),'status':error.status})
+    elif c['kind']=='table':
+        try: out.append(decode_table(c['blob'],c['path']))
         except ProviderError as error: out.append({'error':str(error),'status':error.status})
     else: out.append(discover_roots(c['entries']))
 print(json.dumps(out))`;
@@ -330,6 +333,48 @@ test('images load only from registered image links at the pinned revision', asyn
   await assert.rejects(s.loadImage(id, links.Big.id), /1 MiB/);
   await assert.rejects(s.loadImage(id, links.Gone.id), /not in the repository at this commit/);
   s.clear(); await assert.rejects(s.loadImage(id, links.Flow.id), /Scan again/);
+});
+
+/* CSV and TSV tables (canvas slice 2b). Failure modes: the two readers accept or refuse different files, or give
+   other messages; a file that no loaded record or canvas names is read; an image, a document, or XLSX is read as a table. */
+test('table decoding matches the Python reader', () => {
+  const CSV = Buffer.from('week,guests\n1,12\n'), LFS = Buffer.from('version https://git-lfs.github.com/spec/v1\noid sha256:' + 'a'.repeat(64) + '\nsize 4000000\n');
+  const cases = [
+    ['a.csv', contents(CSV)], ['a.CSV', contents(CSV)], ['b/c.tsv', contents(Buffer.from('a\tb\n'))], ['a.csv', contents(Buffer.from('\ufeffa,b\n'))], ['a.csv', contents(Buffer.alloc(0))],
+    ['a.csv', contents(Buffer.from('café,ünïcode,日本\n'))], ['a.xlsx', contents(Buffer.from('PK'))], ['a.png', contents(PNG)], ['.csv', contents(CSV)],
+    ['a.csv', contents(Buffer.from([0x63, 0x61, 0x66, 0xe9]))], ['a.csv', contents(Buffer.from('a\u0000b'))], ['a.csv', contents(LFS)],
+    ['a.csv', contents(CSV, { size: R.MAX_TABLE + 1 })], ['a.csv', { type: 'file', size: R.MAX_TABLE, encoding: 'none', content: '' }], ['a.csv', contents(Buffer.concat([CSV, Buffer.alloc(R.MAX_TABLE, 'x')]))],
+    ['a.csv', { type: 'file', size: 10, encoding: 'base64', content: '!bad!' }], ['a.csv', { type: 'file', size: 10, encoding: 'utf-8', content: 'x' }], ['a.csv', { type: 'file', size: 4, encoding: 'base64', content: 'YQ' }],
+    ['a.csv', { type: 'dir' }], ['a.csv', []], ['a.csv', null], ['a.csv', contents(CSV, { size: -1 })],
+  ];
+  const expected = python(cases.map(([p, blob]) => ({ kind: 'table', path: p, blob })));
+  for (const [i, [p, blob]] of cases.entries()) {
+    let actual;
+    try { actual = R.decodeTable(blob, p); } catch (error) { assert.ok(error instanceof R.ProviderError, `case ${i}`); actual = { error: error.message, status: error.status }; }
+    assert.deepEqual(actual, expected[i], `case ${i} (${p})`);
+  }
+  assert.equal(R.MAX_TABLE, 1024 * 1024);
+});
+
+test('tables load only from registered CSV and TSV links at the pinned revision', async () => {
+  const f = fake(); const api = f.api;
+  const files = { 'data/signups.csv': contents(Buffer.from('week,guests\n1,12\n')), 'data/stops.tsv': contents(Buffer.from('a\tb\n')), 'data/budget.xlsx': contents(Buffer.from('PK')), 'img/flow.png': contents(PNG) };
+  f.api = async p => {
+    if (p.includes('/git/blobs/')) { f.calls.push(p); return { encoding: 'base64', content: Buffer.from('# R\n[Signups](data/signups.csv) [Stops](data/stops.tsv) [Budget](data/budget.xlsx) [Gone](data/gone.csv) ![Flow](img/flow.png) [Doc](docs/d.md) [Remote](https://example.com/x.csv)').toString('base64') }; }
+    const m = p.match(/\/contents\/([^?]+)\?ref=/);
+    if (m && files[m[1]]) { f.calls.push(p); return files[m[1]]; }
+    if (m && m[1] === 'data/gone.csv') throw new R.ProviderError('Repository or record is no longer accessible.', 404);
+    return api(p);
+  };
+  const s = state(f); await s.scanSync(); const id = s.snapshot().projects[0].id;
+  await assert.rejects(s.loadTable(id, 'f'.repeat(24)), /table linked from a loaded record or canvas/);
+  const links = Object.fromEntries((await s.loadProject(id)).records.vision.connections.map(l => [l.title, l]));
+  assert.deepEqual(await s.loadTable(id, links.Signups.id), { text: 'week,guests\n1,12\n', format: 'csv', size: 17 });
+  assert.ok(f.calls.at(-1).endsWith('/contents/data/signups.csv?ref=' + 'a'.repeat(40)));
+  assert.equal((await s.loadTable(id, links.Stops.id)).format, 'tsv');
+  for (const name of ['Budget', 'Flow', 'Doc', 'Remote']) await assert.rejects(s.loadTable(id, links[name].id), /table linked from a loaded record or canvas/, name);
+  await assert.rejects(s.loadTable(id, links.Gone.id), /The table is not in the repository at this commit\./);
+  s.clear(); await assert.rejects(s.loadTable(id, links.Signups.id), /Scan again/);
 });
 
 test('the vendor folder is not a share link', () => {
