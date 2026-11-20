@@ -118,11 +118,14 @@
   }
   const WORDS = [['added', 'add'], ['moved', 'move'], ['edited', 'edit'], ['connected', 'connect'], ['removed', 'remove']];
   const summary = counts => WORDS.filter(([key]) => counts[key] > 0).map(([key, word]) => word + ' ' + Math.floor(counts[key])).join(', ') || 'update';
-  /* The commit message: the canvas name and counts only, never text from the file. */
-  function message(name, counts) {
+  /* The commit message: the canvas name and counts only, never text from the file. A save to the pull request branch
+     (slice 4c) has no [skip ci]: the checks that the pull request needs must run on its head commit. */
+  function message(name, counts, { pullRequest = false } = {}) {
     if (!F.validName(name)) throw new Error('canvas name is not valid');
-    return 'canvas(' + name + '): ' + summary(counts) + ' [skip ci]';
+    return 'canvas(' + name + '): ' + summary(counts) + (pullRequest ? '' : ' [skip ci]');
   }
+  /* The one branch besides the default branch that a save can write (slice 4c), when the default branch is protected. */
+  const PR_BRANCH = 'horsemen/canvas';
   /* The lines that a save removes and adds. The canonical text has one element on each line. */
   function changedLines(before, after) {
     const count = lines => { const m = new Map(); for (const l of lines) m.set(l, (m.get(l) || 0) + 1); return m; };
@@ -195,6 +198,6 @@
   /* The key of a draft in sessionStorage: the repository, the project root, and the canvas name. */
   const draftKey = (repo, projectRoot, name) => 'horsemen.draft.v1:' + repo + ':' + (projectRoot || '') + ':' + name;
 
-  const api = { NOTE, SECTION, newId, emptyDoc, stable, same, moveNode, addNote, setText, connect, connected, disconnect, remove, saveSection, changes, summary, message, changedLines, merge, draftKey };
+  const api = { PR_BRANCH, NOTE, SECTION, newId, emptyDoc, stable, same, moveNode, addNote, setText, connect, connected, disconnect, remove, saveSection, changes, summary, message, changedLines, merge, draftKey };
   if (node) module.exports = api; else root.HorsemenCanvasEdit = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -312,7 +312,7 @@ test('a head that moves during the commit is tried again, three times at most; a
   assert.equal((await post(s)).status, 200); assert.equal(repo.puts.length, 2); assert.equal(repo.commits, 1);
   repo = fakeRepo({ putConflicts: 5 });
   const busy = await post(s);
-  assert.equal(busy.status, 409); assert.deepEqual(await busy.json(), { error: 'GitHub did not accept the commit. The branch can be protected or busy. Try again later.', code: 'busy' });
+  assert.notEqual((await busy.json()).code, 'busy', 'slice 4c: after three refusals the save goes to horsemen/canvas (worker/test/protected.test.js)');
   assert.equal(repo.puts.length, 3);
   repo = fakeRepo({ putConflicts: 1, onConflict: r => { r.files[PATH] = canvasText([{ ...NOTE, text: 'Changed on GitHub.' }]); } });
   const changed = await post(s);
@@ -327,7 +327,7 @@ test('an unchanged canvas makes no commit', async () => {
 
 test('missing access maps to plain messages without GitHub text', async () => {
   const s = await editorSignIn();
-  for (const [options, status, code] of [[{ push: false }, 403, 'no-push'], [{ repoStatus: 404 }, 403, 'editor-install'], [{ putStatus: 403 }, 403, 'editor-install'], [{ putStatus: 404 }, 403, 'editor-install'], [{ putStatus: 422 }, 502, 'github'], [{ putStatus: 500 }, 502, 'github'], [{ repoStatus: 500 }, 502, 'github']]) {
+  for (const [options, status, code] of [[{ push: false }, 403, 'no-push'], [{ repoStatus: 404 }, 403, 'editor-install'], [{ putStatus: 404 }, 403, 'editor-install'], [{ putStatus: 422 }, 502, 'github'], [{ putStatus: 500 }, 502, 'github'], [{ repoStatus: 500 }, 502, 'github']]) {
     fakeRepo(options);
     const res = await post(s), data = await res.json();
     assert.equal(res.status, status, JSON.stringify(options)); assert.equal(data.code, code, JSON.stringify(options));

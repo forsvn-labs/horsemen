@@ -108,6 +108,8 @@ test('the commit message counts the changes and holds no text from the file', ()
   assert.equal(E.message('progress', E.changes(null, doc([note('a'), note('b')]))), 'canvas(progress): add 2 [skip ci]', 'a new file counts its nodes');
   assert.equal(E.message('progress', E.changes(base, base)), 'canvas(progress): update [skip ci]');
   assert.throws(() => E.message('Bad name', changes));
+  assert.equal(E.message('progress', E.changes(base, base), { pullRequest: true }), 'canvas(progress): update', 'a save to the pull request branch lets its checks run');
+  assert.equal(E.PR_BRANCH, 'horsemen/canvas');
   assert.equal(E.changes(base, E.moveNode(E.setText(base, 'a', 'x'), 'a', 9, 9)).edited, 1, 'a moved and edited element is an edit');
 });
 
