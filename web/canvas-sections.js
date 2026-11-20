@@ -66,14 +66,16 @@
     return '<span class="cardhead"><b>'+esc(node.title)+'</b></span><span class="cardbody">'+body+'</span>';
   }
   const cardLabel=node=>node.kind==='record'?'Open '+node.title:'Open section: '+node.title;
-  /* A place in a link: a record canvas and at most one element on it. Home is the default and needs no name. */
+  /* A place in a link: the canvas of a record or a board (the name of a canvas file) and at most one element on it.
+     Home is the default and needs no name. The app opens Home when the project has no canvas with the name. */
+  const CANVAS_NAME=/^[a-z0-9][a-z0-9-]{0,63}$/;
   function viewLink(state){
-    const canvas=state&&typeof state.canvas==='string'&&Object.hasOwn(TITLES,state.canvas)?state.canvas:null;
+    const canvas=state&&typeof state.canvas==='string'&&state.canvas!=='home'&&CANVAS_NAME.test(state.canvas)?state.canvas:null;
     const node=canvas&&typeof state.node==='string'&&NODE_ID.test(state.node)?state.node:null;
     return {canvas,node};
   }
   /* The local app keeps the place in the address hash: #p=<project>&c=<canvas>&n=<element>&r=<record>. */
-  const HASH=/^#p=([a-f0-9]{24})(?:&c=([a-z]+))?(?:&n=([A-Za-z0-9_-]+))?(?:&r=([a-z]+))?$/;
+  const HASH=/^#p=([a-f0-9]{24})(?:&c=([a-z0-9-]+))?(?:&n=([A-Za-z0-9_-]+))?(?:&r=([a-z]+))?$/;
   function parseHash(hash){
     const m=String(hash||'').match(HASH);if(!m)return null;
     const view=viewLink({canvas:m[2],node:m[3]});

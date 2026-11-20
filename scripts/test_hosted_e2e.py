@@ -1,8 +1,9 @@
 """End-to-end check of the hosted viewer against a disposable fake GitHub.
 
 Runs the real Worker with `wrangler dev`, signs in through a fake OAuth flow,
-reads a fictional project, detects a new commit, and signs out. Saves
-screenshots and the command log to --output (outside the repository).
+reads a fictional project, detects a new commit, shows canvas files that a push
+adds (also a file that is not valid, hostile content, and the public view), and
+signs out. Saves screenshots and the command log to --output (outside the repository).
 
     python3 scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check
 """
@@ -21,6 +22,9 @@ import threading
 import time
 import urllib.request
 from urllib.parse import parse_qs, urlsplit
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from canvas_fixture import BOARDS, CANVASES, HEAVY_SIZE, MEDIA, canvas, node
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output', required=True, type=Path)
@@ -48,7 +52,19 @@ def png(width, height, rgb):
 IMAGES = {'docs/img/board.png': png(48, 24, (51, 64, 122)),
           'docs/img/logo.svg': b'<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" onload="window.pwned=1"><script>window.pwned=1</script><circle cx="20" cy="20" r="18" fill="#a8301d"/></svg>'}
 UPDATED = '# Progress\nNext action: Publish the pilot results.\n## Shipped\n- Pilot results reached all operators.'
-world = {'app_calls': 0, 'rev': 'a' * 40, 'sources': dict(SOURCES), 'revoked': 0, 'tokens': 0, 'not_modified': 0}
+# Canvas files come with a later push: world['canvases'] has the text of each file, by name.
+world = {'app_calls': 0, 'rev': 'a' * 40, 'sources': dict(SOURCES), 'revoked': 0, 'tokens': 0, 'not_modified': 0, 'canvases': {}, 'heavy': False, 'heavy_reads': 0}
+# A canvas file as a person or an agent writes it by hand: indented JSON, not in canonical order.
+PILOT = '''{
+  "nodes": [
+    {"type": "text", "id": "note-first", "x": 0, "y": 0, "width": 320, "height": 140, "text": "Ask the three operators for one sentence each."},
+    {"type": "file", "id": "s-shipped", "x": 400, "y": 0, "width": 320, "height": 200, "file": "PROGRESS.md", "subpath": "#Shipped"}
+  ],
+  "edges": [
+    {"id": "e-ask", "fromNode": "note-first", "toNode": "s-shipped", "label": "about"}
+  ]
+}
+'''
 def sha(text): return hashlib.sha1(text.encode()).hexdigest()
 
 
@@ -84,10 +100,18 @@ class FakeGitHub(BaseHTTPRequestHandler):
             if self.headers.get('If-None-Match') == etag: world['not_modified'] += 1; return self.send(304, None, {'ETag': etag})
             return self.send(200, {'sha': world['rev'], 'commit': {'tree': {'sha': world['rev'][:1] * 40}}}, {'ETag': etag})
         if p.startswith('/repos/example/alpha/git/trees/'):
-            return self.send(200, {'truncated': False, 'tree': [{'path': k, 'type': 'blob', 'mode': '100644', 'sha': sha(v), 'size': len(v)} for k, v in world['sources'].items()]})
+            files = {**world['sources'], **{f'.horsemen/canvas/{name}.canvas': text for name, text in world['canvases'].items()}}
+            tree = [{'path': k, 'type': 'blob', 'mode': '100644', 'sha': sha(v), 'size': len(v.encode())} for k, v in files.items()]
+            # The 2 MiB file exists in the tree only. A request for its content is counted.
+            if world['heavy']: tree.append({'path': '.horsemen/canvas/heavy.canvas', 'type': 'blob', 'mode': '100644', 'sha': 'f' * 40, 'size': HEAVY_SIZE})
+            return self.send(200, {'truncated': False, 'tree': tree})
         if p.startswith('/repos/example/alpha/git/blobs/'):
-            for v in world['sources'].values():
+            if p.endswith('/' + 'f' * 40): world['heavy_reads'] += 1
+            for v in [*world['sources'].values(), *world['canvases'].values()]:
                 if sha(v) == p.rsplit('/', 1)[1]: return self.send(200, {'encoding': 'base64', 'content': base64.b64encode(v.encode()).decode()})
+        if p.startswith('/repos/example/alpha/contents/') and p.split('/contents/', 1)[1] in MEDIA:
+            data = MEDIA[p.split('/contents/', 1)[1]]
+            return self.send(200, {'type': 'file', 'sha': hashlib.sha1(data).hexdigest(), 'size': len(data), 'encoding': 'base64', 'content': base64.b64encode(data).decode()})
         if p.startswith('/repos/example/alpha/contents/') and p.split('/contents/', 1)[1] in IMAGES:
             data = IMAGES[p.split('/contents/', 1)[1]]
             return self.send(200, {'type': 'file', 'sha': hashlib.sha1(data).hexdigest(), 'size': len(data), 'encoding': 'base64', 'content': base64.b64encode(data).decode()})
@@ -215,6 +239,67 @@ try:
     assert value("document.querySelector('#project-description').textContent.includes('bbbbbbb')")
     browser('screenshot', str(args.output / '03-live-update.png'))
 
+    # Canvas files. A person or an agent writes a canvas file by hand and pushes; the open project shows it with no reload.
+    rail = "JSON.stringify([...document.querySelectorAll('#canvases [data-canvas]')].map(b => b.dataset.canvas))"
+    watch_csp = lambda: browser('eval', 'window.__csp=[];document.addEventListener("securitypolicyviolation",e=>window.__csp.push(e.violatedDirective+" "+e.blockedURI))')
+    def open_canvas(name):  # The rail scrolls when the list is long: bring the entry into view, then click it.
+        browser('eval', f'document.querySelector(\'[data-canvas="{name}"]\').scrollIntoView({{block:"center"}})'); browser('click', f'[data-canvas="{name}"]')
+    world['canvases'] = {'pilot': PILOT}; world['rev'] = 'c' * 40
+    until("document.querySelector('[data-canvas=pilot]') && document.body.dataset.state === 'ready'", 30)
+    assert value(rail) == ['home', 'vision', 'progress', 'brain', 'structure', 'pilot'], 'after the push the rail lists the new board'
+    open_canvas('pilot')
+    assert value(place) == '/example/alpha?canvas=pilot', 'the address names the board'
+    assert value("JSON.stringify([document.querySelector('#project-name').textContent, document.querySelector('#project-description').textContent.startsWith('2 elements from pilot.canvas · example/alpha'), document.querySelector('#canvas-notice').hidden])") == ['Pilot', True, True]
+    assert value("JSON.stringify([...document.querySelectorAll('.canvas-node')].map(e => [e.dataset.node, e.dataset.kind, position(e.dataset.node), e.offsetWidth]))") == [['note-first', 'note', [0, 0], 320], ['s-shipped', 'section', [400, 0], 320]], 'the elements of the hand-written file show at their places'
+    assert value("JSON.stringify([document.querySelector('[data-node=s-shipped]').innerText.includes('Pilot results reached all operators'), document.querySelector('[data-node=s-shipped] .card-from').textContent, [...document.querySelectorAll('.wires .edge text')].map(t => t.textContent)])") == [True, 'from Progress', ['about']], 'a section card shows the text of the record at this commit, and the connector has its label'
+    browser('screenshot', str(args.output / '03b-canvas-file-after-push.png'))
+    browser('dblclick', '[data-node="s-shipped"]')
+    until("document.querySelector('#peek').open && document.querySelector('#peek-title').textContent === 'Progress'")
+    assert value(place) == '/example/alpha?canvas=pilot&node=s-shipped&record=progress', 'a section card on a board opens its record, and the address keeps the place'
+    browser('press', 'Escape'); until("!document.querySelector('#peek').open")
+    # A second push adds a file for the Structure record, more boards, a file that is not valid, and a file of 2 MiB.
+    world['canvases'] = {**CANVASES, 'pilot': PILOT}; world['heavy'] = True; world['rev'] = 'd' * 40
+    until("document.querySelector('[data-canvas=review]') && document.body.dataset.state === 'ready' && canvasKey === 'pilot'", 30)
+    assert value(rail) == ['home', 'vision', 'progress', 'brain', 'structure', *sorted([*BOARDS, 'pilot'])], 'the rail lists the boards in name order; home.canvas is not a board'
+    assert value(place) == '/example/alpha?canvas=pilot&node=s-shipped', 'a live update keeps the board and the selected element'
+    assert world['heavy_reads'] == 0, 'the 2 MiB file is refused by its listed size; its content is never requested'
+    watch_csp(); open_canvas('structure')
+    assert value("JSON.stringify([document.querySelector('#project-name').textContent, document.querySelector('#project-description').textContent.startsWith('1 section · 11 elements from structure.canvas · example/alpha'), document.querySelectorAll('.canvas-node').length, document.querySelector('#canvas-notice').hidden])") == ['Structure', True, 11, True], 'a record with a canvas file shows the elements of the file; the file places its one section'
+    until("document.querySelectorAll('.file-node.image .md-image[data-state=shown] img').length === 2", 20)
+    assert value("JSON.stringify([...document.querySelectorAll('.file-node.image img')].map(i => [i.alt, i.src.startsWith('blob:'), i.naturalWidth > 0]))") == [['Pilot board', True, True], ['Pilot logo', True, True]], 'repository images of a canvas load through the read-only proxy as blob: images'
+    assert value("JSON.stringify([document.querySelector('[data-node=note-risk]').innerText.includes('<script>window.pwned=1</script>'), document.querySelectorAll('#map script, #map [onerror], .canvas-node iframe').length, document.querySelector('[data-node=note-risk] a').href, window.pwned ?? null, window.__csp])") == [True, 0, 'https://github.com/example/alpha/blob/' + 'd' * 40 + '/docs/research.md', None, []], 'script text in a note is text; nothing ran and nothing broke the CSP'
+    browser('click', '[data-node="note-risk"]')
+    assert value(place) == '/example/alpha?canvas=structure&node=note-risk', 'the address names an element of the file'
+    browser('wait', '--fn', 'document.querySelector("#toast").hidden')
+    browser('screenshot', str(args.output / '03c-canvas-file-record.png'))
+    browser('dblclick', '[data-node="doc-research"]')
+    until("document.querySelector('#peek').open && document.querySelector('#peek-content').innerText.includes('Operators need a clear next step.')", 20)
+    browser('press', 'Escape'); until("!document.querySelector('#peek').open")
+    # A file that is not valid: a message and the generated canvas of the record.
+    open_canvas('brain')
+    assert value("JSON.stringify([document.querySelector('#canvas-notice').hidden, document.querySelector('#canvas-notice p').textContent, document.querySelector('#canvas-notice a').href, [...document.querySelectorAll('.canvas-node')].map(e => e.dataset.node), !!document.querySelector('[data-canvas=brain] .canvas-fault')])") == [False, 'brain.canvas is not a valid canvas file: file is not valid JSON. The canvas shows the sections of the record.', 'https://github.com/example/alpha/blob/' + 'd' * 40 + '/.horsemen/canvas/brain.canvas', ['s-providers'], True], 'a file that is not valid shows a message and the generated canvas'
+    browser('screenshot', str(args.output / '03d-canvas-file-invalid.png'))
+    # A push repairs the file; the open canvas shows its element and the message goes.
+    world['canvases'] = {**world['canvases'], 'brain': canvas([node('note-fixed', 'text', 400, 0, 320, 140, text='The file is valid now.')])}; world['rev'] = 'e' * 40
+    until("document.querySelector('[data-node=note-fixed]') && document.querySelector('#canvas-notice').hidden && canvasKey === 'brain'", 30)
+    assert value("JSON.stringify([[...document.querySelectorAll('.canvas-node')].map(e => e.dataset.node).sort(), !!document.querySelector('[data-canvas=brain] .canvas-fault')])") == [['note-fixed', 's-providers'], False], 'after the repair the note shows beside the generated section card'
+    # Hostile elements and limits.
+    watch_csp(); open_canvas('review')
+    assert value("JSON.stringify([document.querySelector('#canvas-notice p').textContent, [...document.querySelectorAll('.canvas-node')].map(e => e.dataset.node).sort(), document.querySelectorAll('#map script, #map [onerror], a[href^=\"javascript\" i]').length, [...document.querySelectorAll('.canvas-node')].some(e => /url\\(|background:/.test(e.getAttribute('style'))), window.pwned ?? null, window.__csp])") == ['review.canvas has 3 elements that do not show. First fault: node evil: url must be an http or https address of 2,048 characters or less.', ['label', 'ok', 'quoted'], 0, False, None, []], 'a script address, CSS in a colour, and a path with ".." do not show; script text is text'
+    for name, words in [('crowd', 'crowd.canvas is not a valid canvas file: more than 500 nodes. No element of this file shows.'), ('heavy', 'heavy.canvas was not read. The canvas file is larger than 512 KiB. No element of this file shows.')]:
+        open_canvas(name)
+        assert value("JSON.stringify([document.querySelector('#canvas-notice p').textContent, document.querySelectorAll('.canvas-node').length])") == [words, 0], name
+    assert world['heavy_reads'] == 0
+    assert value("(t => t.includes('.horsemen/canvas/structure.canvas') && !t.includes('the map is one week old') && !t.includes('pwned'))(localStorage.getItem('horsemen.discovery.v1') || '')"), 'the saved index has canvas paths, not canvas text'
+    # The SVG blob test: the image address opened as a page runs no script.
+    open_canvas('structure'); until("document.querySelectorAll('.file-node.image .md-image[data-state=shown] img').length === 2", 20)
+    browser('eval', 'location.href=document.querySelector("[data-node=img-logo] img").src')
+    until("location.protocol === 'blob:' && document.documentElement.localName === 'svg'", 15)
+    assert value("JSON.stringify([document.querySelectorAll('script').length, window.pwned ?? null])") == [1, None], 'the SVG opened as a page from its blob: address has its script element, and the script did not run'
+    browser('open', origin + '/example/alpha')
+    until("document.querySelector('[data-artifact=progress]') && !document.querySelector('[data-artifact=progress]').disabled && document.body.dataset.state === 'ready'", 20)
+    until("document.querySelector('#scan-status').textContent.includes('Checked')", 20)
+
     # A reload shows projects from the saved index at once; the index never holds record text.
     assert value("(t=>t.includes('example/alpha') && t.includes('PROGRESS.md') && !t.includes('Publish the pilot') && !t.includes('Invite three'))(localStorage.getItem('horsemen.discovery.v1')||'')"), 'index has paths, not record text'
     browser('eval', 'location.reload()')
@@ -288,6 +373,17 @@ try:
     until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Independent builders')")
     assert value(place) == public + '&record=vision'
     browser('screenshot', str(args.output / '08-public-canvas.png'))
+    browser('press', 'Escape'); until("!document.querySelector('#peek').open")
+    # Public view of canvas files: a board and its element from a link, and repository images through the public route.
+    board = '/example/open?canvas=launch-plan&node=progress'
+    browser('open', origin + board)
+    until("document.querySelector('meta[name=horsemen-mode]')?.content === 'public' && typeof canvasKey !== 'undefined' && document.body.dataset.state === 'ready' && canvasKey === 'launch-plan' && selected.has('progress')", 20)
+    assert value(place) == board and value("JSON.stringify([document.querySelector('#project-name').textContent, document.activeElement.dataset.node, document.querySelectorAll('.canvas-node').length, localStorage.getItem('horsemen.discovery.v1')])") == ['Launch plan', 'progress', 7, None], 'the public view opens a board at one element and saves nothing'
+    browser('focus', '[data-node="to-structure"]'); browser('press', 'Enter'); browser('press', 'Enter')
+    until("canvasKey === 'structure' && document.querySelectorAll('.file-node.image .md-image[data-state=shown] img').length === 2", 20)
+    assert value(place) == '/example/open?canvas=structure', 'a portal opens its canvas in the public view'
+    browser('wait', '--fn', 'document.querySelector("#toast").hidden')
+    browser('screenshot', str(args.output / '09-public-canvas-file.png'))
     assert world['app_calls'] > 0
     print('Hosted E2E passed:', args.output)
 finally:

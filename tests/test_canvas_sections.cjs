@@ -118,7 +118,9 @@ assert.equal(S.cardLabel(whole.nodes[0]), 'Open README');
 assert.deepEqual(S.viewLink({ canvas: 'progress', node: 's-shipped' }), { canvas: 'progress', node: 's-shipped' });
 assert.deepEqual(S.viewLink({ canvas: 'home', node: 's-shipped' }), { canvas: null, node: null }, 'Home is the default; an element needs a record canvas');
 assert.deepEqual(S.viewLink({ canvas: 'Progress' }), { canvas: null, node: null });
-assert.deepEqual(S.viewLink({ canvas: 'constructor', node: 'x' }), { canvas: null, node: null }, 'object keys are not canvases');
+assert.deepEqual(S.viewLink({ canvas: 'constructor', node: 'x' }), { canvas: 'constructor', node: 'x' }, 'a board can have any valid name; the app finds a canvas by its own keys only');
+assert.deepEqual(S.viewLink({ canvas: 'launch-plan', node: 'note-risk' }), { canvas: 'launch-plan', node: 'note-risk' }, 'a board has the name of its canvas file');
+for (const bad of ['../x', 'a/b', 'a_b', 'a.b', '-a', 'a b', 'a'.repeat(65), '', '<b>', 7, null]) assert.deepEqual(S.viewLink({ canvas: bad, node: 'x' }), { canvas: null, node: null }, 'not a canvas name: ' + String(bad));
 assert.deepEqual(S.viewLink({ node: 's-shipped' }), { canvas: null, node: null });
 for (const bad of ['', '-x', 's shipped', 's-"x"', '<b>', 'a'.repeat(65), '../x', null, undefined, 5]) assert.equal(S.viewLink({ canvas: 'vision', node: bad }).node, null, String(bad));
 assert.deepEqual(S.viewLink(null), { canvas: null, node: null });
@@ -128,7 +130,11 @@ const id = 'a1b2c3d4e5f6a1b2c3d4e5f6';
 assert.deepEqual(S.parseHash('#p=' + id), { p: id, r: null, c: null, n: null });
 assert.deepEqual(S.parseHash('#p=' + id + '&r=vision'), { p: id, r: 'vision', c: null, n: null }, 'a link from before canvases still opens its record');
 assert.deepEqual(S.parseHash('#p=' + id + '&c=progress&n=s-shipped&r=progress'), { p: id, r: 'progress', c: 'progress', n: 's-shipped' });
-assert.deepEqual(S.parseHash('#p=' + id + '&c=nope&n=s-shipped'), { p: id, r: null, c: null, n: null });
+assert.deepEqual(S.parseHash('#p=' + id + '&c=launch-plan&n=note-risk'), { p: id, r: null, c: 'launch-plan', n: 'note-risk' }, 'a link can name a board');
+assert.deepEqual(S.parseHash('#p=' + id + '&c=home&n=s-shipped'), { p: id, r: null, c: null, n: null });
+assert.equal(S.parseHash('#p=' + id + '&c=Launch&n=s-shipped'), null);
+assert.equal(S.formatHash({ p: id, c: 'launch-plan', n: 'note-risk' }), '#p=' + id + '&c=launch-plan&n=note-risk');
+assert.equal(S.formatHash({ p: id, c: '../x', n: 'a' }), '#p=' + id);
 assert.deepEqual(S.parseHash('#p=' + id + '&n=s-shipped'), { p: id, r: null, c: null, n: null });
 for (const bad of ['', '#', '#p=short', '#p=' + id + '&x=1', '#p=' + id + '&r=VISION', '#q=' + id, '#p=' + id + '&c=progress&c=vision', '#p=' + id + '&n=%3Cb%3E&c=vision']) {
   const parsed = S.parseHash(bad);
@@ -140,7 +146,7 @@ assert.equal(S.formatHash({ p: id, c: 'progress', n: 's-shipped', r: 'progress' 
 assert.equal(S.formatHash({ p: id, c: 'home', n: 's-shipped' }), '#p=' + id, 'Home needs no canvas in the link');
 assert.equal(S.formatHash({ p: id, c: 'progress', n: 'bad id' }), '#p=' + id + '&c=progress');
 assert.equal(S.formatHash({}), '');
-for (const state of [{ p: id, r: null, c: null, n: null }, { p: id, r: 'brain', c: 'brain', n: 's-providers' }, { p: id, r: null, c: 'changelog', n: null }]) assert.deepEqual(S.parseHash(S.formatHash(state)), state, 'a place survives a round trip');
+for (const state of [{ p: id, r: null, c: null, n: null }, { p: id, r: 'brain', c: 'brain', n: 's-providers' }, { p: id, r: null, c: 'changelog', n: null }, { p: id, r: 'vision', c: 'q3-2026', n: 'idea_1' }]) assert.deepEqual(S.parseHash(S.formatHash(state)), state, 'a place survives a round trip');
 
 /* Reading view: find the heading of a section among the rendered headings. */
 const headings = ['Latest day', 'Shipped', 'In progress', 'Upcoming roadmap'];
