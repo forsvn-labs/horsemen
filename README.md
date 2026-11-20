@@ -13,7 +13,7 @@ Three ways to use it today:
 | See your projects in the browser | Keep records current with your agent | Check records without AI |
 | --- | --- | --- |
 | Sign in with GitHub at [horsemen.forsvn.com](https://horsemen.forsvn.com) | Install the agent skill | Install the CLI |
-| Read each record in a view made for it | Gather context and update the right originals | Get repeatable results with Python 3.10+ |
+| Open each record as a canvas or a reading view | Gather context and update the right originals | Get repeatable results with Python 3.10+ |
 | Share a link to any project or record | Get a reminder to push record edits | Update one local record with an exact edit |
 
 The skill and the CLI use the same checker. The CLI has no runtime
@@ -25,9 +25,10 @@ outside services.
 ### See your projects
 
 Open <https://horsemen.forsvn.com>, sign in with GitHub, and choose the
-repositories to show. Each project opens as a canvas of its records. Each
-record opens in a reading view: Progress starts with the next action, then
-current work and shipped work by day with links to proof. Pick one of eight
+repositories to show. Each project opens as a canvas of its records, and the
+sidebar lists them. Each record opens as its own canvas with a card for each
+section; a card opens the reading view at that section. Progress starts with
+the next action, then current work and shipped work by day with links to proof. Pick one of eight
 themes from the account menu.
 
 Copy a link to a project or record, such as
