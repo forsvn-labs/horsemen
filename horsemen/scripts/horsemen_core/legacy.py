@@ -4,7 +4,7 @@
 usage:
   horsemen.py check [DIR] [--json]
   horsemen.py hook session-start|stop          (reads hook JSON on stdin)
-  horsemen.py hooks install|uninstall|status [--claude-settings P] [--codex-hooks P] [--script-path P]
+  horsemen.py hooks install|uninstall|status [--claude-settings P] [--codex-hooks P] [--script-path P] [--pointer]
   horsemen.py show [TARGET]                    (workspace index, record section, or canvas outline)
   horsemen.py canvas apply NAME [--ops FILE]   (change one canvas file; does not commit)
   horsemen.py mcp [install|status]             (local MCP server with the tools read and canvas_edit)
@@ -47,6 +47,10 @@ TECHNICAL = [r"`[^`\n]+`", r"\bPRs?\s*#?\d+", r"(?<![\w/&])#\d+\b", r"\b(?=[0-9a
 SNAPSHOT_LINES = 60
 SNAPSHOT_CHARS = 3000
 READ_FIRST_CHARS = 600
+POINTER_CHARS = 700  # all that session start injects in pointer mode
+GATES_CHARS = 300
+CANVAS_FOLDERS = ((".horsemen/canvas", ".canvas"), (".horsemen/media", ""))
+CANVAS_FILES = 200  # files of .horsemen that the stop rules follow
 HOOK_BUDGET = 3.5  # seconds for all Git calls in one hook run; hosts allow 5
 DEADLINE = None
 REQUIRED_COLUMNS = ["item", "date"]
@@ -705,6 +709,12 @@ def load_state(path, root):
     dirs = state.get("dirs")
     if dirs is not None and (not isinstance(dirs, list) or any(not isinstance(item, str) for item in dirs)):
         return None
+    boards = state.get("canvas")
+    if boards is not None:
+        if not isinstance(boards, dict) or not isinstance(boards.get("files"), dict) or not isinstance(boards.get("broken"), list):
+            return None
+        if any(not isinstance(item, str) for item in [*boards["files"], *boards["files"].values(), *boards["broken"]]):
+            return None
     return state
 
 
@@ -777,6 +787,15 @@ def orient(root, top):
                 incomplete.append("the STRUCTURE.md 'Read before changing' section")
     if incomplete:
         lines.append("Injected text is incomplete. Read the rest of " + " and ".join(incomplete) + " before acting.")
+    health = health_lines(root, top, report, progress_name)
+    if health:
+        lines += ["", "Record health:"] + [f"- {h[:240]}" for h in health[:6]]
+        lines.append(f"Full report: python3 {Path(__file__).resolve()} check")
+    return "\n".join(lines)
+
+
+def health_lines(root, top, report, progress_name):
+    """Short problem lines for session start, most important first."""
     health = []
     if top:
         since = commits_since(root, progress_name)
@@ -802,13 +821,146 @@ def orient(root, top):
             health.append(f"{hits[0]['file']}: {hits[0]['message']}")
     if report["info"].get("open_questions"):
         health.append(f"VISION.md lists {plural(report['info']['open_questions'], 'open question')}.")
-    if health:
-        lines += ["", "Record health:"] + [f"- {h[:240]}" for h in health[:6]]
-        lines.append(f"Full report: python3 {Path(__file__).resolve()} check")
-    return "\n".join(lines)
+    return health
 
 
-def session_start(payload):
+def gates_of(snapshot):
+    """(text, below a heading) of the gates in a PROGRESS snapshot: the lines below a Gates heading, or a
+    `Gates:` line with its list. ("", False) when the snapshot has none."""
+    rows = snapshot.splitlines()
+    for index, row in enumerate(rows):
+        heading = re.match(r"#{1,6}\s+gates\s*#*\s*$", row.strip(), re.I)
+        line = None if heading else re.match(r"(?:[-*]\s+)?\**gates\**\s*:\**\s*(.*)$", row.strip(), re.I)
+        if not heading and not line:
+            continue
+        body = [line.group(1).strip()] if line and line.group(1).strip() else []
+        for later in rows[index + 1:]:
+            text = later.strip()
+            if re.match(r"#{1,6}\s", text) or text.startswith(("</details", "<details", "<summary", "|")):
+                break
+            if line and body and not text:
+                break  # A Gates line ends at the first empty line after its text.
+            if line and re.match(r"[A-Z][\w ]{0,30}:(\s|$)", text):
+                break  # The next labelled line, such as "Task tracking:".
+            if text:
+                body.append(text)
+        return " ".join(body), bool(heading)
+    return "", False
+
+
+def canvas_problems(root):
+    """Errors in the canvas files of a project, as "file name: message". Empty without canvas files."""
+    if not (Path(root) / ".horsemen" / "canvas").exists():
+        return []
+    return [(file, code, f"{file.rsplit('/', 1)[-1]}: {message}")
+            for level, code, file, message in core("canvas").check_project(root) if level == "error"]
+
+
+def pointer_text(root, top):
+    """Pointer mode: at most POINTER_CHARS characters. The gates stay; all other text is read on demand."""
+    report = check(root, top, fast=True)
+    progress_name = report["info"]["progress_file"]
+    where = str(root) if len(str(root)) <= 100 else "…" + str(root)[-99:]
+    head = f"Horsemen records for {where}: " + ", ".join(report["records"]) + "."
+    more = "Read more with the `read` tool or `horsemen show`. Review the four records before you finish each task."
+    script = Path(__file__).resolve().parent.parent / "horsemen.py"
+    more_full = more.replace("`horsemen show`", f"`horsemen show` (python3 {script} show)")
+    text = read(root / "PROGRESS.md")
+    action, structure_line, canvases = "", "", []
+    if text is not None:
+        snapshot, _ = split_progress(text)
+        found, heading = gates_of(snapshot)
+        if not found:
+            gates = "Gates: none in the PROGRESS.md snapshot."
+        elif len(found) <= GATES_CHARS:
+            gates = "Gates: " + found
+        else:
+            gates = (f"Gates: more than {GATES_CHARS} characters. Read "
+                     + ("progress#Gates" if heading else "the Gates line in PROGRESS.md") + " before you act.")
+        match = re.search(r"(?m)^\**Next action:?\**:?[ \t]*(\S.*)$", snapshot)
+        action = "Next action: " + match.group(1).strip() if match else ""
+    elif progress_name == LEGACY_PROGRESS:
+        gates = "Status lives in legacy STATUS.md. Read it before project work: it holds the gates and the next action."
+    else:
+        gates = "PROGRESS.md is missing, so no gates are known."
+    structure = read(root / "STRUCTURE.md")
+    if structure is not None and any(title.startswith("read before") and body.strip() for title, body in sections(structure).items()):
+        structure_line = "STRUCTURE.md has a Read before changing list: read structure#Read before changing first."
+    health = []
+    try:
+        names = sorted(n[:-7] for n in os.listdir(root / ".horsemen" / "canvas") if n.endswith(".canvas"))
+        canvases = names if (root / ".horsemen" / "canvas").resolve().is_relative_to(Path(root).resolve()) else []
+        problems = canvas_problems(root) if canvases else []
+        if problems:
+            health.append(f"{plural(len(problems), 'canvas problem')}; run check.")
+    except Exception:  # No canvas folder, or a canvas module that does not load: the pointer still works.
+        canvases = []
+    health += health_lines(root, top, report, progress_name)
+
+    room = POINTER_CHARS - len(head) - len(gates) - len(more) - 2
+    chosen = {}
+
+    def take(key, variants):
+        nonlocal room
+        for variant in variants:
+            if variant and len(variant) + 1 <= room:
+                chosen[key] = variant
+                room -= len(variant) + 1
+                return
+
+    take("structure", [structure_line])
+    if action:
+        take("action", [action] if len(action) <= 240 else [])
+        if "action" not in chosen and room > 80:
+            take("action", [action[:min(room, 240) - 2] + "…"])
+    if canvases:
+        variants = ["Canvases: " + ", ".join(canvases) + "."]
+        for count in range(len(canvases) - 1, 0, -1):
+            variants.append("Canvases: " + ", ".join(canvases[:count]) + f", +{len(canvases) - count} more.")
+        take("canvases", variants + [f"Canvases: {len(canvases)}."])
+    for index, item in enumerate(health[:3]):
+        take(f"health{index}", ["- " + item if len(item) <= 110 else "- " + item[:109] + "…",
+                                 "- " + item[:max(room - 4, 0)] + "…" if room >= 40 else ""])
+    lines = [head, chosen.get("canvases"), chosen.get("action"), gates, chosen.get("structure"),
+             *(chosen.get(f"health{index}") for index in range(3)),
+             more_full if len(more_full) - len(more) <= room else more]
+    return "\n".join(line for line in lines if line)[:POINTER_CHARS]
+
+
+def canvas_files(root):
+    """A short hash for each file in .horsemen/canvas and .horsemen/media, by project path."""
+    found = {}
+    real_root = Path(root).resolve()
+    for folder, suffix in CANVAS_FOLDERS:
+        base = Path(root) / folder
+        try:
+            if not base.is_dir() or not base.resolve().is_relative_to(real_root):
+                continue  # A folder that is a link out of the project is not read.
+            names = sorted(os.listdir(base))
+        except OSError:
+            continue
+        for name in names:
+            path = base / name
+            if len(found) >= CANVAS_FILES:
+                break
+            try:
+                if name.endswith(suffix) and path.is_file() and not path.is_symlink():
+                    size = path.stat().st_size
+                    found[f"{folder}/{name}"] = hashlib.sha256(path.read_bytes()).hexdigest()[:16] if size <= 2 * 1024 * 1024 else f"size:{size}"
+            except OSError:
+                pass
+    return found
+
+
+def canvas_baseline(root):
+    """What stop compares canvases to: the files and the problems that existed when the session started."""
+    try:
+        return {"files": canvas_files(root), "broken": [text for _, _, text in canvas_problems(root)]}
+    except Exception:
+        return None
+
+
+def session_start(payload, pointer=False):
     cwd = Path(payload.get("cwd") or os.getcwd())
     root, top = find_root(cwd)
     if root is None:
@@ -822,7 +974,8 @@ def session_start(payload):
             head = git(root, "rev-parse", "HEAD") if top else None
             state = {"version": CACHE_VERSION, "root": str(root), "git": bool(top), "head": head.strip() if head else None,
                      "time": int(time.time()), "hashes": record_hashes(root),
-                     "shipped": sorted(shipped_items(read(root / "PROGRESS.md"))), "reminded": {}}
+                     "shipped": sorted(shipped_items(read(root / "PROGRESS.md"))), "reminded": {},
+                     "canvas": canvas_baseline(root)}
             if top and state["head"]:
                 listing = git(root, "ls-files", "-co", "--exclude-standard")
                 if listing is not None:
@@ -831,7 +984,7 @@ def session_start(payload):
         prune_state()
     except OSError:
         pass  # Orientation and task review do not depend on a writable cache.
-    return emit_context(orient(root, top))
+    return emit_context(pointer_text(root, top) if pointer else orient(root, top))
 
 
 def emit_context(text):
@@ -928,11 +1081,17 @@ def stop(payload):
         notes.append("Vision: VISION.md changed. Check README.md, PROGRESS.md (Next, Later), and BRAIN.md for conflicts, "
                      "and log the agreed direction change. Ask only if the owner's intent is unclear.")
 
-    if changed and top and state.get("git"):
-        unpublished = unpublished_records(root, top, changed)
+    boards = state.get("canvas")  # None for a cache from before canvases: the canvas rules are skipped.
+    files_now, canvas_changed = {}, []
+    if boards is not None:
+        files_now = canvas_files(root)
+        canvas_changed = sorted(n for n in set(files_now) | set(boards["files"]) if files_now.get(n) != boards["files"].get(n))
+
+    if (changed or canvas_changed) and top and state.get("git"):
+        unpublished = unpublished_records(root, top, changed, canvas_changed)
         if unpublished:
             names, ref = unpublished
-            fingerprint = digest(ref + "\n" + "\n".join(f"{n}:{now.get(n)}" for n in names))
+            fingerprint = digest(ref + "\n" + "\n".join(f"{n}:{now.get(n) or files_now.get(n)}" for n in names))
             if reminded.get("publish") != fingerprint:
                 reminded["publish"] = fingerprint
                 notes.append(f"Publish: {', '.join(names[:4])} changed in this session but {'differs' if len(names) == 1 else 'differ'} from {ref}. Readers of GitHub, "
@@ -947,12 +1106,30 @@ def stop(payload):
             reminded["lint"] = fingerprint
             notes.append("Record errors: " + " ".join(errors[:5]))
 
+    if boards is not None and (files_now or boards["files"]):
+        try:
+            problems = canvas_problems(root)
+        except Exception:  # The four-record review does not depend on the canvas check.
+            problems = []
+        errors = [text for file, _, text in problems if file in canvas_changed]
+        fingerprint = digest("\n".join(errors))
+        if errors and reminded.get("canvas_lint") != fingerprint:
+            reminded["canvas_lint"] = fingerprint
+            notes.append("Canvas errors: " + " ".join(errors[:3]) + " Correct the file; canvas_edit checks and formats it.")
+        known = set(boards["broken"])
+        cards = [text for file, code, text in problems if code == "canvas-dangling-ref" and file not in canvas_changed and text not in known]
+        fingerprint = digest("\n".join(cards))
+        if cards and reminded.get("canvas_cards") != fingerprint:
+            reminded["canvas_cards"] = fingerprint
+            notes.append("Canvas: " + " ".join(cards[:3]) + " The card broke in this session. Repair it with canvas_edit or `horsemen.py canvas apply`.")
+
     save_state(path, state)
     return completion_reminder(notes)
 
 
-def unpublished_records(root, top, names):
-    """Records changed in this session whose text differs from the remote default branch, as of the last fetch."""
+def unpublished_records(root, top, names, files=()):
+    """Records and .horsemen files changed in this session whose content differs from the remote default
+    branch, as of the last fetch."""
     ref = (git(top, "symbolic-ref", "--quiet", "--short", "refs/remotes/origin/HEAD") or "").strip()
     if not ref:
         return None  # No remote default branch: nothing reads these records from GitHub.
@@ -968,6 +1145,15 @@ def unpublished_records(root, top, names):
             continue
         remote = git(top, "show", f"{ref}:{prefix}{name}")
         if remote != local:
+            out.append(name)
+    for name in sorted(files)[:12]:
+        if not (Path(root) / name).is_file():
+            continue
+        local = git(root, "hash-object", "--", name)  # Media can be binary: compare object names, not text.
+        if local is None:
+            continue
+        remote = git(top, "rev-parse", "--verify", "--quiet", f"{ref}:{prefix}{name}", ok_codes=(0, 1))
+        if remote is not None and remote.strip() != local.strip():
             out.append(name)
     return (out, ref) if out else None
 
@@ -1002,7 +1188,7 @@ def work_commits(root, base, progress_name, since):
     return count
 
 
-def run_hook(event):
+def run_hook(event, pointer=False):
     global DEADLINE
     DEADLINE = time.monotonic() + HOOK_BUDGET
     try:
@@ -1013,7 +1199,7 @@ def run_hook(event):
             payload = {}
         if not isinstance(payload, dict):
             payload = {}
-        result = session_start(payload) if event == "session-start" else stop(payload) if event == "stop" else None
+        result = session_start(payload, pointer) if event == "session-start" else stop(payload) if event == "stop" else None
         if result:
             sys.stdout.write(json.dumps(result))
     except Exception:  # A hook must never break the host session.
@@ -1033,15 +1219,16 @@ def find_python():
     return "/usr/bin/python3" if sys.platform != "darwin" else ""
 
 
-def hook_command(script, event, python=None):
+def hook_command(script, event, python=None, pointer=False):
     python = python if python is not None else find_python()
     if "'" in str(script) + python:
         raise SystemExit("The script and python paths must not contain a single quote.")
     order = dict.fromkeys(p for p in [python, "/opt/homebrew/bin/python3", "/usr/local/bin/python3",
                                       "/Library/Developer/CommandLineTools/usr/bin/python3"] if p)
     candidates = " ".join(f'"{p}"' for p in order)
+    mode = " --pointer" if pointer and event == "session-start" else ""
     return (f"/bin/sh -c 'f=\"{script}\"; [ -f \"$f\" ] || exit 0; for p in {candidates}; do "
-            f"[ -x \"$p\" ] && exec \"$p\" \"$f\" hook {event}; done; exit 0'")
+            f"[ -x \"$p\" ] && exec \"$p\" \"$f\" hook {event}{mode}; done; exit 0'")
 
 
 def is_ours(hook):
@@ -1101,6 +1288,8 @@ def hooks_cli(args):
     parser.add_argument("--codex-hooks", type=Path, default=Path.home() / ".codex" / "hooks.json")
     parser.add_argument("--script-path", type=Path, default=Path.home() / ".agents" / "skills" / "horsemen" / "scripts" / "horsemen.py")
     parser.add_argument("--only", choices=["claude", "codex"])
+    parser.add_argument("--pointer", action="store_true",
+                        help="With install: session start injects a pointer of 700 characters or less, not the PROGRESS snapshot")
     opts = parser.parse_args(args)
     healthy = True
     targets = [("claude", opts.claude_settings), ("codex", opts.codex_hooks)]
@@ -1119,6 +1308,8 @@ def hooks_cli(args):
                 if len(events.get(event, [])) != 1:
                     print(f"  {event}: expected 1 hook, found {len(events.get(event, []))}")
                     healthy = False
+            if any(" hook session-start --pointer" in command for command in events.get("SessionStart", [])):
+                print("  SessionStart: pointer mode")
             for command in dict.fromkeys(ours):
                 target = hook_target(command)
                 if target is None or not target.is_absolute():
@@ -1135,7 +1326,8 @@ def hooks_cli(args):
         if opts.action == "install":
             hooks = config.setdefault("hooks", {})
             for event, name in (("SessionStart", "session-start"), ("Stop", "stop")):
-                hooks.setdefault(event, []).append({"hooks": [{"type": "command", "command": hook_command(opts.script_path, name), "timeout": 5}]})
+                command = hook_command(opts.script_path, name, pointer=opts.pointer)
+                hooks.setdefault(event, []).append({"hooks": [{"type": "command", "command": command, "timeout": 5}]})
         save_json(path, config)
         print(f"{opts.action}ed horsemen hooks: {host} ({path})")
     if opts.action == "install" and any(t[0] == "codex" for t in targets):
@@ -1169,7 +1361,7 @@ def print_report(report):
 
 def main(argv):
     if len(argv) >= 2 and argv[0] == "hook":
-        return run_hook(argv[1])
+        return run_hook(argv[1], pointer="--pointer" in argv[2:])
     if argv and argv[0] == "hooks":
         return hooks_cli(argv[1:])
     if argv and argv[0] in ("show", "canvas", "mcp"):

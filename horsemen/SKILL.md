@@ -50,7 +50,10 @@ team guides use the destination and available document tools named by BRAIN.
    (for legacy layouts, everything above the first dated heading) and STRUCTURE's "Read
    before changing" section. The session-start hook injects both; read them
    yourself only if they were not injected or the injection says it is
-   incomplete. In a legacy project, read STATUS.md in full instead.
+   incomplete. In a legacy project, read STATUS.md in full instead. In
+   pointer mode the hook injects the Next action and the Gates only; read
+   the other parts when the task needs them, with the `read` tool or
+   `horsemen.py show`.
 2. Read VISION before a decision about scope, priority, or design.
 3. Read BRAIN before you search for, cite, or save knowledge outside the
    repository.
@@ -346,9 +349,11 @@ provider choices, account limits, and ask-before-write rules still apply.
 ## Hooks
 
 Two hooks, installed once per machine, support the review without writing
-records: session start injects the PROGRESS snapshot and health lines;
-stop requests the four-record check at each normal task end and adds detected
-drift. The host's `stop_hook_active` flag prevents recursion. Hooks cannot
+records: session start injects the PROGRESS snapshot and health lines, or
+a pointer of 700 characters or less when the hooks were installed with
+`--pointer`; stop requests the four-record check at each normal task end and
+adds detected drift, including canvas errors and broken cards that the
+session made. The host's `stop_hook_active` flag prevents recursion. Hooks cannot
 see whether outside documents changed or judge what is worth keeping.
 Hosts without hooks follow the same rules
 through AGENTS.md. Details, install commands, and failure modes:

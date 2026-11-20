@@ -11,9 +11,9 @@ All behavior lives in one dependency-free script, `scripts/horsemen.py`
 | Command | Used by | Result |
 | --- | --- | --- |
 | `horsemen.py check [DIR] [--json]` | Agents and people, after record edits | Health report. Exit 1 when errors exist |
-| `horsemen.py hook session-start` | `SessionStart` hook | Compact orientation for the agent |
+| `horsemen.py hook session-start [--pointer]` | `SessionStart` hook | Compact orientation for the agent; with `--pointer`, a pointer of 700 characters or less |
 | `horsemen.py hook stop` | `Stop` hook | Blocks only when it finds new record drift, and names the drift |
-| `horsemen.py hooks install\|uninstall\|status` | People, once per machine | Installs, removes, or checks the two hooks and their script targets for Claude Code and Codex |
+| `horsemen.py hooks install\|uninstall\|status` | People, once per machine | Installs, removes, or checks the two hooks and their script targets for Claude Code and Codex. `install --pointer` selects [pointer mode](#pointer-mode) |
 | `horsemen.py show`, `canvas apply`, `mcp` | Agents and people | Short reads, canvas edits, and the local MCP server; see [canvases](canvas.md) |
 | `scripts/e2e.py --output FILE` | Maintainers | Scenario validation with a JSON receipt |
 
@@ -56,6 +56,31 @@ output. The script uses only these supported fields:
 A Git repository with no records gets one line: offer setup, do not start it.
 A folder that is neither a project nor a Git repository gets nothing.
 
+### Pointer mode
+
+Pointer mode is a choice at install time: `hooks install --pointer`. Without
+it, session start injects the text above, byte for byte as before. In pointer
+mode, session start injects 700 characters or less, and the agent reads the
+rest on demand with the `read` tool or `horsemen.py show`
+(see [canvases](canvas.md)).
+
+| Line | Rule |
+| --- | --- |
+| Root and records | Always. A root longer than 100 characters keeps its last 99 |
+| Canvases | The names of the canvas files. No line when the project has none. Names that do not fit become `+N more`, then a count |
+| Next action | The `Next action:` line of the PROGRESS snapshot. A line over 240 characters is cut with `…` |
+| Gates | Always. In full when the gates have 300 characters or less. Longer gates become "Read progress#Gates before you act"; a gate is never cut. A snapshot without gates says so |
+| STRUCTURE reading list | One line that names `structure#Read before changing`, when the section exists |
+| Health | Up to three lines: canvas problems first, then the lines of the usual order |
+| Read line | Always. It names the `read` tool and `horsemen show`, and asks for the review of the four records |
+
+The gates are a `Gates:` line with its list, or the lines below a `Gates`
+heading, in the PROGRESS snapshot. The root, the gates, and the read line
+always stay. When the limit is near, the other lines go in this order:
+health, canvases, next action, STRUCTURE reading list. A legacy project gets
+the instruction to read STATUS.md before project work in place of the next
+action and the gates.
+
 ### What stop checks
 
 Stop does not ask for a routine review. Session-start text already tells the
@@ -74,8 +99,15 @@ temp folder. When one is available, stop compares the project to it:
 | Structure | A folder at depth 1 or 2 was added, removed, or renamed, and STRUCTURE did not change | Update STRUCTURE |
 | Changelog | PROGRESS gained a `Shipped` bullet (including partly shipped), and CHANGELOG did not change (or does not exist) | Add the shipped part to CHANGELOG, creating the file if needed |
 | Vision | VISION changed since the last VISION reminder | Reuse the owner's agreement, check README, PROGRESS, and BRAIN for conflicts, and log an agreed direction change |
-| Publish | A record changed in this session, and its text differs from the remote default branch (`origin/HEAD`, as of the last fetch). It counts uncommitted, unpushed, and unmerged edits. Projects without a remote default branch are skipped | Commit and push when the project's rules allow, so readers of GitHub, such as the hosted viewer, see the change |
+| Publish | A record, or a file in `.horsemen/canvas/` or `.horsemen/media/`, changed in this session, and its content differs from the remote default branch (`origin/HEAD`, as of the last fetch). It counts uncommitted, unpushed, and unmerged edits. Projects without a remote default branch are skipped | Commit and push when the project's rules allow, so readers of GitHub, such as the hosted viewer, see the change |
 | Lint | A record changed and `check` finds errors in it | Fix the listed errors |
+| Canvas errors | A canvas file changed in this session and `check` finds errors in it | Correct the file; `canvas_edit` checks and formats it |
+| Canvas card | A card on an unchanged canvas names a heading or file that was there at session start and is gone now | Repair the card with `canvas_edit` or `horsemen.py canvas apply` |
+
+The two canvas rules run only in a project with files in `.horsemen/`. A
+card that was broken before the session is not reported at stop; `check` and
+the pointer's health line report it. A project without canvases gets the
+same stop text as before.
 
 Triggered rules go into one reminder under 1,200 characters, with the
 review instructions and the request to end with the full task report. When the agent updates STRUCTURE
@@ -94,8 +126,11 @@ A later work commit or VISION edit can produce a new drift detail.
   The script does not read the transcript. Projects and IDs that share
   punctuation or a long prefix cannot overwrite each other's cache.
 - Fields: format version, project root, whether Git was found, baseline
-  HEAD and time, record hashes, shipped item names, folder names, and prior
-  drift reminder fingerprints. No owner choices or permissions live here.
+  HEAD and time, record hashes, shipped item names, folder names, a short
+  hash for each file in `.horsemen/canvas/` and `.horsemen/media/` (200 files
+  at most), the canvas problems at session start, and prior drift reminder
+  fingerprints. No owner choices or permissions live here. A cache from an
+  earlier release has no canvas fields; then stop skips the canvas rules.
 - Startup and clear reset the baseline. Resume, compaction, and an omitted
   source preserve a valid baseline. Invalid or older cache formats are
   rebuilt at session start. Files unused for seven days are removed.
@@ -173,7 +208,22 @@ covers each one marked with a test ID.
 | S19 | Folder added after STRUCTURE was already updated once | Structure rule fires again |
 | S20 | Second release after CHANGELOG was already updated once | Changelog rule fires again |
 | S21 | New `Shipped` bullet in a project without CHANGELOG.md | Reminder to create CHANGELOG.md with the shipped part only |
-| S22 | Any block | Ask the agent to end with its full task report again, because hosts show only the last turn |
+| S22 | The session writes a canvas file that breaks a rule | Canvas errors reminder, one time for the same errors; no note for a valid or repaired file |
+| S23 | The session renames a heading that a section card names | Canvas card reminder, one time; a card that was broken before the session is not reported |
+| S24 | A canvas or media file changed and is not on the remote default branch | The Publish reminder names the file; binary media compares by Git object name |
+| S25 | The cache is from a release before canvases | Exit cleanly without a block; the canvas rules are skipped |
+| S26 | Any block | Ask the agent to end with its full task report again, because hosts show only the last turn |
+| L1 | Hooks installed without `--pointer` (all installations before pointer mode) | Session start gives the same bytes as before, also in a project with canvases; stop gives its expected text in a project without canvases (S26 changed that text) |
+| PT1 | Pointer mode in a healthy project | 700 characters or less; the root, the records, the next action, the read line, and the review request; no snapshot text |
+| PT2 | Gates of 300 characters or less, as a `Gates:` line or below a `Gates` heading | The gates stay in full |
+| PT3 | Gates over 300 characters | An instruction to read the gates before acting; no gate is cut |
+| PT4 | A project without canvas files | No canvas line |
+| PT5 | A long root path, 20 canvases with long names, a long next action, and many problems | Still 700 characters or less, with the gates, the record names, and the read line |
+| PT6 | Pointer mode outside a project, or with malformed stdin | Print nothing; exit 0 |
+| PT7 | Only legacy `STATUS.md` exists | The instruction to read it before project work |
+| PT8 | STRUCTURE has a "Read before changing" section | One line that names the section to read |
+| PT9 | More than three health findings | Three health lines at most, canvas problems first |
+| PT10 | `hooks install --pointer`, then `hooks install` | Only the SessionStart command changes; `status` names pointer mode; a later install without the option gives the earlier commands |
 
 ### Check
 
@@ -256,6 +306,12 @@ command tries an absolute `python3` (never the macOS `/usr/bin/python3`
 stub) and exits silently when the script or Python is missing. Codex asks the user to trust new hooks before they run;
 approve them in Codex. Hosts without hook support rely on `AGENTS.md`.
 
+`install --pointer` selects [pointer mode](#pointer-mode) for session start.
+Run `install` again without the option to go back; `status` prints
+`SessionStart: pointer mode` when it is on. Pointer mode is useful when the
+host has the Horsemen MCP server, or when the agent has a shell for
+`horsemen.py show`.
+
 `status` checks both expected events and the script path in the saved
 commands. It exits 1 for a missing event, duplicate event, missing target,
 or target it cannot verify. It does not prove the host enabled or trusted
@@ -271,7 +327,14 @@ temporary project. A hook count alone is not proof of a working install.
 - Structure drift covers folders at depth 1 and 2. A moved file inside an
   unchanged folder is not detected; `check` still catches its broken path in
   STRUCTURE.
-- The hooks do not read canvas files. Run `check` after a canvas edit.
+- Stop reports canvas problems that the session made, not older ones. Run
+  `check` after a canvas edit.
+- Pointer mode finds gates in a `Gates:` line or below a `Gates` heading
+  only. Gates in another form, such as a table cell, are not found; then the
+  pointer says that the snapshot has no gates. Keep gates in one of the two
+  forms before you select pointer mode.
+- In pointer mode, an agent that does not read on demand sees less of
+  PROGRESS than in the default mode.
 - The check does not judge meaning. A VISION that contradicts PROGRESS needs
   the agent's review, which the vision rule requests.
 
