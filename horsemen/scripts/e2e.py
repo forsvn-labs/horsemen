@@ -1186,6 +1186,227 @@ def scenario_canvas_check(env):
     record("C18 hooks still run in a project with canvases", code == 0 and review_requested(out), json.dumps(out))
 
 
+# The hook output of the release before canvases, for the same fixtures. Legacy mode must give these bytes.
+LEGACY_START = 'Horsemen records for {root}: VISION.md, BRAIN.md, PROGRESS.md, STRUCTURE.md.\nBefore acting, respect the gates and constraints below. Read VISION.md, BRAIN.md, or the rest of STRUCTURE.md when the task needs direction, knowledge, or locations. Before finishing each task, use horsemen to review all four records silently, including work outside Git. Keep unchanged records and dates unchanged. Do not replace the actual task report with skill maintenance; report it only if asked, or for necessary permission questions and actionable blockers.\n\nPROGRESS.md snapshot:\n# Progress\n\nUpdated: 2026-10-30 · Stage: building · Health: On track\n\nThe editor works for early testers. Export is next.\n\nNext action: Hung finishes the editor.\n\n## In progress\n\n- **Note editor** (started 2026-10-28): Consultants can write notes in the app.\n\n## Up next\n\n- **Export to PDF**: Consultants send a summary as a PDF.\n\n## Roadmap\n\n- Idea: calendar import.\n\n<details>\n<summary>Technical details</summary>\n\n| Item | Evidence |\n| --- | --- |\n| Note editor | branch editor |\n\n</details>\n\nRecord health:\n- VISION.md lists 1 open question.\nFull report: python3 {checker} check'
+LEGACY_STOP = "Horsemen: before finishing this task, review VISION, BRAIN, PROGRESS, and STRUCTURE, including work outside Git. Honor read-only commands: plain inspect and check report proposed changes without writing. Keep VISION unless the user requested or agreed to a direction change. Use BRAIN's saved destinations and permissions: update originals; bin stale copies only when authorized. Write PROGRESS in plain words; fix STRUCTURE when locations change. Check README, CHANGELOG, and TECHSTACK if affected. Proactively open relevant brain originals; check freshness, links, and duplicates. Update or archive only when authorized; preserve history and report unsaved blockers. If nothing changed, leave files and dates alone. Shipped needs delivery evidence. Do this silently; do not narrate the review or add a Horsemen section to the task report unless asked. Still surface necessary permission questions and actionable blockers.\n- Structure: folders added src/new since session start, but STRUCTURE.md did not change. Update its map and any moved knowledg…\n- Vision: VISION.md changed. Check README.md, PROGRESS.md (Next, Later), and BRAIN.md for conflicts, and log the agreed direct…"
+EMPTY_CANVAS = '{\n"horsemen":{"version":1},\n"nodes":[],\n"edges":[]\n}\n'
+POINTER_LIMIT = 700
+
+
+def pointer(env, root, session="pointer"):
+    """The text that session start injects in pointer mode."""
+    payload = {"session_id": session, "cwd": str(root), "hook_event_name": "SessionStart"}
+    proc, _ = env.run(["hook", "session-start", "--pointer"], json.dumps(payload), cwd=root)
+    out = proc.stdout.strip()
+    return context(json.loads(out)) if out else ""
+
+
+def stop_reason(env, root, session):
+    return (env.hook("Stop", root, session=session, stop_hook_active=False)[1] or {}).get("reason", "")
+
+
+def scenario_legacy_mode(env):
+    """L1: without --pointer, the hooks give the same bytes as before, also in a project with canvases."""
+    checker = str(SCRIPT.resolve().parent / "horsemen_core" / "legacy.py")
+    root = healthy_project(env, env.base / "legacy-mode")
+    write(root, {".horsemen/canvas/progress.canvas": CANVAS, ".horsemen/media/chart.svg": CHART})
+    text = context(env.hook("SessionStart", root, session="legacy-mode")[1])
+    want = LEGACY_START.replace("{root}", str(root)).replace("{checker}", checker)
+    record("L1 legacy session start is byte-for-byte the same, with canvases in the project", text == want, text)
+    plain = healthy_project(env, env.base / "legacy-stop")
+    env.hook("SessionStart", plain, session="legacy-stop")
+    write(plain, {"VISION.md": VISION + "\nOwner direction note.\n", "src/new/a.js": "x\n"})
+    reason = stop_reason(env, plain, "legacy-stop")
+    record("L1 legacy stop is byte-for-byte the same in a project without canvases", reason == LEGACY_STOP, reason)
+
+
+def scenario_pointer(env):
+    """P1-P9: pointer mode injects 700 characters or less and keeps the gates."""
+    root = healthy_project(env, env.base / "pointer")
+    gate = "The phone and bank-app QR rehearsal must pass before a release."
+    write(root, {"PROGRESS.md": progress(extra=f"\nGates: {gate}\n")})
+    text = pointer(env, root)
+    record("P1 the pointer is 700 characters or less", 0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
+    record("P1 the pointer names the root, the records, and the next action",
+           str(root) in text and all(name in text for name in ("VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md"))
+           and "Next action: Hung finishes the editor." in text, text)
+    record("P1 the pointer names the read tool and the show command", "`read`" in text and "horsemen show" in text, text)
+    record("P1 the pointer does not inject the snapshot", "Consultants can write notes" not in text and "| Item | Evidence |" not in text, text)
+    record("P2 a short Gates line stays in full", "Gates: " + gate in text, text)
+    record("P4 no canvas line without canvases", "anvas" not in text, text)
+    record("P1 the pointer still asks for the review of the four records", "review" in text.lower(), text)
+    legacy = context(env.hook("SessionStart", root, session="pointer-legacy")[1])
+    record("P1 the pointer is shorter than the legacy text", 0 < len(text) < len(legacy) / 2, f"{len(text)} and {len(legacy)}")
+
+    write(root, {".horsemen/canvas/progress.canvas": CANVAS, ".horsemen/media/chart.svg": CHART, ".horsemen/canvas/launch-plan.canvas": EMPTY_CANVAS})
+    text = pointer(env, root)
+    record("P4 canvases are named", "Canvases: launch-plan, progress." in text and len(text) <= POINTER_LIMIT, text)
+
+    gates = "## Gates\n\n- No public walk before the insurer confirms cover.\n- Keep payment data out of the app.\n\n"
+    write(root, {"PROGRESS.md": progress(rows=ROW_EDITOR + ROW_EXPORT + gates)})
+    text = pointer(env, root)
+    record("P2 gates below a Gates heading stay in full",
+           "No public walk before the insurer confirms cover." in text and "Keep payment data out of the app." in text and len(text) <= POINTER_LIMIT, text)
+
+    many = "## Gates\n\n" + "".join(f"- Gate {i}: " + "x" * 60 + f" END-{i}.\n" for i in range(8)) + "\n"
+    write(root, {"PROGRESS.md": progress(rows=ROW_EDITOR + ROW_EXPORT + many)})
+    text = pointer(env, root)
+    record("P3 long gates become an instruction to read them; no gate is cut",
+           "progress#Gates before you act" in text and "END-" not in text and "xxxx" not in text and len(text) <= POINTER_LIMIT, text)
+    write(root, {"PROGRESS.md": progress(extra="\nGates:\n\n- " + "y" * 320 + " FINAL-GATE\n")})
+    text = pointer(env, root)
+    record("P3 a long Gates line becomes an instruction to read it",
+           "Gates" in text and "before you act" in text and "FINAL-GATE" not in text and "yyyy" not in text and len(text) <= POINTER_LIMIT, text)
+    write(root, {"PROGRESS.md": PROGRESS})
+    text = pointer(env, root)
+    record("P2 a snapshot without gates says so", "Gates: none" in text, text)
+
+    big = healthy_project(env, env.base / ("pointer-" + "d" * 90) / ("e" * 90))
+    files = {f".horsemen/canvas/{'board-' + str(i).zfill(2) + '-' + 'n' * 50}.canvas": EMPTY_CANVAS for i in range(20)}
+    files["PROGRESS.md"] = progress(rows=ROW_EDITOR + ROW_EXPORT + "## Gates\n\n- " + "g" * 280 + " GATE-END.\n\n").replace(
+        "Next action: Hung finishes the editor.", "Next action: " + "n" * 600 + " NEXT-END")
+    files["STRUCTURE.md"] = STRUCTURE.replace("## Brain", "## Read before changing\n\n- `docs/decisions.md` before any API change.\n\n## Brain") \
+        + "\n| `gone/one/` | x |\n| `gone/two/` | x |\n"
+    files["BRAIN.md"] = BRAIN.replace("Brain: Google Drive", "Storage: Google Drive")
+    files["VISION.md"] = VISION.replace("Confirmed: 2026-10-20", "Confirmed: unconfirmed")
+    write(big, files)
+    text = pointer(env, big)
+    record("P5 the pointer stays in 700 characters with a long path, 20 canvases, a long next action, and many problems",
+           0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
+    record("P5 a full pointer keeps the gates, the read line, and all four record names",
+           "GATE-END." in text and "`read`" in text and "horsemen show" in text
+           and all(name in text for name in ("VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md")), text)
+    record("P8 the pointer keeps the STRUCTURE reading list as one line", "Read before changing" in text, text)
+    record("P9 a full pointer has at most three health lines", text.count("\n- ") <= 3, text)
+    many = healthy_project(env, env.base / "pointer-many")
+    write(many, {name: files[name] for name in ("STRUCTURE.md", "BRAIN.md", "VISION.md")})
+    write(many, {".horsemen/canvas/progress.canvas": CANVAS.replace("#Up next", "#Renamed"), ".horsemen/media/chart.svg": CHART})
+    text = pointer(env, many)
+    record("P9 five problems give three health lines, with the canvas problem first",
+           text.count("\n- ") == 3 and "\n- 1 canvas problem; run check." in text and len(text) <= POINTER_LIMIT, text)
+    record("P5 a next action that does not fit is not cut without a mark", "NEXT-END" in text or "…" in text or "next action" not in text.lower(), text)
+
+    old = healthy_project(env, env.base / "pointer-status")
+    (old / "PROGRESS.md").unlink()
+    write(old, {"STATUS.md": LEGACY_STATUS})
+    text = pointer(env, old)
+    record("P7 a legacy STATUS file must be read before project work", "STATUS.md" in text and "before project work" in text and len(text) <= POINTER_LIMIT, text)
+    proc, _ = env.run(["hook", "session-start", "--pointer"], "not json", cwd=env.base / "home")
+    record("P6 pointer mode is silent outside a project", proc.returncode == 0 and not proc.stdout.strip(), proc.stdout + proc.stderr)
+
+
+def scenario_pointer_install(env):
+    """P10: pointer mode is a choice at install time."""
+    root = env.base / "mode-cfg"
+    root.mkdir()
+    claude, codex = root / "settings.json", root / "hooks.json"
+    opts = ["--claude-settings", str(claude), "--codex-hooks", str(codex)]
+
+    def commands(path):
+        data = json.loads(path.read_text())
+        return {event: [h["command"] for entry in data["hooks"][event] for h in entry["hooks"]] for event in ("SessionStart", "Stop")}
+
+    env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT)])
+    plain = commands(claude)
+    proc, _ = env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT), "--pointer"])
+    both = [commands(claude), commands(codex)]
+    record("P10 install --pointer changes the SessionStart command only",
+           proc.returncode == 0 and all(len(c["SessionStart"]) == 1 and "hook session-start --pointer" in c["SessionStart"][0]
+                                        and c["Stop"] == plain["Stop"] for c in both), json.dumps(both))
+    project = healthy_project(env, env.base / "mode-installed")
+    run = subprocess.run(["/bin/sh", "-c", both[0]["SessionStart"][0]], input=json.dumps({"session_id": "pi", "cwd": str(project)}),
+                         capture_output=True, text=True, cwd=project, env=env.env, timeout=10)
+    text = context(json.loads(run.stdout)) if run.stdout.strip() else ""
+    record("P10 the installed pointer command injects the pointer", 0 < len(text) <= POINTER_LIMIT and "Consultants can write notes" not in text, run.stdout + run.stderr)
+    proc, _ = env.run(["hooks", "status", *opts])
+    record("P10 status names pointer mode", proc.returncode == 0 and "pointer mode" in proc.stdout, proc.stdout)
+    env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT)])
+    record("P10 install without --pointer gives the same commands as before", commands(claude) == plain, json.dumps(commands(claude)))
+    proc, _ = env.run(["hooks", "status", *opts])
+    record("P10 status without pointer mode is unchanged", proc.returncode == 0 and "pointer" not in proc.stdout, proc.stdout)
+
+
+def scenario_canvas_stop(env):
+    """S22-S25: stop reports a canvas problem that the session made, once, and Publish covers .horsemen."""
+    remote = env.base / "canvas-remote.git"
+    env.git(env.base, "init", "-q", "--bare", "-b", "main", str(remote))
+    root = env.base / "canvas-stop"
+    healthy_project(env, root, git=False)
+    name = ".horsemen/canvas/progress.canvas"
+    write(root, {name: CANVAS, ".horsemen/media/chart.svg": CHART})
+    env.git(root, "init", "-q", "-b", "main")
+    env.git(root, "config", "maintenance.auto", "false")
+    env.git(root, "config", "gc.auto", "0")
+    env.git(root, "add", "-A")
+    env.git(root, "commit", "-q", "-m", "init", "--date", "2026-10-01T00:00:00")
+    env.git(root, "remote", "add", "origin", str(remote))
+    env.git(root, "push", "-q", "-u", "origin", "main")
+    env.git(root, "remote", "set-head", "origin", "main")
+    env.hook("SessionStart", root, session="cs")
+    reason = stop_reason(env, root, "cs")
+    record("S22 a valid canvas adds no note", "VISION" in reason and "anvas" not in reason and "Publish:" not in reason, reason)
+
+    write(root, {name: CANVAS.replace('"x":0,', '"x":0.5,')})
+    reason = stop_reason(env, root, "cs")
+    record("S22 an invalid canvas file that the session wrote is reported", "Canvas errors:" in reason and "progress.canvas" in reason and "whole number" in reason, reason)
+    record("S24 an unpublished canvas file asks to commit and push", "Publish:" in reason and name in reason.split("Publish:")[-1], reason)
+    reason = stop_reason(env, root, "cs")
+    record("S22 the same canvas error is reported once", "VISION" in reason and "Canvas errors:" not in reason and "Publish:" not in reason, reason)
+    write(root, {name: CANVAS})
+    reason = stop_reason(env, root, "cs")
+    record("S22 a repaired canvas adds no note", "VISION" in reason and "anvas" not in reason, reason)
+
+    write(root, {"PROGRESS.md": PROGRESS.replace("## Up next", "## Next up")})
+    reason = stop_reason(env, root, "cs")
+    record("S23 a section card whose heading the session changed is reported",
+           "Canvas:" in reason and "s-up-next" in reason and "#Up next" in reason and "progress.canvas" in reason, reason)
+    reason = stop_reason(env, root, "cs")
+    record("S23 a broken card is reported once", "VISION" in reason and "s-up-next" not in reason, reason)
+    write(root, {"PROGRESS.md": PROGRESS})
+
+    write(root, {".horsemen/media/new-proof.svg": CHART, name: CANVAS.replace("Ask two testers", "Ask three testers")})
+    reason = stop_reason(env, root, "cs")
+    record("S24 new media and a changed canvas are unpublished", "Publish:" in reason and name in reason and ".horsemen/media/new-proof.svg" in reason, reason)
+    env.git(root, "add", "-A")
+    env.git(root, "commit", "-qm", "canvas")
+    env.git(root, "push", "-q", "origin", "main")
+    write(root, {".horsemen/media/chart.svg": CHART + "<!-- changed -->\n"})
+    write(root, {".horsemen/media/chart.svg": CHART})
+    reason = stop_reason(env, root, "cs2")
+    record("S24 published canvas files do not fire", "VISION" in reason and "Publish:" not in reason, reason)
+
+    before = healthy_project(env, env.base / "canvas-before")
+    write(before, {name: CANVAS.replace("#Up next", "#Renamed")})
+    env.hook("SessionStart", before, session="cb")
+    write(before, {"PROGRESS.md": PROGRESS + "\n<!-- fictional edit -->\n"})
+    reason = stop_reason(env, before, "cb")
+    record("S23 a card that was broken before the session is not reported", "VISION" in reason and "anvas" not in reason, reason)
+
+    old = healthy_project(env, env.base / "canvas-old-cache")
+    write(old, {name: CANVAS})
+    env.hook("SessionStart", old, session="co")
+    for cache in env.state.glob("*.json"):
+        state = json.loads(cache.read_text())
+        if state.get("root") == str(old):
+            state.pop("canvas", None)
+            cache.write_text(json.dumps(state))
+    write(old, {name: "not json"})
+    code, out, _, _ = env.hook("Stop", old, session="co", stop_hook_active=False)
+    record("S25 a cache from before canvases still gets the review, with no canvas note",
+           code == 0 and review_requested(out) and "anvas" not in out.get("reason", ""), json.dumps(out))
+    wrong = healthy_project(env, env.base / "canvas-wrong-cache")
+    write(wrong, {name: CANVAS})
+    env.hook("SessionStart", wrong, session="cw")
+    for cache in env.state.glob("*.json"):
+        state = json.loads(cache.read_text())
+        if state.get("root") == str(wrong):
+            state["canvas"] = {"files": [1, 2], "broken": "x"}
+            cache.write_text(json.dumps(state))
+    write(wrong, {name: "not json"})
+    code, out, _, _ = env.hook("Stop", wrong, session="cw", stop_hook_active=False)
+    record("K7 review survives a canvas baseline with the wrong shape", code == 0 and review_requested(out), json.dumps(out))
+
+
 SCENARIOS = [scenario_noise, scenario_initialization, scenario_adoption, scenario_shipping, scenario_doc_only_commits,
              scenario_refactor, scenario_knowledge_migration, scenario_vision_change, scenario_publish, scenario_non_software,
              scenario_scale_and_staleness, scenario_nested, scenario_branch_switch, scenario_changelog_and_links,
@@ -1193,7 +1414,7 @@ SCENARIOS = [scenario_noise, scenario_initialization, scenario_adoption, scenari
              scenario_rearm, scenario_slow_git, scenario_install_permissions, scenario_orientation_safety, scenario_check_hardening,
              scenario_record_formats, scenario_structure_trees, scenario_task_review, scenario_state_identity,
              scenario_state_resume, scenario_cache_shape, scenario_install_health,
-             scenario_canvas_check]
+             scenario_canvas_check, scenario_legacy_mode, scenario_pointer, scenario_pointer_install, scenario_canvas_stop]
 
 
 def main():
