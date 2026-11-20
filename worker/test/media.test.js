@@ -5,8 +5,8 @@
    - the media list: not a list, empty, five files, an item with other keys, a duplicate name, base64 that is not valid,
      a body over 6 MiB, a file over 1 MiB
    - names: a path, "..", a leading dot, capitals, an extension of another type, a hash that is not the hash of the bytes
-   - content: bytes that do not match the type (a PNG named .jpg, text named .png, a PNG named .csv), an SVG with a
-     script or a link to another file, a Git LFS pointer as a table, an empty file
+   - content: bytes that do not match the type (a PNG named .jpg, text named .png, a PNG named .csv), any SVG (with
+     or without a script), a Git LFS pointer as a table, an empty file
    - references: a file that the canvas does not name; a new canvas node that names a media file that is not in the save
      and not on the canvas on GitHub (with and without media in the save)
    - paths: the Worker builds every path; only <root>/.horsemen/canvas/ and <root>/.horsemen/media/ are written
@@ -138,7 +138,7 @@ test('the media list has 1 to 4 files, each with exactly a name and base64 data,
 test('a media name that the Worker would not build is refused, and the Worker never takes a path', async () => {
   const s = await editorSignIn(); mockFetch(async () => json({}));
   const p = await payload(), good = p.media[0].name, hash = good.slice(-12, -4);
-  for (const name of ['../' + good, 'media/' + good, '.' + good, good.toUpperCase(), 'route-' + hash + '.jpeg', 'route-' + hash + '.png.svg', '/etc/passwd', 'route-' + hash + '.png%00', 'a'.repeat(200) + '.png', '']) {
+  for (const name of ['../' + good, 'media/' + good, '.' + good, good.toUpperCase(), 'route-' + hash + '.jpeg', 'route-' + hash + '.png.svg', 'route-' + hash + '.svg', '/etc/passwd', 'route-' + hash + '.png%00', 'a'.repeat(200) + '.png', '']) {
     const res = await post(s, { ...p, media: [{ name, data: p.media[0].data }] });
     assert.equal(res.status, 400, name); assert.match((await res.json()).error, /name/, name);
   }
@@ -149,10 +149,9 @@ test('a media name that the Worker would not build is refused, and the Worker ne
 
 test('bytes that do not match the type of the name are refused', async () => {
   const s = await editorSignIn(); mockFetch(async () => json({}));
-  const svgScript = bytes('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), svgLink = bytes('<svg xmlns="http://www.w3.org/2000/svg"><image href="https://tracker.example/p.png"/></svg>');
   const lfs = bytes('version https://git-lfs.github.com/spec/v1\noid sha256:0\nsize 1\n');
   for (const [label, data, ext, pattern] of [['a PNG named .jpg', PNG, 'jpg', /do not match \.jpg/], ['text named .png', CSV, 'png', /do not match \.png/], ['a PNG named .csv', PNG, 'csv', /do not match \.csv/],
-    ['a GIF named .webp', GIF, 'webp', /do not match/], ['an SVG with a script', svgScript, 'svg', /script/], ['an SVG that loads a file', svgLink, 'svg', /another file/], ['an LFS pointer as a table', lfs, 'csv', /Git LFS/]]) {
+    ['a GIF named .webp', GIF, 'webp', /do not match/], ['an LFS pointer as a table', lfs, 'csv', /Git LFS/]]) {
     const name = await nameOf(data, ext);
     const res = await post(s, { ...(await payload()), text: canvasText([NOTE, imageNode(name)]), media: [file(name, data)] });
     assert.equal(res.status, 422, label); const out = await res.json(); assert.equal(out.code, 'media', label); assert.match(out.error, pattern, label);
@@ -178,6 +177,16 @@ test('size: a file over 1 MiB and a body over 6 MiB are refused before GitHub; f
   const res = await post(s, { ...(await payload()), text: canvasText([NOTE, ...four.map((f, i) => imageNode(f.name, 'img-' + i))]), media: four });
   assert.equal(res.status, 200, await res.clone().text());
   assert.equal(repo.mutations.length, 1); assert.equal(repo.mutations[0].fileChanges.additions.length, 5, 'one commit: the canvas and four files');
+});
+
+test('a canvas that is not valid is refused before its media is read or GitHub is called', async () => {
+  const s = await editorSignIn(); mockFetch(async () => json({}));
+  const p = await payload();
+  for (const text of ['{', canvasText([NOTE, { ...imageNode(p.media[0].name), file: '../outside.png' }]), JSON.stringify({ nodes: [NOTE], edges: [{ id: 'e', fromNode: 'note-first', toNode: 'gone' }] })]) {
+    const res = await post(s, { ...p, text });
+    assert.equal(res.status, 422, text.slice(0, 40)); assert.equal((await res.json()).code, 'invalid');
+  }
+  assert.equal(calls.length, 0);
 });
 
 /* ---------------------------------------------------------------- references */

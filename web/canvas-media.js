@@ -2,17 +2,19 @@
 /* Media rules for edit mode (canvas slice 4b): images, GIFs, and CSV and TSV tables that a person drops or pastes
    on a canvas. Shared by the browser (web/canvas-editor.js) and the Worker (worker/src/index.js), so both apply the
    same rules; tests/test_canvas_media.cjs checks them.
-   - The type comes from the bytes (magic numbers for images, UTF-8 text for SVG and tables), never from a name.
+   - The type comes from the bytes (magic numbers for images, UTF-8 text for tables), never from a name.
    - A name is <stem>-<first 8 hex of the SHA-256 of the bytes>.<extension of the type>. The browser builds it; the
      Worker builds the hash and the extension again from the bytes and refuses a name that differs. The same bytes
      always get the same name, and a name never changes its content.
-   - 1 MiB a file, 4 files a save. An SVG must not run code or load other files when someone opens it.
+   - 1 MiB a file, 4 files a save. SVG is refused: an SVG can hold script, and the design keeps SVG upload off
+     until a separate decision (docs/product/canvas-workspace.md, Security and privacy).
    Pure rules: no DOM, no network. digest() uses Web Crypto, which browsers, Workers, and Node.js 20 have. */
 (function (root) {
   const MAX_BYTES = 1024 * 1024, MAX_FILES = 4, DIR = '.horsemen/media/', STEM = 40;
-  const TYPES = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', csv: 'text/csv', tsv: 'text/tab-separated-values' };
-  const IMAGES = ['png', 'jpg', 'gif', 'webp', 'svg'], TABLES = ['csv', 'tsv'];
-  const NAME = /^([a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?)-([0-9a-f]{8})\.(png|jpg|gif|webp|svg|csv|tsv)$/;
+  const TYPES = { png: 'image/png', jpg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', csv: 'text/csv', tsv: 'text/tab-separated-values' };
+  const IMAGES = ['png', 'jpg', 'gif', 'webp'], TABLES = ['csv', 'tsv'];
+  const NAME = /^([a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?)-([0-9a-f]{8})\.(png|jpg|gif|webp|csv|tsv)$/;
+  const NO_SVG = 'SVG files cannot be added in the browser. Export the image as PNG, then add it.';
   const VIDEO = /\.(?:mp4|m4v|mov|webm|avi|mkv|ogv|wmv)$/i;
   const LFS = 'version https://git-lfs.github.com/spec/';
   const LINK_INSTEAD = 'Put it on a file or video host and paste its address to add a link card.';
@@ -37,19 +39,6 @@
     if (s === null) return null;
     return svgRoot(s) ? 'svg' : 'text';
   }
-  /* An SVG may show only itself: no script, no event attribute, no script address, no HTML inside, no entity,
-     and no reference to another file (an address in href or url() must start with "#"). Null when it is safe. */
-  function svgFault(s) {
-    if (/<script[\s>/]/i.test(s)) return 'it has a script';
-    if (/[\s"'/]on[a-z]+\s*=/i.test(s)) return 'it has an event attribute';
-    if (/javascript\s*:/i.test(s)) return 'it has a script address';
-    if (/<foreignObject[\s>/]/i.test(s)) return 'it has HTML inside';
-    if (/<!ENTITY/i.test(s)) return 'it declares an entity';
-    if (/@import/i.test(s)) return 'it loads a style sheet';
-    for (const m of s.matchAll(/(?:^|[\s"'])(?:xlink:)?href\s*=\s*(["'])([\s\S]*?)\1/gi)) if (!m[2].trim().startsWith('#')) return 'it names another file';
-    for (const m of s.matchAll(/url\(\s*(["']?)([^)"']*)\1\s*\)/gi)) if (!m[2].trim().startsWith('#')) return 'it names another file';
-    return null;
-  }
   const fail = (code, error) => ({ ok: false, code, error });
 
   /* The rules for bytes that will be saved with the extension `ext`. */
@@ -59,7 +48,6 @@
     const kind = sniff(b);
     if (IMAGES.includes(ext)) {
       if (kind !== ext) return fail('type', 'The bytes of the file do not match .' + ext + '.');
-      if (ext === 'svg') { const fault = svgFault(utf8(b)); if (fault) return fail('svg', 'The SVG file is not accepted: ' + fault + '.'); }
       return { ok: true, ext, type: TYPES[ext], kind: 'image' };
     }
     if (kind === null && b.length && utf8(b) === null) return fail('type', 'The table is not UTF-8 text.');
@@ -98,10 +86,11 @@
     if (b.length > MAX_BYTES) return fail('size', 'The file is larger than 1 MiB. ' + LINK_INSTEAD);
     const kind = sniff(b), named = (file.match(/\.([A-Za-z0-9]+)$/) || [])[1]?.toLowerCase();
     let ext;
+    if (kind === 'svg' || named === 'svg' || /^image\/svg/i.test(String(mime))) return fail('svg', NO_SVG);
     if (IMAGES.includes(kind)) ext = kind;
     else if (TABLES.includes(hint)) ext = hint;
     else if (TABLES.includes(named)) ext = named;
-    else return fail('type', 'This file type is not supported. Add PNG, JPEG, GIF, WebP, or SVG images, or CSV or TSV tables.');
+    else return fail('type', 'This file type is not supported. Add PNG, JPEG, GIF, or WebP images, or CSV or TSV tables.');
     const result = checkBytes(ext, b);
     if (!result.ok) return result;
     return { ok: true, name: stem(file, result.kind === 'image' ? 'image' : 'table') + '-' + (await digest(b)).slice(0, 8) + '.' + ext, ...result };
@@ -147,6 +136,6 @@
   }
   function toBase64(b) { let out = ''; for (let i = 0; i < b.length; i += 0x8000) out += String.fromCharCode(...b.subarray(i, i + 0x8000)); return btoa(out); }
 
-  const api = { MAX_BYTES, MAX_FILES, DIR, TYPES, IMAGES, TABLES, sniff, svgFault, validName, digest, check, stem, build, address, tableKind, references, path, fromBase64, toBase64 };
+  const api = { MAX_BYTES, MAX_FILES, DIR, TYPES, IMAGES, TABLES, sniff, validName, digest, check, stem, build, address, tableKind, references, path, fromBase64, toBase64 };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenCanvasMedia = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

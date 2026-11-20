@@ -3,8 +3,7 @@
    Failure modes covered (security first):
    - a file whose bytes do not match its name: a PNG named .jpg, text named .png, a PNG named .csv, an SVG named .png
    - a file type that the canvas does not take: a video, a PDF, an XLSX or another ZIP, a BMP, unknown bytes
-   - an SVG that can run code or load more when someone opens it outside the app: a script, an event attribute,
-     a javascript: address, foreignObject, an entity declaration
+   - an SVG (it can hold script): refused by its bytes, its name, and its browser type, also when it looks harmless
    - a table that is not text: a NUL byte, bytes that are not UTF-8, a Git LFS pointer
    - an empty file; a file over 1 MiB; 1 MiB exactly is allowed
    - a name that the Worker would not build: capitals, a path, "..", a leading dot, a hash that is not the hash of the
@@ -26,7 +25,7 @@ const CSV = bytes('stop,minutes\nHarbour gate,4\nOld mill,12\n');
 const TSV = bytes('stop\tminutes\nHarbour gate\t4\n');
 const named = async (data, ext, stem = 'route') => stem + '-' + (await M.digest(data)).slice(0, 8) + '.' + ext;
 
-test('the type comes from the bytes: each image magic number, SVG text, and table text', () => {
+test('the type comes from the bytes: each image magic number, SVG text (to refuse it), and table text', () => {
   assert.equal(M.sniff(PNG), 'png'); assert.equal(M.sniff(JPEG), 'jpg'); assert.equal(M.sniff(GIF), 'gif'); assert.equal(M.sniff(WEBP), 'webp');
   assert.equal(M.sniff(bytes('GIF87a', 'x')), 'gif');
   assert.equal(M.sniff(SVG), 'svg'); assert.equal(M.sniff(bytes('<!-- a comment -->\n<svg viewBox="0 0 1 1"></svg>')), 'svg');
@@ -38,14 +37,14 @@ test('the type comes from the bytes: each image magic number, SVG text, and tabl
 });
 
 test('a file is accepted only when its name is the name the rules build from its bytes', async () => {
-  for (const [data, ext] of [[PNG, 'png'], [JPEG, 'jpg'], [GIF, 'gif'], [WEBP, 'webp'], [SVG, 'svg'], [CSV, 'csv'], [TSV, 'tsv']]) {
+  for (const [data, ext] of [[PNG, 'png'], [JPEG, 'jpg'], [GIF, 'gif'], [WEBP, 'webp'], [CSV, 'csv'], [TSV, 'tsv']]) {
     const name = await named(data, ext), result = await M.check(name, data);
     assert.deepEqual(result, { ok: true, name, ext, type: M.TYPES[ext], kind: ext === 'csv' || ext === 'tsv' ? 'table' : 'image' }, ext);
   }
 });
 
 test('bytes that do not match the extension are refused, also for tables', async () => {
-  const cases = [[PNG, 'jpg'], [JPEG, 'png'], [GIF, 'webp'], [CSV, 'png'], [PNG, 'csv'], [SVG, 'png'], [PNG, 'svg'], [SVG, 'csv'], [bytes('a,b\n', [0], '1'), 'csv'], [bytes([0xc3, 0x28]), 'tsv'],
+  const cases = [[PNG, 'jpg'], [JPEG, 'png'], [GIF, 'webp'], [CSV, 'png'], [PNG, 'csv'], [SVG, 'png'], [SVG, 'csv'], [bytes('a,b\n', [0], '1'), 'csv'], [bytes([0xc3, 0x28]), 'tsv'],
     [bytes('version https://git-lfs.github.com/spec/v1\noid sha256:abc\nsize 12\n'), 'csv']];
   for (const [data, ext] of cases) {
     const result = await M.check(await named(data, ext), data);
@@ -53,17 +52,15 @@ test('bytes that do not match the extension are refused, also for tables', async
   }
 });
 
-test('an SVG that can run code or load more is refused', async () => {
-  for (const body of ['<script>alert(1)</script>', '<rect onload="alert(1)"/>', '<rect ONCLICK = "x"/>', '<a href="javascript:alert(1)"><rect/></a>', '<a xlink:href=" JavaScript:x"/>',
-    '<foreignObject><div>x</div></foreignObject>', '<image href="https://tracker.example/pixel.png"/>', '<use href="http://example.com/a.svg#x"/>', '<style>@import url(https://x.example/a.css)</style>']) {
-    const data = bytes('<svg xmlns="http://www.w3.org/2000/svg">' + body + '</svg>');
-    const result = await M.check(await named(data, 'svg'), data);
-    assert.equal(result.ok, false, body); assert.equal(result.code, 'svg', body);
+test('an SVG is refused: by its bytes, its name, and its browser type; .svg is not a valid name', async () => {
+  for (const [file, data, mime] of [['plan.svg', SVG, 'image/svg+xml'], ['plan.png', SVG, 'image/png'], ['plan', SVG, ''], ['plan.svg', PNG, ''], ['clip', PNG, 'image/svg+xml'],
+    ['x.svg', bytes('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'), '']]) {
+    const result = await M.build(file, data, 'auto', mime);
+    assert.equal(result.ok, false, file); assert.equal(result.code, 'svg', file); assert.match(result.error, /Export the image as PNG/, file);
   }
-  const entity = bytes('<?xml version="1.0"?><!DOCTYPE svg [<!ENTITY x "y">]><svg xmlns="http://www.w3.org/2000/svg"></svg>');
-  assert.equal((await M.check(await named(entity, 'svg'), entity)).code, 'svg');
-  const local = bytes('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><use href="#dot"/><circle id="dot" r="2"/></svg>');
-  assert.equal((await M.check(await named(local, 'svg'), local)).ok, true, 'a link inside the file is allowed');
+  const name = await named(SVG, 'svg');
+  assert.equal(M.validName(name), false); assert.equal((await M.check(name, SVG)).code, 'name');
+  assert.equal(M.TYPES.svg, undefined); assert.equal(M.IMAGES.includes('svg'), false);
 });
 
 test('size: an empty file and a file over 1 MiB are refused; 1 MiB exactly is allowed', async () => {
@@ -96,7 +93,7 @@ test('the browser builds the name from the file name and the bytes; the same byt
   assert.equal(again.name, one.name);
   assert.notEqual((await M.build('Route Map (Final).PNG', JPEG)).name, one.name);
   assert.equal((await M.build('photo.png', JPEG)).ext, 'jpg', 'the bytes give the type, not the name');
-  assert.match((await M.build('Café Plan.svg', SVG)).name, /^cafe-plan-[0-9a-f]{8}\.svg$/);
+  assert.match((await M.build('Café Plan.gif', GIF)).name, /^cafe-plan-[0-9a-f]{8}\.gif$/);
   assert.match((await M.build('', PNG)).name, /^image-[0-9a-f]{8}\.png$/); assert.match((await M.build('!!!.png', PNG)).name, /^image-[0-9a-f]{8}\.png$/);
   assert.match((await M.build('x'.repeat(90) + '.png', PNG)).name, /^x{40}-[0-9a-f]{8}\.png$/);
   assert.match((await M.build('stops.csv', CSV)).name, /^stops-[0-9a-f]{8}\.csv$/); assert.equal((await M.build('stops.TSV', TSV)).ext, 'tsv');
@@ -105,7 +102,7 @@ test('the browser builds the name from the file name and the bytes; the same byt
     const result = await M.build(file, data);
     assert.equal(result.ok, false, file); assert.equal(result.code, code, file); assert.ok(result.error, file);
   }
-  for (const [file, data] of [['a.png', PNG], ['b.svg', SVG], ['c.csv', CSV]]) { const r = await M.build(file, data); assert.deepEqual(await M.check(r.name, data), r, file); }
+  for (const [file, data] of [['a.png', PNG], ['b.webp', WEBP], ['c.csv', CSV]]) { const r = await M.build(file, data); assert.deepEqual(await M.check(r.name, data), r, file); }
 });
 
 test('a video or a large file gets a message that offers a link card', async () => {

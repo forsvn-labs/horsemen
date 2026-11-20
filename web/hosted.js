@@ -179,7 +179,8 @@
       if (result !== 'ok') access.delete(repo);
       return result;
     },
-    /* One save: { repo, root, canvas, base, text }. The Worker builds the path, the branch, and the message. */
+    /* One save: { repo, root, canvas, base, text } and, with new files, media: [{ name, data }] (slice 4b). The Worker builds
+       the paths, the branch, and the message. */
     async save(payload) {
       const res = await writeJSON('/write/canvas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.data.code === 'editor-signin') { editorInfo.signed_in = false; access.clear(); }
