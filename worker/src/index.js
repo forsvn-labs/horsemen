@@ -303,7 +303,9 @@ async function appPage(env, request, session, mode = 'hosted') {
   html = html.replace('__SESSION__', mode === 'public' ? '' : await csrfFor(env, session))
     .replace('<meta charset="utf-8">', '<meta charset="utf-8">' + meta)
     .replace(/<title>[^<]*<\/title>/, '<title>Horsemen</title>')
-    .replace(anchor, '<script src="/hosted-reader.js" defer></script><script src="/hosted.js" defer></script>' + anchor);
+    .replace(anchor, '<script src="/hosted-reader.js" defer></script><script src="/hosted.js" defer></script>' + (mode === 'public' ? '' : '<script src="/canvas-edit.js" defer></script>') + anchor);
+  /* Edit mode (signed in only): its script runs after app.js, its styles follow the app styles. */
+  if (mode !== 'public') html = html.replace(anchor + '</script>', anchor + '</script><script src="/canvas-editor.js" defer></script>').replace('<link rel="stylesheet" href="/style.css">', '<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/canvas-editor.css">');
   return respond(html, 200, { 'content-type': 'text/html; charset=utf-8' });
 }
 

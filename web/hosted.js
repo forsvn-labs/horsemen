@@ -152,8 +152,53 @@
     throw Error('Not found.');
   }
 
+  /* Editing (slice 4a): the opt-in editor app. The viewer token never writes; the Worker keeps the editor token
+     in the same cookie and uses it only for /write/*. Drafts stay in this tab (sessionStorage); sign-out removes them. */
+  let editorInfo = { available: false, signed_in: false, install_url: null };
+  const access = new Map();
+  const DRAFTS = 'horsemen.draft.v1:';
+  function forgetDrafts() {
+    try { for (const key of Object.keys(sessionStorage)) if (key.startsWith(DRAFTS)) sessionStorage.removeItem(key); } catch { /* Storage is optional. */ }
+  }
+  async function writeJSON(path, init) {
+    const res = await fetch(path, { cache: 'no-store', ...init, headers: headers(init?.headers || {}) });
+    let data = null; try { data = await res.json(); } catch { /* handled below */ }
+    if (res.status === 401) { signedOut(); throw new R.ProviderError('Your GitHub session ended. Sign in again.', 401); }
+    return { status: res.status, data: data || { error: 'The request failed. Retry.' } };
+  }
+  const editor = {
+    info: () => ({ ...editorInfo }),
+    /* 'signin', 'install', 'no-push', or 'ok' for this repository, asked once for each repository in this tab. */
+    async access(repo) {
+      if (!editorInfo.available) return 'unavailable';
+      if (!editorInfo.signed_in) return 'signin';
+      if (!access.has(repo)) access.set(repo, writeJSON('/write/access?repo=' + encodeURIComponent(repo)).then(r => r.status === 200 ? r.data.editor : Promise.reject(new Error(r.data.error))).catch(error => { access.delete(repo); throw error; }));
+      const result = await access.get(repo);
+      if (result !== 'ok') access.delete(repo);
+      return result;
+    },
+    /* One save: { repo, root, canvas, base, text }. The Worker builds the path, the branch, and the message. */
+    async save(payload) {
+      const res = await writeJSON('/write/canvas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      if (res.data.code === 'editor-signin') { editorInfo.signed_in = false; access.clear(); }
+      return res;
+    },
+    /* The text of a canvas file by its blob SHA, through the read-only proxy with the viewer token. */
+    async readBlob(repo, sha) {
+      const data = await gh(`/repos/${repo}/git/blobs/${sha}`);
+      return R.decodeBlob(data, { encoding: 'Unsupported canvas encoding.', unreadable: 'The canvas file could not be decoded as UTF-8 text.', large: 'The canvas file is larger than 512 KiB.' });
+    },
+    signIn() { location.assign('/auth/edit/login?next=' + encodeURIComponent(location.pathname + location.search)); },
+    async stop() {
+      await writeJSON('/auth/edit/logout', { method: 'POST' });
+      editorInfo.signed_in = false; access.clear();
+      document.dispatchEvent(new CustomEvent('horsemen:editor', { detail: editor.info() }));
+    },
+    forgetDrafts,
+  };
+
   async function signOut() {
-    forgetIndex();
+    forgetIndex(); forgetDrafts();
     try { await fetch('/auth/logout', { method: 'POST', headers: headers(), cache: 'no-store' }); } finally { signedOut(); }
   }
 
@@ -203,15 +248,16 @@
     const close = document.getElementById('close-peek');
     if (close && !document.getElementById('share-record')) { const b = shareButton('share-record', 'Copy link', 'icon-btn share-record'); b.setAttribute('aria-label', 'Copy link'); close.parentElement.prepend(b); }
     const note = document.getElementById('menu-note');
-    if (note) note.textContent = PUBLIC ? 'Public view of a public repository. Read-only. Nothing stored. Checks for new commits every minute.' : 'Read-only. Nothing stored on the server. Open projects check for new commits every minute.';
+    if (note) note.textContent = PUBLIC ? 'Public view of a public repository. Read-only. Nothing stored. Checks for new commits every minute.' : 'Nothing stored on the server. Saves of canvas edits are commits by you. Open projects check for new commits every minute.';
   }
   if (!PUBLIC) fetch('/api/session', { headers: headers(), cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(info => {
     if (!info) return;
     pollSeconds = Math.max(5, Number(info.poll_seconds) || 60); installURL = info.install_url;
+    if (info.editor && info.editor.available) { editorInfo = { available: true, signed_in: !!info.editor.signed_in, install_url: String(info.editor.install_url || '') }; document.dispatchEvent(new CustomEvent('horsemen:editor', { detail: editor.info() })); }
     for (const id of ['choose-repos', 'connect-repo']) { const link = document.getElementById(id); if (link) { link.href = installURL; link.hidden = false; } }
     if (watched) watch(watched);
   }).catch(() => {});
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decorate); else decorate();
 
-  window.HorsemenHosted = { api, signOut, state, check, target, shareURL: (project, record, canvas, node) => R.shareURL(location.origin, project, record, canvas, node) };
+  window.HorsemenHosted = { api, signOut, state, check, target, public: PUBLIC, editor: PUBLIC ? null : editor, shareURL: (project, record, canvas, node) => R.shareURL(location.origin, project, record, canvas, node) };
 })();

@@ -219,6 +219,7 @@ function renderHeader(){
   if(v?.fromFile)parts.push(v.fromFile+(v.fromFile===1?' element':' elements')+' from '+canvasKey+'.canvas');
   $('#project-name').textContent=home?p.name:canvasTitle(canvasKey);
   $('#project-description').textContent=[...parts,projectMeta(p)].join(' · ');
+  window.HorsemenEditor?.sync();
 }
 /* The message of a canvas file that is not valid, was not read, or has elements that do not show. File text is set as text. */
 function renderNotice(){
@@ -252,7 +253,8 @@ function buildCanvas(){
   const home=canvasKey==='home',p=projects[current];
   for(const el of recordCards)el.hidden=!home;world.dataset.canvas=canvasKey;
   if(!home&&p){
-    const file=canvasFiles.get(canvasKey)||null;
+    /* In edit mode (hosted, canvas-editor.js) the draft of this canvas shows in place of its file. */
+    const file=window.HorsemenEditor?.file(canvasKey)??canvasFiles.get(canvasKey)??null;
     canvasView=V.compose({key:canvasKey,records,root:p.root,file,canvases:canvasKeys().filter(key=>key!=='home'),base:'https://github.com/'+p.repo+'/blob/'+p.revision+'/'+(p.root?p.root.split('/').map(encodeURIComponent).join('/')+'/':'')});
     for(const node of V.listOrder(canvasView.nodes)){world.append(nodeElement(node));sectionSpots.set(node.id,[node.x,node.y]);sectionNodes.set(node.id,node)}
     /* Repository images that this canvas file names load from blob: addresses, as in a record. */
@@ -294,7 +296,7 @@ async function selectProject(index){
     const data=await api('/api/project?id='+p.id);if(version!==request)return;records=data.records;recordsLoaded=true;
     /* Canvas files: the reader gives the text; the format reader checks it once. A file that was not read keeps its error. */
     canvasFiles=new Map();
-    for(const [name,file] of Object.entries(data.canvases||{}))if(F.validName(name)&&file)canvasFiles.set(name,{name,path:file.path,url:file.url,error:typeof file.content==='string'?null:String(file.error||'The canvas file could not be read.'),parsed:typeof file.content==='string'?F.parse(file.content):null,links:Array.isArray(file.connections)?file.connections:[]});
+    for(const [name,file] of Object.entries(data.canvases||{}))if(F.validName(name)&&file)canvasFiles.set(name,{name,path:file.path,url:file.url,blob:typeof file.blob==='string'?file.blob:null,error:typeof file.content==='string'?null:String(file.error||'The canvas file could not be read.'),parsed:typeof file.content==='string'?F.parse(file.content):null,links:Array.isArray(file.connections)?file.connections:[]});
     for(const b of recordCards){const r=records[b.dataset.artifact];if(!r)continue;b.disabled=false;b.classList.toggle('missing',!!r.error);const body=b.querySelector('.cardbody');if(body)body.innerHTML=previewHTML(b.dataset.artifact,r,b.classList.contains('supporter'))}
     if(!hasCanvas(canvasKey)){if(link)showToast(isRecordKey(canvasKey)?titles[canvasKey]+' is not in this project.':'This project has no canvas with the name “'+canvasKey+'”.');canvasKey='home'}
     lastCanvas.set(p.id,canvasKey);installRecordLinks();buildCanvas();renderHeader();renderRail();document.body.dataset.state='ready';loadCanvas();
@@ -583,6 +585,7 @@ function updateSelection(){
     :element?V.nodeTitle(element)+' selected.'+(V.openable(element)?' Press Enter to open.':'')
     :(record?.name||connectionNodes.get(id)?.link.title||names[id])+' selected. Press Enter to open.';
   renderCardToggles();if(document.body.dataset.state==='ready')syncHash();
+  window.HorsemenEditor?.selection();
 }
 function setTool(next){cancelGesture();tool=next;canvas.dataset.tool=next}
 function openSelected(){const id=selected.size===1?[...selected][0]:null;if(id)openArtifact(id,cardOf(id))}
@@ -590,8 +593,12 @@ function collapseAll(){expandedConnections.clear();refreshGraph()}
 const marquee=document.createElement('div');marquee.className='selection-marquee';marquee.hidden=true;canvas.append(marquee);
 function localPoint(e){const r=canvas.getBoundingClientRect();return{x:e.clientX-r.x,y:e.clientY-r.y}}
 function worldPoint(pt){return{x:(pt.x-camera.x)/camera.z,y:(pt.y-camera.y)/camera.z}}
+/* Elements of a canvas have fixed places, except in edit mode: then each element of the open canvas can move. */
+const editable=id=>!!window.HorsemenEditor?.editing()&&sectionNodes.has(id);
+const canMove=id=>editable(id)||!sectionSpots.has(id);
+function setSpot(id,p){if(editable(id)){sectionSpots.set(id,p);const n=sectionNodes.get(id);n.x=p[0];n.y=p[1]}else positions()[id]=p}
 function cancelGesture(){
-  if(gesture?.origins){for(const [id,p] of Object.entries(gesture.origins))positions()[id]=p;renderPositions()}
+  if(gesture?.origins){for(const [id,p] of Object.entries(gesture.origins))setSpot(id,p);renderPositions()}
   if(gesture?.kind==='pan'){camera={...gesture.camera};renderCamera()}
   gesture=null;pointers.clear();pinch=null;marquee.hidden=true;canvas.classList.remove('grabbing');
 }
@@ -612,7 +619,7 @@ canvas.addEventListener('pointerdown',e=>{
   else if(node){
     const id=node.dataset.artifact;if(!node.classList.contains('canvas-node'))node.style.zIndex=++highestLayer;/* Elements of a canvas keep their layer: a group stays behind its cards. */setSelection(HorsemenCanvas.hitSelection(selected,id,e.shiftKey));
     /* Section cards have fixed places: a drag that starts on one moves the canvas. */
-    const origins=Object.fromEntries([...selected].filter(key=>!sectionSpots.has(key)).map(key=>[key,[...position(key)]]));
+    const origins=Object.fromEntries([...selected].filter(canMove).map(key=>[key,[...position(key)]]));
     gesture=Object.keys(origins).length?{id:e.pointerId,kind:'move',start:pt,moved:false,origins}:{id:e.pointerId,kind:'pan',start:pt,camera:{...camera},moved:false};node.focus({preventScroll:true});
   }else{
     const before=e.shiftKey?new Set(selected):new Set();setSelection(before);canvas.focus({preventScroll:true});
@@ -626,7 +633,7 @@ window.addEventListener('pointermove',e=>{
   if(pinch&&pointers.size===2){const [a,b]=[...pointers.values()],mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2},z=Math.max(.15,Math.min(3.5,pinch.z*Math.hypot(a.x-b.x,a.y-b.y)/Math.max(1,pinch.distance)));camera={x:mid.x-pinch.wx*z,y:mid.y-pinch.wy*z,z};renderCamera();return}
   if(!gesture||gesture.id!==e.pointerId)return;
   const dx=pt.x-gesture.start.x,dy=pt.y-gesture.start.y;if(Math.hypot(dx,dy)>4)gesture.moved=true;if(!gesture.moved)return;
-  if(gesture.kind==='move'){for(const [id,origin] of Object.entries(gesture.origins))positions()[id]=[origin[0]+dx/camera.z,origin[1]+dy/camera.z];renderPositions()}
+  if(gesture.kind==='move'){for(const [id,origin] of Object.entries(gesture.origins))setSpot(id,[origin[0]+dx/camera.z,origin[1]+dy/camera.z]);renderPositions()}
   else if(gesture.kind==='pan'){canvas.classList.add('grabbing');camera.x=gesture.camera.x+dx;camera.y=gesture.camera.y+dy;renderCamera()}
   else{
     const left=Math.min(pt.x,gesture.start.x),top=Math.min(pt.y,gesture.start.y),width=Math.abs(dx),height=Math.abs(dy);
@@ -639,7 +646,9 @@ window.addEventListener('pointermove',e=>{
 function finishPointer(e){
   if(!pointers.has(e.pointerId))return;
   const wasPinch=!!pinch;pointers.delete(e.pointerId);
-  if(gesture?.moved||wasPinch)suppressClick={at:performance.now()};saveLayout();gesture=null;pinch=null;marquee.hidden=true;canvas.classList.remove('grabbing');
+  if(gesture?.moved||wasPinch)suppressClick={at:performance.now()};
+  if(gesture?.kind==='move'&&gesture.moved&&window.HorsemenEditor?.editing())HorsemenEditor.moved(Object.keys(gesture.origins));else saveLayout();
+  gesture=null;pinch=null;marquee.hidden=true;canvas.classList.remove('grabbing');
   if(pointers.size){const [id,pt]=[...pointers.entries()][0];gesture={id,kind:'pan',start:pt,camera:{...camera},moved:true}}
 }
 window.addEventListener('pointerup',finishPointer);window.addEventListener('pointercancel',cancelGesture);
@@ -662,7 +671,7 @@ window.addEventListener('keydown',e=>{
   /* Enter opens the selected card. With focus on another card, Enter selects that card first, as a click does. */
   if(e.key==='Enter'&&selected.size===1&&!e.target.closest('a[href]')){const focused=e.target.closest('[data-artifact]');if(!focused||selected.has(focused.dataset.artifact)){e.preventDefault();openSelected();return}}
   const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[e.key];
-  if(d){e.preventDefault();const focused=e.target.closest('[data-artifact]');if(e.altKey&&focused)setSelection(new Set([focused.dataset.artifact]));const movable=[...selected].filter(id=>!sectionSpots.has(id));if(movable.length){const step=e.altKey?20:e.shiftKey?10:1;for(const id of movable){const p=position(id);positions()[id]=[p[0]+d[0]*step,p[1]+d[1]*step]}renderPositions();saveLayout()}else{camera.x-=d[0]*60;camera.y-=d[1]*60;renderCamera()}return}
+  if(d){e.preventDefault();const focused=e.target.closest('[data-artifact]');if(e.altKey&&focused)setSelection(new Set([focused.dataset.artifact]));const movable=[...selected].filter(canMove);if(movable.length){const step=e.altKey?20:e.shiftKey?10:1;for(const id of movable){const p=position(id);setSpot(id,[p[0]+d[0]*step,p[1]+d[1]*step])}renderPositions();if(window.HorsemenEditor?.editing())HorsemenEditor.moved(movable);else saveLayout()}else{camera.x-=d[0]*60;camera.y-=d[1]*60;renderCamera()}return}
   if(e.shiftKey&&e.code==='Digit1'){e.preventDefault();fitCanvas();return}
   if(e.shiftKey&&e.code==='Digit2'){e.preventDefault();fitCanvas(true);return}
   if(['+','=','-','0'].includes(e.key)){e.preventDefault();if(e.key==='0')zoomAt(1);else zoomAt(camera.z*(e.key==='-'?1/1.2:1.2))}
@@ -772,6 +781,7 @@ function paletteItems(){
     {group:'Actions',icon:'refresh',label:'Refresh GitHub',hint:'Scan again',run:()=>{leave();scan()}},
     {group:'Actions',icon:'clear',label:'Clear workspace',hint:copy('Remove the scan from memory','Remove the scan from this tab'),run:()=>{leave();clearWorkspace()}});
   if(hosted&&projects[current])items.push({group:'Actions',icon:'link',label:'Copy link',hint:'Share',run:()=>$('#share-link')?.click()});
+  for(const item of window.HorsemenEditor?.actions()||[])items.push({group:'Edit',...item,run:()=>{leave();item.run()}});
   const active=T.styles.find(st=>st.id===root.dataset.style);
   for(const st of T.styles)items.push({group:'Themes',chip:themeChip(st),label:st.label+' theme',hint:st.note,run:()=>applyTheme({style:st.id})});
   if(active.palettes)for(const t of paletteChoices)items.push({group:'Themes',icon:t.id==='system'?'device':t.scheme==='dark'?'moon':'sun',label:'Engraved palette: '+t.label,hint:t.note,run:()=>applyTheme({style:'engraved',theme:t.id})});

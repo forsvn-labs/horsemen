@@ -1,0 +1,44 @@
+/* Edit mode for canvas files (hosted mode only; web/canvas-editor.js). Theme tokens only, so each of the
+   eight themes draws it in its own fonts, borders, shapes, and colours. */
+.btn.primary{background:var(--ink);border-color:var(--ink);color:var(--surface)}
+.btn.primary:hover:not(:disabled){background:var(--ink-2);border-color:var(--ink-2)}
+.btn.danger{color:var(--vermilion);border-color:color-mix(in srgb,var(--vermilion) 45%,var(--line))}
+.btn:disabled{opacity:.5;cursor:default}
+.edit-toggle[aria-pressed=true]{border-color:var(--signal);box-shadow:inset 0 0 0 1px var(--signal)}
+.edit-bar{position:absolute;top:12px;left:50%;translate:-50% 0;z-index:6;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:6px;
+  max-width:calc(100% - 32px);padding:6px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-pop);font-family:var(--ui)}
+.edit-bar[hidden]{display:none}
+.edit-bar .btn{min-height:32px;padding:4px 10px}
+.edit-status{padding:0 8px;color:var(--ink-2);font-size:var(--fs-s);white-space:nowrap;max-width:28ch;overflow:hidden;text-overflow:ellipsis}
+#edit-merge{border-color:var(--signal)}
+#edit-merge[hidden]{display:none}
+body[data-editing] .canvas .canvas-node{cursor:move}
+body[data-editing] .canvas .canvas-node:not(.saved){border-style:dashed}
+.edit-dialog{width:min(560px,calc(100vw - 32px));max-height:calc(100dvh - 48px);padding:0;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-sheet);background:var(--surface);color:var(--ink);box-shadow:var(--shadow-pop)}
+.edit-dialog::backdrop{background:rgb(var(--shadow)/.4)}
+.edit-dialog form{display:flex;flex-direction:column;gap:12px;padding:20px 22px;font-family:var(--ui);font-size:var(--fs-ui)}
+.edit-dialog h2{margin:0;font:var(--display-weight) var(--fs-m)/1.25 var(--display)}
+.edit-dialog p{margin:0;line-height:1.5;color:var(--ink-2)}
+.edit-dialog .edit-warning{color:var(--ink);padding:8px 10px;border-left:3px solid var(--vermilion);background:var(--surface-2)}
+.edit-facts{margin:0;padding:0 0 0 18px;display:grid;gap:6px;color:var(--ink-2);line-height:1.45}
+dl.edit-facts{padding:0}
+dl.edit-facts div{display:grid;grid-template-columns:72px 1fr;gap:8px}
+dl.edit-facts dt{color:var(--ink-3)}
+dl.edit-facts dd{margin:0;overflow-wrap:anywhere;font-family:var(--mono);font-size:var(--fs-s);color:var(--ink)}
+.edit-diff{margin:0;max-height:220px;overflow:auto;padding:8px 10px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);background:var(--surface-2);font:var(--fs-s)/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
+.edit-diff span{display:block}
+.edit-diff .add{color:var(--verdigris)}
+.edit-diff .del{color:var(--vermilion)}
+.edit-field{display:grid;gap:6px;color:var(--ink-2)}
+.edit-field textarea{width:100%;min-height:160px;resize:vertical;padding:10px;border:var(--bw) var(--bs) var(--line-strong);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--fs-ui)/1.5 var(--mono)}
+.edit-conflicts{display:grid;gap:10px;max-height:46dvh;overflow:auto}
+.edit-conflicts fieldset{margin:0;padding:10px 12px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);display:grid;gap:6px}
+.edit-conflicts legend{padding:0 4px;color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.edit-conflicts label{display:flex;align-items:center;gap:6px;color:var(--ink)}
+.edit-dialog-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px;margin-top:4px}
+.edit-dialog :focus-visible,.edit-bar :focus-visible{outline:var(--focus-w) var(--focus-style) var(--focus);outline-offset:2px}
+@media (max-width:640px){
+  .edit-bar{top:8px;left:8px;right:8px;translate:none;max-width:none;justify-content:flex-start}
+  .edit-status{order:-1;flex-basis:100%;padding:2px 4px}
+  .edit-dialog form{padding:16px}
+}

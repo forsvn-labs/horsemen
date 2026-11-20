@@ -368,6 +368,16 @@ test('the access check says whether this person can save to a repository', async
   assert.equal((await call('/write/access?repo=example/alpha', { headers: { cookie: s.cookie } })).status, 403, 'needs the CSRF token');
 });
 
+test('the signed-in app loads the edit rules; the public view does not', async () => {
+  const s = await signIn();
+  const html = await (await call('/', { headers: { cookie: s.cookie } })).text();
+  assert.ok(html.indexOf('/canvas-edit.js') > 0 && html.indexOf('/canvas-edit.js') < html.indexOf('/app.js'));
+  assert.ok(html.indexOf('/canvas-editor.js') > html.indexOf('/app.js'), 'edit mode runs after the app'); assert.match(html, /href="\/canvas-editor.css"/);
+  mockFetch(async req => new URL(req.url).pathname === '/repos/example/open' ? json({ private: false }) : json({}, 404));
+  const pub = await (await call('/example/open', {}, env({ CACHE: null }))).text();
+  assert.match(pub, /content="public"/); assert.doesNotMatch(pub, /canvas-edit|canvas-editor/);
+});
+
 test('the sign-in page no longer says that Horsemen never writes, and says what the editor does', async () => {
   const html = await (await call('/')).text();
   assert.doesNotMatch(html, /never writes to your repositories/);
