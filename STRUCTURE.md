@@ -6,6 +6,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 
 ```text
 ./
+├── .horsemen/canvas/      Canvas files of this project, such as the roadmap board (`roadmap.canvas`)
 ├── web/                   GitHub canvas (local and hosted), Markdown, diagrams (vendored Mermaid in web/vendor/), images, themes, previews, and setup guide
 │   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
 │   ├── canvas-sections.js Rules for the generated canvas of a record: sections, card IDs, layout, card text, and links
@@ -15,9 +16,9 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in and read-only proxy
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
-├── docs/product/           GUI requirements, artifact views, icon system, design audit, release boundaries, and the canvas workspace proposal with its file schema
+├── docs/product/           GUI requirements, artifact views, icon system, design audit, release boundaries, and the canvas workspace design with its file schema
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
-├── docs/show-me/canvas-workspace/ Canvas workspace mock, fictional fixture, and fixture check (proposal)
+├── docs/show-me/canvas-workspace/ Canvas workspace mock, fictional fixture, and fixture check
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
 ├── favicon.png             Project icon
