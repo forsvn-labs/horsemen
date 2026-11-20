@@ -2,6 +2,8 @@
 
 ## 2026-11-20
 
+- Canvas link cards for YouTube, Vimeo, Loom, Figma, and Google Docs, Sheets, and Slides load a sandboxed player after a click; nothing loads before. CSV and TSV files on a canvas show as tables. The content security policy allows frames from these five player origins only. [PR #39](https://github.com/hungv47/horsemen/pull/39).
+
 - The Stop hook blocks only when it finds new record drift, and then asks the agent to end with its full task report again. Before, it blocked at every stop, and hosts that show only the last turn hid the task report. [PR #38](https://github.com/hungv47/horsemen/pull/38).
 
 - `hooks install --pointer` selects a short session start for agents: the next action and the gates in 700 characters or less. The Stop hook now reports a canvas that the session broke and canvas files that are not pushed. Refresh your installation to get it. [Hooks](horsemen/references/hooks.md#pointer-mode). [PR #37](https://github.com/hungv47/horsemen/pull/37).
