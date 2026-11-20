@@ -243,6 +243,31 @@ test('a shared project path opens the app, or sign-in that returns to the same l
   assert.match(await app.text(), /<meta name="horsemen-mode" content="hosted">/);
 });
 
+/* Canvas links. Failure modes: sign-in drops the canvas or the element of a
+   shared link; an unknown query key or a bad value passes through sign-in. */
+test('sign-in keeps the canvas and the element of a shared link', async () => {
+  const link = '/example/alpha?root=apps%2Fweb&canvas=progress&node=s-shipped&record=progress';
+  const signedOut = await call(link);
+  assert.match(await signedOut.text(), new RegExp('href="/auth/login\\?next=' + encodeURIComponent(link).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '"'));
+  const back = async next => {
+    const login = await call('/auth/login?next=' + encodeURIComponent(next));
+    const state = new URL(login.headers.get('location')).searchParams.get('state');
+    mockFetch(async req => req.url.endsWith('/login/oauth/access_token') ? json({ access_token: 't' }) : json({ login: 'operator' }));
+    return (await call(`/auth/callback?code=c&state=${state}`, { headers: { cookie: cookieOf(login, '__Host-horsemen-state') } })).headers.get('location');
+  };
+  assert.equal(await back(link), link);
+  assert.equal(await back('/example/alpha?canvas=launch-plan&node=note-risk'), '/example/alpha?canvas=launch-plan&node=note-risk', 'a board name and a word ID pass');
+  assert.equal(await back('/example/alpha?node=s-shipped&canvas=progress'), '/example/alpha?canvas=progress&node=s-shipped', 'the order is fixed');
+  for (const [next, expected] of [
+    ['/example/alpha?canvas=progress&node=s-shipped&evil=1&next=//evil.example', '/example/alpha?canvas=progress&node=s-shipped'],
+    ['/example/alpha?canvas=Progress%22&node=s-shipped', '/example/alpha?node=s-shipped'],
+    ['/example/alpha?canvas=progress&node=%3Cscript%3E', '/example/alpha?canvas=progress'],
+    ['/example/alpha?canvas=../x&node=' + 'a'.repeat(65), '/example/alpha'],
+    ['/example/alpha?canvas=' + 'a'.repeat(65), '/example/alpha'],
+    ['/?canvas=progress&node=s-shipped', '/?canvas=progress&node=s-shipped'],
+  ]) assert.equal(await back(next), expected, next);
+});
+
 test('sign-in never redirects outside the app', async () => {
   for (const next of ['//evil.example/x', 'https://evil.example', '/\\evil.example', '/auth/logout', '/gh/user', 'javascript:alert(1)', '/' + 'a'.repeat(400), '/a/b/c']) {
     const login = await call('/auth/login?next=' + encodeURIComponent(next));

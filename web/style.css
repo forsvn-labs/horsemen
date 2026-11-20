@@ -236,7 +236,24 @@ kbd{display:inline-block;min-width:1.7em;font:500 var(--fs-s)/1 var(--mono);text
 .brand{display:flex;align-items:center;gap:10px;padding:0 8px}
 .brand img{border-radius:7px}
 .wordmark{font:var(--display-weight) 1.125rem/1 var(--display);letter-spacing:var(--display-track);text-transform:var(--display-case)}
-.projects-nav{flex:1;min-height:0;overflow:auto;margin:0 -4px;padding:0 4px}
+/* The project switcher: one button at the top of the rail; the project list opens under it. */
+.workspace{position:relative}
+.workspace-toggle{display:flex;align-items:center;gap:8px;width:100%;min-height:46px;padding:6px 10px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);text-align:left}
+.workspace-toggle:hover:not(:disabled),.workspace-toggle[aria-expanded=true]{border-color:var(--line-strong)}
+.workspace-label{flex:1;min-width:0;display:grid}
+.workspace-label b{font-size:.875rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-label small{font:400 var(--fs-s)/1.4 var(--mono);color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-label small:empty{display:none}
+.workspace-toggle .chevron{width:14px;height:14px;color:var(--ink-2);transition:rotate .15s var(--ease)}
+.workspace-toggle[aria-expanded=true] .chevron{rotate:180deg}
+.workspace-pop{position:absolute;z-index:30;left:0;top:calc(100% + 6px);width:max(100%,264px);max-height:min(60dvh,480px);overflow:auto;overscroll-behavior:contain;padding:6px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-card);background:var(--surface);box-shadow:var(--shadow-pop)}
+.workspace-pop .project.active{background:var(--surface-2)}
+.workspace-connect{display:flex;align-items:center;gap:8px;margin-top:4px;padding:8px 10px 4px;border-top:var(--bw) var(--bs) var(--line);color:var(--ink-2);font-size:.84375rem;text-decoration:none}
+.workspace-connect:hover{color:var(--ink)}
+/* The canvases of the open project: Home, then each record. A row here and a row in the project list share the .project look. */
+.canvases-nav{flex:1;min-height:0;overflow:auto;margin:0 -4px;padding:2px 4px}
+.canvas-link{--accent:var(--ink-2);gap:0 9px;flex-wrap:nowrap}
+.canvas-link .icon{width:15px;height:15px;color:var(--accent)}
 .project-search{position:relative;display:block;margin-bottom:8px}
 .project-search .icon{position:absolute;left:10px;top:50%;translate:0 -50%;width:14px;height:14px;color:var(--ink-2)}
 .project-search input{width:100%;min-width:0;padding:7px 10px 7px 30px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);background:var(--surface);font-size:.84375rem}
@@ -351,6 +368,14 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 .supporter.has-link-control .cardhead{padding-right:74px}
 .supporter .card-line{-webkit-line-clamp:2}
 .card-label{font-weight:600;color:var(--ink)}
+/* Section cards on a record canvas: the heading, a few source lines, and a quiet count at the foot. */
+.section-card .cardbody{flex:1}
+.section-card .card-line~.card-line{display:none}
+.card-meta{margin-top:auto;font-size:var(--fs-s);color:var(--ink-2)}
+#map.list .section-card .card-line~.card-line{display:-webkit-box}
+#map.list .card-meta{margin-top:2px}
+#peek-content :is(h2,[data-outline]){scroll-margin-top:20px}
+.canvas-note{position:absolute;inset:0;z-index:1;display:grid;place-items:center;margin:0;padding:24px;font-size:.875rem;color:var(--ink-2);pointer-events:none}
 .card-note,.waiting{font-size:.8125rem;color:var(--ink-2)}
 .artifact.missing .cardhead .icon{color:var(--ink-2)}
 .canvas .connected-node{width:260px;min-height:96px;padding:12px 14px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;border-style:dashed}
@@ -454,7 +479,7 @@ dialog{color:var(--ink)}
 figure.diagram{margin:1.25em 0;min-width:0;max-width:100%}
 figure.diagram[data-state]{border:var(--bw) var(--bs) var(--line);border-radius:var(--radius);background:var(--surface);overflow:hidden}
 figure.diagram[data-state] .diagram-source{margin:0;border:0;border-radius:0}
-.diagram-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;border-bottom:var(--bw) var(--bs) var(--line);font:500 var(--fs-s)/1.5 var(--ui);color:var(--ink-3)}
+.diagram-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 12px;border-bottom:var(--bw) var(--bs) var(--line);font:500 var(--fs-s)/1.5 var(--ui);color:var(--ink-2)}
 .diagram-kind{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .diagram-bar .link-btn{flex:none;font-size:var(--fs-s)}
 .diagram-canvas{overflow:auto;padding:16px;text-align:center;background:var(--surface);overscroll-behavior-x:contain}
@@ -464,7 +489,7 @@ figure.diagram[data-state] .diagram-source{margin:0;border:0;border-radius:0}
 .diagram-error:before{content:'!' / '';display:inline-grid;place-items:center;width:1.4em;height:1.4em;margin-right:6px;border-radius:50%;background:var(--vermilion);color:var(--surface);font-weight:700}
 /* Repository images. A failed image keeps its alt text as a link, with the reason. */
 .md-image img{display:inline-block;max-width:100%;height:auto;vertical-align:middle;border-radius:var(--radius-s)}
-.md-image-note{display:block;color:var(--ink-3);font:var(--fs-s)/1.5 var(--ui)}
+.md-image-note{display:block;color:var(--ink-2);font:var(--fs-s)/1.5 var(--ui)}
 :is(.prose,.view) table{width:100%;border-collapse:collapse;font:.875rem/1.5 var(--ui)}
 :is(.prose,.view) th{padding:8px 12px;text-align:left;font-weight:600;font-size:.8125rem;color:var(--ink-2);background:var(--surface-2);white-space:nowrap}
 :is(.prose,.view) td{padding:9px 12px;border-top:var(--bw) var(--bs) var(--line);vertical-align:top;overflow-wrap:anywhere}
@@ -671,7 +696,7 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 :root[data-style=swiss] .artifact:hover:not(:disabled){border-top-color:var(--signal)}
 :root[data-style=swiss] .canvas .artifact.canvas-selected{box-shadow:0 0 0 2px var(--signal)}
 :root[data-style=swiss] .project.active,:root[data-style=swiss] .segmented button[aria-pressed=true]{background:var(--signal);color:var(--surface);box-shadow:none}
-:root[data-style=swiss] .project.active :is(small,.private-mark){color:var(--surface)}
+:root[data-style=swiss] .project.active :is(small,.private-mark,.icon){color:var(--surface)}
 :root[data-style=swiss] .lead-text{font-weight:800;line-height:1.05}
 :root[data-style=swiss] .card:not(.supporter) .cardhead b{font-size:1.25rem}
 
@@ -715,17 +740,21 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
   .segmented button span,.jump span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
 }
 @media(max-width:720px){.share-link span{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}}
-/* Phone: projects in a row under the brand; the list is the default view; a record fills the screen. */
+/* Phone: the project switcher beside the brand mark, the canvases in a row under it; the list is the default view; a record fills the screen. */
 @media(max-width:640px){
   html,body{height:auto}
   .app{display:block;height:auto}
-  .rail{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:10px 8px;padding:12px 16px 10px;border-right:0;border-bottom:var(--bw) var(--bs) var(--line)}
-  .projects-nav{grid-column:1/-1;grid-row:2;overflow:visible;margin:0;padding:0}
-  #projects{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
-  .project{width:auto;flex:none;margin:0;padding:6px 10px;white-space:nowrap}
-  .project small{display:none}
-  .rail-bottom{grid-column:2;grid-row:1}
-  .account{width:auto;max-width:46vw}
+  .rail{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px 8px;padding:12px 16px 10px;border-right:0;border-bottom:var(--bw) var(--bs) var(--line)}
+  .brand{padding:0}.wordmark{display:none}
+  .workspace{grid-column:2;grid-row:1;min-width:0}
+  .workspace-toggle{min-height:38px;padding:4px 10px}
+  .workspace-label small{display:none}
+  .workspace-pop{width:min(320px,calc(100vw - 32px));max-height:70dvh}
+  .canvases-nav{grid-column:1/-1;grid-row:2;overflow:visible;margin:0;padding:0}
+  #canvases{display:flex;gap:6px;overflow-x:auto;padding:2px}
+  .canvas-link{width:auto;flex:none;margin:0;padding:6px 10px;white-space:nowrap}
+  .rail-bottom{grid-column:3;grid-row:1}
+  .account{width:auto;max-width:36vw}
   #menu{left:auto;right:0;bottom:auto;top:calc(100% + 6px);width:min(300px,calc(100vw - 32px));max-height:70dvh}
   .main{height:auto}
   .topbar{padding:14px 16px}

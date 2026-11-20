@@ -70,6 +70,9 @@ def value(code):
     result=json.loads(browser('eval',code))
     return json.loads(result) if isinstance(result,str) else result
 
+def location_ends(browser,tail):
+    return json.loads(browser('eval','location.hash')).endswith(tail)
+
 def drag_points(start,end):
     browser('mouse','move',str(round(start[0])),str(round(start[1])))
     browser('mouse','down','left')
@@ -148,6 +151,9 @@ try:
     assert value('JSON.stringify(position("vision"))')==before, 'Escape cancels an unfinished drag'
 
 
+    assert value('JSON.stringify([document.querySelector("#workspace-name").textContent,document.querySelector("#workspace-repo").textContent,document.querySelector("#workspace-pop").hidden])')==['alpha','example/alpha',True], 'The switcher names the open project; its list is closed'
+    browser('click','#workspace-toggle')
+    assert value('JSON.stringify([document.querySelector("#workspace-toggle").getAttribute("aria-expanded"),document.activeElement.dataset.project===String(current)])')==['true',True], 'The switcher opens on the current project'
     browser('eval','document.querySelector(".project-search").hidden=false')
     browser('fill','#project-search','no-match')
     assert 'No matching projects' in browser('get','text','#no-projects')
@@ -159,6 +165,8 @@ try:
     browser('fill','#project-search','')
     browser('eval','document.querySelector("#project-search").blur()')
     assert value('JSON.stringify(document.querySelector(".project-search").hidden)') is True, 'Search hides again when the query is empty'
+    browser('focus','#workspace-toggle');browser('press','Escape')
+    assert value('JSON.stringify([document.querySelector("#workspace-pop").hidden,document.activeElement.id])')==[True,'workspace-toggle'], 'Escape closes the project list and keeps focus on the switcher'
     browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
     assert 'Help small teams' in browser('get','text','#peek-content')
     assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Vision', 'The record view names the record'
@@ -312,6 +320,97 @@ try:
     assert 'Changelog' in browser('get','text','#peek-title') and 'alpha' in browser('get','text','#project-name'), 'A reload returns to the same project and record'
     browser('press','Escape')
     assert value('JSON.stringify(getComputedStyle(document.querySelector("#scan-status")).display)')=='none', 'The status line hides when discovery is done and nothing needs attention'
+
+    # Canvases: the rail lists Home and each record that is found. A record opens as a canvas of its sections.
+    shown='JSON.stringify([canvasKey,[...selected],document.querySelector("#peek").open])'
+    place='JSON.stringify(location.hash.replace(/^#p=[a-f0-9]{24}/,""))'
+    # The heading of a section is at the top of the reading view, or the page is at its end.
+    at_section=lambda name:value('JSON.stringify((()=>{const area=document.querySelector(".peek-content"),top=area.getBoundingClientRect().top,want=HorsemenSections.slug("'+name+'");const el=[...document.querySelectorAll("#peek-content [data-outline],#peek-content .prose h2")].find(e=>HorsemenSections.slug(e.dataset.outline||e.textContent)===want);if(!el)return "missing";const y=el.getBoundingClientRect().top-top;return (y>=-2&&y<=140)||area.scrollTop+area.clientHeight>=area.scrollHeight-2})())')
+    assert value('JSON.stringify([...document.querySelectorAll("#canvases [data-canvas]")].map(b=>b.dataset.canvas))')==['home','vision','progress','brain','structure','changelog','techstack'], 'The rail lists Home and the records that are found; the missing README has no canvas'
+    assert value('JSON.stringify([...document.querySelectorAll("#canvases [aria-current=page]")].map(b=>b.dataset.canvas))')==['home']
+    browser('click','[data-canvas="progress"]')
+    assert value('JSON.stringify([...document.querySelectorAll(".section-card")].map(e=>e.dataset.node))')==['s-latest-day','s-shipped','s-in-progress','s-up-next','s-gates','s-historical-ships','s-upcoming-roadmap'], 'One card for each second-level heading, in order'
+    assert value('JSON.stringify([document.querySelector("#project-name").textContent,document.querySelector("#project-description").textContent.startsWith("7 sections · example/alpha"),document.querySelector("#workspace-name").textContent])')==['Progress',True,'alpha'], 'The header names the canvas; the switcher names the project'
+    assert value('JSON.stringify([[...document.querySelectorAll("#canvases [aria-current=page]")].map(b=>b.dataset.canvas),recordCards.every(e=>e.hidden),document.querySelectorAll(".wires path,.connected-node:not([hidden]),.card-links-toggle:not([hidden])").length])')==[['progress'],True,0], 'A record canvas shows its own cards only'
+    assert value('JSON.stringify([...document.querySelectorAll(".section-card")].map(e=>[e.dataset.node,position(e.dataset.node),e.offsetWidth,e.offsetHeight]))')==value('JSON.stringify(HorsemenSections.canvas("progress",records.progress.content).nodes.map(n=>[n.id,[n.x,n.y],n.width,n.height]))'), 'Cards sit where the layout rule puts them'
+    assert value(overlap_check)==[], 'Section cards do not overlap'
+    assert value('JSON.stringify([...document.querySelectorAll(".section-card")].every(e=>{const r=e.getBoundingClientRect(),c=document.querySelector(".canvas").getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom}))') is True, 'A new canvas fits the screen'
+    assert value('JSON.stringify([document.querySelector("[data-node=s-latest-day] .card-lead").textContent,document.querySelector("[data-node=s-upcoming-roadmap] .card-meta").textContent,!document.querySelector(".section-card").innerHTML.match(/<details|<summary/)])')==['Latest day · 2026-11-18','2 items',True], 'Cards show source excerpts'
+    assert value(place)=='&c=progress', 'The address names the canvas'
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('screenshot',str(args.output/'canvas-progress.png'))
+    browser('click','[data-node="s-gates"]')
+    assert value(shown)==['progress',['s-gates'],False] and value(place)=='&c=progress&n=s-gates', 'One click selects a card and the address names it'
+    spot=value('JSON.stringify(position("s-gates"))');camera_before=value('JSON.stringify(camera)')
+    box=value('JSON.stringify((()=>{const r=document.querySelector("[data-node=s-gates]").getBoundingClientRect();return {x:r.x,y:r.y}})())')
+    drag_points((box['x']+40,box['y']+40),(box['x']+80,box['y']+70))
+    assert value('JSON.stringify(position("s-gates"))')==spot and value('camera.x')>camera_before['x'], 'A drag on a section card moves the canvas; the card keeps its place'
+    assert value('JSON.stringify(localStorage.getItem("horsemen-local-layouts-v1")||"")').find('s-gates')<0, 'Nothing about a section card is saved'
+    browser('focus','[data-node="s-gates"]');browser('press','ArrowRight')
+    assert value('JSON.stringify(position("s-gates"))')==spot, 'Arrow keys do not move a section card'
+    browser('click','#fit')
+    browser('dblclick','[data-node="s-gates"]');browser('wait','#peek[open]')
+    assert value('JSON.stringify([document.querySelector("#peek-title").textContent,document.querySelector("#peek-content").dataset.mode])')==['Progress','document'], 'A section the layout does not name opens in the full document'
+    assert at_section('Gates') is True, 'The reading view opens at the section'
+    assert value(place)=='&c=progress&n=s-gates&r=progress', 'The address keeps the canvas, the card, and the open record'
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('screenshot',str(args.output/'canvas-reading-view.png'))
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-gates" && !location.hash.includes("&r=")')
+    assert value('JSON.stringify(location.hash.endsWith("&c=progress&n=s-gates"))') is True, 'Closing returns focus to the card and the address to the canvas'
+    browser('dblclick','[data-node="s-shipped"]');browser('wait','#peek[open]')
+    assert value('JSON.stringify(document.querySelector("#peek-content").dataset.mode)')=='overview' and at_section('Shipped') is True, 'A section the layout names opens in that layout'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-shipped" && !location.hash.includes("&r=")')
+    # Keyboard: a canvas from the rail, then a card. Enter selects; Enter again opens; Escape returns.
+    browser('focus','[data-canvas="vision"]');browser('press','Enter')
+    assert value('JSON.stringify([canvasKey,document.querySelector("#project-name").textContent,document.activeElement.dataset.canvas])')==['vision','Vision','vision'], 'Enter on a rail item opens its canvas and keeps focus'
+    browser('focus','[data-canvas="brain"]');browser('press','Space')
+    assert value('JSON.stringify(canvasKey)')=='brain', 'Space presses a rail item'
+    browser('focus','[data-canvas="vision"]');browser('press','Enter')
+    browser('focus','[data-node="s-who-we-build-for"]');browser('press','Enter')
+    assert value(shown)==['vision',['s-who-we-build-for'],False], 'Enter selects the focused card'
+    browser('press','Enter');browser('wait','#peek[open]')
+    assert at_section('Who we build for') is True
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-who-we-build-for" && !location.hash.includes("&r=")')
+    browser('press','Escape')
+    assert value(shown)==['vision',[],False] and value(place)=='&c=vision', 'Escape clears the selection and the address'
+    # List view of a canvas: the same cards in reading order; one click opens.
+    browser('click','#list-view')
+    order=value('JSON.stringify([...document.querySelectorAll(".section-card")].map(e=>[e.dataset.node,Math.round(e.getBoundingClientRect().top)]))')
+    assert [o[0] for o in order]==value('JSON.stringify(HorsemenSections.parse(records.vision.content).map(s=>s.id))') and [o[1] for o in order]==sorted(o[1] for o in order), 'The list shows the sections in reading order'
+    browser('click','[data-node="s-why-we-exist"]');browser('wait','#peek[open]')
+    assert value(place)=='&c=vision&n=s-why-we-exist&r=vision' and at_section('Why we exist') is True, 'One click in the list opens the section'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-why-we-exist" && !location.hash.includes("&r=")');browser('click','#canvas-view')
+    assert value('JSON.stringify([...document.querySelectorAll(".section-card")].every(e=>{const r=e.getBoundingClientRect(),c=document.querySelector(".canvas").getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom}))') is True, 'A canvas first seen as a list fits the screen when it opens'
+    # Links: a reload returns to the same canvas, card, and record. A link from before canvases still opens its record on Home.
+    browser('click','[data-canvas="progress"]');browser('click','[data-node="s-shipped"]')
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+    assert value(shown)==['progress',['s-shipped'],False] and value('JSON.stringify(document.querySelector("#project-name").textContent)')=='Progress', 'A reload returns to the canvas and the card'
+    assert value('JSON.stringify(document.activeElement.dataset.node)')=='s-shipped', 'The card a link names has focus'
+    browser('press','Enter');browser('wait','#peek[open]')
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','#peek[open]')
+    assert value(shown)==['progress',['s-shipped'],True] and at_section('Shipped') is True, 'A reload returns to the open section'
+    browser('click','[data-record="brain"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Brain"')
+    assert value(place)=='&c=progress&n=s-shipped&r=brain', 'Another record can open over a canvas'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "s-shipped" && !location.hash.includes("&r=")')
+    pid=value('JSON.stringify(projects[current].id)')
+    def go(tail):
+        browser('eval',f'location.hash="#p={pid}{tail}";location.reload()');browser('wait','--fn','document.body.dataset.state === "ready"')
+    go('&r=vision');browser('wait','#peek[open]')
+    assert value(shown)==['home',[],True] and value('JSON.stringify([document.querySelector("#peek-title").textContent,document.querySelector("#project-name").textContent])')==['Vision','alpha'], 'A link from before canvases opens its record over Home'
+    browser('press','Escape')
+    go('&c=progress&n=s-renamed')
+    assert value(shown)==['progress',[],False] and 'not in Progress now' in browser('get','text','#toast'), 'A link to a section that is gone says so'
+    go('&c=readme')
+    assert value(shown)==['home',[],False] and 'README is not in this project' in browser('get','text','#toast'), 'A link to the canvas of a missing record opens Home and says so'
+    # Jump reaches each canvas. A project returns to its last canvas.
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','brain canvas');browser('press','Enter')
+    assert value('JSON.stringify([canvasKey,document.querySelector("#palette").open])')==['brain',False], 'Jump opens a canvas'
+    browser('click','#workspace-toggle');browser('press','ArrowUp');browser('press','Enter');browser('wait','--fn','document.body.dataset.state === "ready" && projects[current].repo === "example/aardvark"')
+    assert value('JSON.stringify([canvasKey,document.querySelector("#workspace-name").textContent,document.querySelector("#workspace-pop").hidden,document.activeElement.id])')==['home','aardvark',True,'workspace-toggle'], 'Arrow keys and Enter change project; a new project opens on Home'
+    browser('click','#workspace-toggle');browser('click','[data-project]:not(.active)');browser('wait','--fn','document.body.dataset.state === "ready" && projects[current].repo === "example/alpha"')
+    assert value('JSON.stringify(canvasKey)')=='brain', 'A project opens on its last canvas'
+    browser('click','[data-canvas="home"]')
+    assert value('JSON.stringify([canvasKey,recordCards.every(e=>!e.hidden),document.querySelectorAll(".section-card").length,document.querySelector("#project-name").textContent,location.hash==="#p="+projects[current].id])')==['home',True,0,'alpha',True], 'Home returns with its record cards'
     # Shortcut sheet: from ? and from Jump.
     browser('focus','.canvas');browser('press','?');browser('wait','#shortcuts[open]')
     assert 'Collapse all linked branches' in browser('get','text','#shortcuts'), 'The shortcut sheet lists the canvas keys'
@@ -357,6 +456,21 @@ try:
     browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
     assert 'list' in browser('get','attr','#map','class'), 'A phone opens in List view, where cards stay readable'
     browser('screenshot','--full',str(args.output/'mobile-list.png'))
+    rail=value('JSON.stringify((()=>{const row=document.querySelector("#canvases"),r=document.querySelector(".rail");return [document.documentElement.scrollWidth<=innerWidth,r.scrollWidth<=r.clientWidth+1,row.scrollWidth>=row.clientWidth,getComputedStyle(row).overflowX]})())')
+    assert rail==[True,True,True,'auto'], 'On a phone the canvases are one row that scrolls inside the rail'
+    browser('eval','document.querySelector("[data-canvas=progress]").scrollIntoView({inline:"center",block:"nearest"})');browser('click','[data-canvas="progress"]')
+    assert value('JSON.stringify([canvasKey,document.querySelector("#map").classList.contains("list"),document.querySelectorAll(".section-card").length,document.documentElement.scrollWidth<=innerWidth])')==['progress',True,7,True], 'On a phone a canvas opens as a list of its sections'
+    assert value('JSON.stringify([...document.querySelectorAll(".section-card")].every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&e.scrollWidth<=e.clientWidth+1}))') is True, 'Section cards fit a phone'
+    browser('screenshot','--full',str(args.output/'mobile-canvas-list.png'))
+    browser('eval','document.querySelector("[data-node=s-gates]").scrollIntoView({block:"center"})');browser('click','[data-node="s-gates"]');browser('wait','#peek[open]')
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    assert value('JSON.stringify((r=>[Math.round(r.width),Math.round(r.height)])(document.querySelector("#peek").getBoundingClientRect()))')==[390,844] and location_ends(browser,'&c=progress&n=s-gates&r=progress'), 'On a phone a section opens the reading view on the full screen'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open')
+    browser('eval','scrollTo(0,0)');browser('click','#workspace-toggle')
+    pop=value('JSON.stringify((()=>{const r=document.querySelector("#workspace-pop").getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return [r.top>=0,r.bottom<=innerHeight,r.left>=0,r.right<=innerWidth,!!top.closest("#workspace-pop"),document.querySelectorAll("#workspace-pop [data-project]").length]})())')
+    assert pop==[True,True,True,True,True,2], 'On a phone the project list opens on screen, above the page'
+    browser('press','Escape')
+    browser('eval','document.querySelector("[data-canvas=home]").scrollIntoView({inline:"center",block:"nearest"})');browser('click','[data-canvas="home"]')
     browser('click','#menu-toggle')
     menu=value('JSON.stringify((()=>{const r=document.querySelector("#menu").getBoundingClientRect(),top=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return [r.top>=0,r.bottom<=innerHeight,r.left>=0,r.right<=innerWidth,!!top.closest("#menu")]})())')
     assert menu==[True,True,True,True,True], 'On a phone the menu opens on screen, above the page'
@@ -424,6 +538,8 @@ try:
     roles='JSON.stringify(["display","label","ui","prose","mono"].flatMap(r=>getComputedStyle(document.documentElement).getPropertyValue("--"+r).split(",").map(f=>f.trim().replace(/\\"/g,""))))'
     head='JSON.stringify((()=>{const links=[...document.querySelectorAll("link[rel=preload][as=font]")],css=document.querySelector("link[rel=stylesheet]");return [links.map(l=>l.getAttribute("href")),links.every(l=>l.compareDocumentPosition(css)&Node.DOCUMENT_POSITION_FOLLOWING)]})())'
     no_overflow='JSON.stringify([document.documentElement.scrollWidth<=innerWidth,[".topbar",".rail",".heading-actions"].every(s=>{const e=document.querySelector(s);return e.scrollWidth<=e.clientWidth+1})])'
+    # Text of a section card stays inside the card: the head and each line end before the card ends.
+    card_fit='JSON.stringify([...document.querySelectorAll(".section-card")].filter(e=>{const r=e.getBoundingClientRect();return [...e.querySelectorAll(".cardhead b,.card-lead,.card-line,.card-meta,.card-note")].some(c=>{const b=c.getBoundingClientRect();return b.height&&(b.bottom>r.bottom-4||b.right>r.right-4)})}).map(e=>e.dataset.node))'
     for t in styles:
         if browser('eval','document.querySelector("#menu").hidden').strip()=='true':browser('click','#menu-toggle')
         browser('click',f'[data-style-choice="{t["id"]}"]')
@@ -438,6 +554,12 @@ try:
         assert value(head)==[[f'/assets/fonts/{f}.woff2' for f in t['fonts']],True], t['id']+' preloads only its own fonts, before the stylesheet'
         assert set(value(fonts))<=set(value(roles)), t['id']+' downloads no font from another theme'
         browser('click','#fit');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+        browser('click','[data-canvas="progress"]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+        assert value(no_overflow)==[True,True], t['id']+' has no overflow on a record canvas'
+        assert value(card_fit)==[], t['id']+' shows section card text inside the card'
+        assert value('JSON.stringify((look=>look(document.querySelector("#canvases .active"))!==look(document.querySelector("#canvases .project:not(.active)")))(e=>{const s=getComputedStyle(e);return [s.backgroundColor,s.color,s.fontWeight,s.textDecorationLine,s.boxShadow,getComputedStyle(e,"::before").content].join("|")}))') is True, t['id']+' marks the open canvas in the rail'
+        browser('screenshot',str(args.output/f'theme-{t["id"]}-canvas.png'))
+        browser('click','[data-canvas="home"]')
         assert value(no_overflow)==[True,True], t['id']+' has no layout overflow at desktop width'
         browser('screenshot',str(args.output/f'theme-{t["id"]}-home.png'))
         browser('eval','openPeek("progress",document.querySelector("[data-artifact=progress]"))');browser('wait','#peek[open]');browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
@@ -483,6 +605,9 @@ try:
         browser('eval',f'localStorage.setItem("horsemen-style","{t["id"]}")')
         browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
         assert browser('eval','document.documentElement.scrollWidth <= innerWidth').strip()=='true', t['id']+' fits a phone'
+        browser('eval','showCanvas("progress")')
+        assert value('JSON.stringify([document.documentElement.scrollWidth<=innerWidth,(r=>r.scrollWidth<=r.clientWidth+1)(document.querySelector(".rail")),[...document.querySelectorAll(".section-card")].every(e=>e.scrollWidth<=e.clientWidth+1&&e.getBoundingClientRect().right<=innerWidth)])')==[True,True,True], t['id']+' fits a record canvas on a phone'
+        browser('eval','showCanvas("home")')
         for key in ['progress','vision','brain','structure','changelog','techstack']:
             browser('eval',f'openPeek("{key}",document.querySelector("[data-artifact={key}]"))');browser('wait','#peek[open]')
             assert browser('eval',fits).strip()=='true', key+' fits a phone in '+t['id']
@@ -500,7 +625,7 @@ try:
     assert browser('get','text','#peek-content').strip()==''
     assert browser('get','text','#project-name').strip()=='Workspace cleared'
     assert not browser('errors').strip()
-    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, mobile bounds, every theme at desktop and phone width, no browser errors.')
+    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, generated canvases with section links and keyboard use, mobile bounds, every theme at desktop and phone width, no browser errors.')
 except BaseException:
     try:
         browser('screenshot',str(args.output/'failure.png'))

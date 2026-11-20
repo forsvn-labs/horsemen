@@ -175,6 +175,14 @@
       const choose = item('a', 'choose-repos', 'layers', 'Choose repositories');
       choose.rel = 'noopener'; choose.target = '_blank'; choose.hidden = !installURL; if (installURL) choose.href = installURL;
       github.append(choose);
+      /* The project switcher also leads to the page where a person adds a repository. */
+      const pop = document.getElementById('workspace-pop');
+      if (pop) {
+        const connect = document.createElement('a'); connect.id = 'connect-repo'; connect.className = 'workspace-connect'; connect.rel = 'noopener'; connect.target = '_blank';
+        connect.innerHTML = '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#plus"/></svg><span>Connect a repository</span>';
+        connect.hidden = !installURL; if (installURL) connect.href = installURL;
+        pop.append(connect);
+      }
       const group = document.createElement('div'); group.setAttribute('role', 'group'); group.setAttribute('aria-label', 'Session'); group.id = 'hosted-controls';
       const out = item('button', 'sign-out', 'back', 'Sign out'); out.addEventListener('click', signOut);
       group.append(out);
@@ -200,10 +208,10 @@
   if (!PUBLIC) fetch('/api/session', { headers: headers(), cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(info => {
     if (!info) return;
     pollSeconds = Math.max(5, Number(info.poll_seconds) || 60); installURL = info.install_url;
-    const link = document.getElementById('choose-repos'); if (link) { link.href = installURL; link.hidden = false; }
+    for (const id of ['choose-repos', 'connect-repo']) { const link = document.getElementById(id); if (link) { link.href = installURL; link.hidden = false; } }
     if (watched) watch(watched);
   }).catch(() => {});
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', decorate); else decorate();
 
-  window.HorsemenHosted = { api, signOut, state, check, target, shareURL: (project, record) => R.shareURL(location.origin, project, record) };
+  window.HorsemenHosted = { api, signOut, state, check, target, shareURL: (project, record, canvas, node) => R.shareURL(location.origin, project, record, canvas, node) };
 })();

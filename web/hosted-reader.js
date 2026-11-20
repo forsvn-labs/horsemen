@@ -449,11 +449,19 @@
     try { owner = decodeURIComponent(parts[0]); repo = decodeURIComponent(parts[1]); } catch { return null; }
     if (!OWNER.test(owner) || !REPO_NAME.test(repo) || repo === '.' || repo === '..' || RESERVED.has(owner.toLowerCase())) return null;
     const record = url.searchParams.get('record');
-    return { repo: `${owner}/${repo}`, root: url.searchParams.get('root') || '', record: Object.hasOwn(FILES, record || '') ? record : null };
+    return { repo: `${owner}/${repo}`, root: url.searchParams.get('root') || '', record: Object.hasOwn(FILES, record || '') ? record : null, ...viewLink(url.searchParams.get('canvas'), url.searchParams.get('node')) };
   }
-  function shareURL(origin, project, record = null) {
-    const query = new URLSearchParams();
+  /* A place on a canvas: a record canvas and at most one element on it. Home is the default and has no name in a link. */
+  const NODE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
+  function viewLink(canvas, node) {
+    const known = typeof canvas === 'string' && Object.hasOwn(FILES, canvas) ? canvas : null;
+    return { canvas: known, node: known && typeof node === 'string' && NODE_ID.test(node) ? node : null };
+  }
+  function shareURL(origin, project, record = null, canvas = null, node = null) {
+    const query = new URLSearchParams(), view = viewLink(canvas, node);
     if (project.root) query.set('root', project.root);
+    if (view.canvas) query.set('canvas', view.canvas);
+    if (view.node) query.set('node', view.node);
     if (record && Object.hasOwn(FILES, record)) query.set('record', record);
     const qs = query.toString();
     return `${origin}/${project.repo.split('/').map(encodeURIComponent).join('/')}${qs ? '?' + qs : ''}`;

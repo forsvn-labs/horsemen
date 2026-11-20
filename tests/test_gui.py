@@ -139,6 +139,13 @@ class HTTPTests(unittest.TestCase):
         paths=set(re.findall(r'(?:src|href)="(/[^"#]+)',page))
         self.assertIn('/markdown.js',paths);self.assertIn('/theme.js',paths)
         for path in paths:self.assertEqual(urlopen(self.base+path).status,200,path)
+    def test_many_page_files_load_at_once(self):
+        # A browser opens several connections for the page files. A refused one leaves the page without a script.
+        from concurrent.futures import ThreadPoolExecutor
+        def get(path):
+            with urlopen(self.base+path,timeout=10) as r:r.read();return r.status
+        with ThreadPoolExecutor(32) as pool:results=list(pool.map(get,['/','/app.js','/style.css','/canvas-sections.js']*40))
+        self.assertEqual(set(results),{200})
     def test_bundled_assets_only(self):
         r=urlopen(self.base+'/assets/fonts/cleft.woff2');self.assertEqual(r.headers['Content-Type'],'font/woff2');self.assertTrue(r.read(4)==b'wOF2')
         for path in ['/assets/%2e%2e/app.js','/assets/%2e%2e/%2e%2e/BRAIN.md','/assets/fonts/missing.woff2','/assets/fonts/','/assets/fonts/cleft.woff2/..','/assets//etc/passwd','/assets/..%2f..%2fBRAIN.md']:

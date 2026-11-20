@@ -343,7 +343,7 @@ class Handler(BaseHTTPRequestHandler):
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/canvas-sections.js':('canvas-sections.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
             if path.startswith('/assets/'):
                 # Bundled fonts and icons only: plain names, known types, no traversal or links.
                 parts=path[len('/assets/'):].split('/')
@@ -365,7 +365,10 @@ class Handler(BaseHTTPRequestHandler):
         self.respond(404,{'error':'Not found.'})
     def do_OPTIONS(self): self.respond(403,{'error':'Cross-origin requests are not allowed.'})
 
+class WorkspaceServer(ThreadingHTTPServer):
+    # A browser opens several connections at once for the page files. The default queue of 5 refuses some of them.
+    request_queue_size=128
 def make_server(port, state, assets):
-    server=ThreadingHTTPServer(('127.0.0.1',port),Handler)
+    server=WorkspaceServer(('127.0.0.1',port),Handler)
     server.daemon_threads=True;server.state=state;server.assets=Path(assets);server.session=secrets.token_urlsafe(32)
     return server

@@ -2,6 +2,8 @@
 
 ## 2026-11-19
 
+- Each record now opens as a canvas. The sidebar has a project switcher and a list of canvases; each section of a record is a card, and a card opens the reading view at that section. Links such as `horsemen.forsvn.com/owner/repo?canvas=progress&node=s-shipped` open one canvas at one card. [Design](docs/product/canvas-workspace.md). [PR #30](https://github.com/hungv47/horsemen/pull/30).
+
 - Records now show Mermaid diagrams and charts in the colours of the active theme, with a View code toggle. A diagram that cannot be drawn shows its code and the reason. Images stored in the repository show in place when a record links to them; external images stay links. Works in the hosted viewer and the local app. [Hosted viewer](worker/README.md#how-it-works). [PR #27](https://github.com/hungv47/horsemen/pull/27).
 
 - Public repositories open without sign-in. Anyone can read the canvas at a link such as [horsemen.forsvn.com/hungv47/horsemen](https://horsemen.forsvn.com/hungv47/horsemen). Private repositories still need sign-in, and nothing is stored. [PR #25](https://github.com/hungv47/horsemen/pull/25), [PR #26](https://github.com/hungv47/horsemen/pull/26).
