@@ -178,7 +178,12 @@ const ROUTES = [
   [new RegExp(`^/repos/${NAME}/${NAME}/git/blobs/[0-9a-f]{40}(?:[0-9a-f]{24})?$`), []],
   [new RegExp(`^/repos/${NAME}/${NAME}/contents/[^?#]{1,1024}$`), ['ref']],
   [new RegExp(`^/repos/${NAME}/${NAME}/pulls/[1-9][0-9]{0,8}$`), []],
+  /* Slice 4c: the open pull request of horsemen/canvas, so the editor can link it. Signed-in view only. */
+  [new RegExp(`^/repos/${NAME}/${NAME}/pulls$`), ['state', 'head', 'per_page'], 'pulls'],
 ];
+/* The pull request list needs exactly state=open and head=<owner of the repository>:horsemen/canvas. */
+const PULLS_QUERY = { head: /^[A-Za-z0-9][A-Za-z0-9-]{0,38}:horsemen\/canvas$/ };
+const pullsQueryValid = (path, query) => query.get('state') === 'open' && query.get('head') === path.split('/')[2] + ':horsemen/canvas';
 const ERRORS = {
   401: [401, 'Your GitHub session ended. Sign in again.'],
   403: [403, 'GitHub denied access or reached a rate limit. Check access, then retry.'],
@@ -197,7 +202,8 @@ function allowedTarget(path, search, routes = ROUTES) {
     if (decoded.includes('/') && !(route[2] === 'ref' && i === segments.length - 1)) return null;
   }
   const query = new URLSearchParams();
-  for (const [k, v] of new URLSearchParams(search)) if (route[1].includes(k) && /^[A-Za-z0-9._-]{1,255}$/.test(v)) query.append(k, v);
+  for (const [k, v] of new URLSearchParams(search)) if (route[1].includes(k) && !query.has(k) && ((route[2] === 'pulls' && PULLS_QUERY[k]) || /^[A-Za-z0-9._-]{1,255}$/).test(v)) query.append(k, v);
+  if (route[2] === 'pulls' && !pullsQueryValid(path, query)) return null;
   const qs = query.toString();
   return path + (qs ? '?' + qs : '');
 }
@@ -252,7 +258,7 @@ function safeNext(next) {
    a user token (see publicHeaders), and every read first checks
    that the repository is public. Public data is cached at the edge for a short time
    (branch heads and repository metadata) or a day (objects addressed by SHA). */
-const PUBLIC_ROUTES = [[new RegExp(`^/repos/${NAME}/${NAME}$`), []], ...ROUTES.filter(([pattern]) => pattern.source.startsWith('^\\/repos'))];
+const PUBLIC_ROUTES = [[new RegExp(`^/repos/${NAME}/${NAME}$`), []], ...ROUTES.filter(([pattern, , mode]) => pattern.source.startsWith('^\\/repos') && mode !== 'pulls')];
 /* GitHub refuses GitHub App client credentials on repository reads. Public reads use an optional
    public-read token (a fine-grained token with no permissions, secret GITHUB_PUBLIC_TOKEN) for the
    5,000/hour limit, or no credentials (60/hour per Cloudflare IP; the edge cache absorbs repeats). */
@@ -406,16 +412,110 @@ const WRITE_ERRORS = {
   install: [403, 'The Horsemen Editor app is not installed on this repository, or it cannot write there. Install it, then save again.', 'editor-install'],
   push: [403, 'Your GitHub account cannot push to this repository.', 'no-push'],
   github: [502, 'GitHub did not accept the save. Try again.', 'github'],
-  busy: [409, 'GitHub did not accept the commit. The branch can be protected or busy. Try again later.', 'busy'],
+  refused: [409, 'GitHub refused the save on the default branch and on horsemen/canvas. A rule of this repository protects both. Your draft stays in this tab. Ask an owner of the repository to allow the branch horsemen/canvas, then save again.', 'refused'],
+  'branch-conflict': [409, 'The branch horsemen/canvas has changes that conflict with the default branch. Resolve its pull request on GitHub, or delete the branch, then save again.', 'branch-conflict'],
 };
-const writeError = (name, cookie) => { const [status, error, code] = WRITE_ERRORS[name]; return json({ error, code }, status, cookieOf(cookie)); };
+const writeError = (name, cookie, extra = {}) => { const [status, error, code] = WRITE_ERRORS[name]; return json({ error, code, ...extra }, status, cookieOf(cookie)); };
 class GitHubFailure extends Error { constructor(name) { super(name); this.name = name; } }
 
-/* POST /write/canvas: one commit that writes <root>/.horsemen/canvas/<canvas>.canvas on the default branch.
-   Contract and checks: docs/product/canvas-workspace.md#slice-4a-as-built. GitHub calls (REST contents API):
-   GET /repos/{repo} (default branch, push permission), GET the file at the branch (blob SHA, for the conflict check),
-   PUT the file with that SHA. A 409 or 422 from the PUT reads the file again: a new SHA is a conflict; the same SHA
-   means the branch head moved, so the PUT runs again, three times at most. */
+/* ---------------------------------------------------------------- protected default branches (slice 4c)
+   A save that GitHub does not take on the default branch goes to one fixed branch, horsemen/canvas, and the reply
+   carries the address of the pull request page. The Worker builds every ref: the default branch comes from GitHub,
+   the other name is the constant below. No other branch is ever written, a ref is never forced, nothing is deleted. */
+const SIDE = E.PR_BRANCH;
+/* Ruleset rules that stop a direct commit of a person who cannot bypass them. Other rules (deletion, non_fast_forward,
+   creation, linear history) do not stop a normal commit. */
+const BLOCKING_RULES = new Set(['update', 'pull_request', 'required_status_checks', 'required_deployments', 'merge_queue']);
+const refPath = name => name.split('/').map(encodeURIComponent).join('/');
+const compareURL = (env, repo, branch) => `${web(env)}/${repo}/compare/${refPath(branch)}...${SIDE}?expand=1`;
+/* The GitHub calls of the write routes, with the editor token only. */
+function editorGitHub(env, token, repo) {
+  const call = (target, init = {}) => fetch(apiBase(env) + target, { ...init, headers: { ...githubHeaders(token), ...(init.body ? { 'content-type': 'application/json' } : {}) } });
+  const api = {
+    call,
+    /* Default branch and push permission. */
+    async repository() {
+      const meta = await call(`/repos/${repo}`);
+      if (meta.status === 404 || meta.status === 403) throw new GitHubFailure('install');
+      if (meta.status === 401) throw new GitHubFailure('signin');
+      if (!meta.ok) throw new GitHubFailure('github');
+      const info = await meta.json();
+      if (!info.permissions || info.permissions.push !== true) throw new GitHubFailure('push');
+      if (typeof info.default_branch !== 'string' || !info.default_branch || info.default_branch.length > 255) throw new GitHubFailure('github');
+      return info.default_branch;
+    },
+    /* True when a direct commit on the branch is not allowed: classic branch protection, or a ruleset rule that blocks
+       it. A check that fails counts as no protection; a refused commit then goes to horsemen/canvas. */
+    async protectedBranch(branch) {
+      const [classic, rules] = await Promise.all([call(`/repos/${repo}/branches/${refPath(branch)}`), call(`/repos/${repo}/rules/branches/${refPath(branch)}?per_page=100`)]);
+      if (classic.status === 401 || rules.status === 401) throw new GitHubFailure('signin');
+      const flag = classic.ok ? (await classic.json().catch(() => ({})))?.protected === true : false;
+      const list = rules.ok ? await rules.json().catch(() => []) : [];
+      return flag || (Array.isArray(list) && list.some(rule => rule && BLOCKING_RULES.has(rule.type)));
+    },
+    /* The head commit of a branch, or null when the branch does not exist. */
+    async head(branch) {
+      const res = await call(`/repos/${repo}/git/ref/heads/${refPath(branch)}`);
+      if (res.status === 404) return null;
+      if (res.status === 401) throw new GitHubFailure('signin');
+      if (!res.ok) throw new GitHubFailure('github');
+      const sha = String((await res.json())?.object?.sha || '');
+      if (!BLOB.test(sha)) throw new GitHubFailure('github');
+      return sha;
+    },
+    /* How horsemen/canvas stands to the default branch: 'missing', 'contained' (nothing of its own), 'ahead', or 'diverged'. */
+    async sideState(branch) {
+      const [side, main] = await Promise.all([api.head(SIDE), api.head(branch)]);
+      if (!main) throw new GitHubFailure('github');
+      if (!side) return { state: 'missing', main };
+      if (side === main) return { state: 'contained', main, side };
+      const res = await call(`/repos/${repo}/compare/${refPath(branch)}...${SIDE}`);
+      if (res.status === 401) throw new GitHubFailure('signin');
+      if (!res.ok) throw new GitHubFailure('github');
+      const cmp = await res.json();
+      const ahead = Number(cmp?.ahead_by), behind = Number(cmp?.behind_by);
+      if (!Number.isInteger(ahead) || !Number.isInteger(behind)) throw new GitHubFailure('github');
+      return { state: ahead === 0 ? 'contained' : behind === 0 ? 'ahead' : 'diverged', main, side };
+    },
+    /* Make horsemen/canvas from the default branch head. A branch that appears at the same time is fine. */
+    async createSide(main) {
+      const res = await call(`/repos/${repo}/git/refs`, { method: 'POST', body: JSON.stringify({ ref: 'refs/heads/' + SIDE, sha: main }) });
+      if (res.ok) return;
+      if (res.status === 401) throw new GitHubFailure('signin');
+      if (res.status === 403 || res.status === 404) throw new GitHubFailure('install');
+      if (await api.head(SIDE)) return;
+      throw new GitHubFailure('refused');
+    },
+    /* Bring horsemen/canvas up to the default branch before a save: make it, fast-forward it (never forced), or merge
+       the default branch into it. Its own commits are never lost. */
+    async prepareSide(branch) {
+      const { state, main } = await api.sideState(branch);
+      if (state === 'missing') return api.createSide(main);
+      if (state === 'ahead') return;
+      if (state === 'contained') {
+        const res = await call(`/repos/${repo}/git/refs/heads/${SIDE}`, { method: 'PATCH', body: JSON.stringify({ sha: main, force: false }) });
+        if (res.ok) return;
+        if (res.status === 401) throw new GitHubFailure('signin');
+        if (res.status === 403 || res.status === 404) throw new GitHubFailure('install');
+        throw new GitHubFailure('refused');
+      }
+      const res = await call(`/repos/${repo}/merges`, { method: 'POST', body: JSON.stringify({ base: SIDE, head: main, commit_message: `Merge ${branch} into ${SIDE}` }) });
+      if (res.ok) return;
+      if (res.status === 401) throw new GitHubFailure('signin');
+      if (res.status === 409) throw new GitHubFailure('branch-conflict');
+      if (res.status === 403 || res.status === 404) throw new GitHubFailure('install');
+      throw new GitHubFailure('refused');
+    },
+  };
+  return api;
+}
+
+/* POST /write/canvas: one commit that writes <root>/.horsemen/canvas/<canvas>.canvas on the default branch, or on
+   horsemen/canvas when the default branch is protected. Contract and checks: docs/product/canvas-workspace.md
+   (slice 4a and slice 4c as built). GitHub calls (REST contents API): GET /repos/{repo} (default branch, push
+   permission), the protection checks, GET the file at the target branch (blob SHA, for the conflict check), PUT the
+   file with that SHA. A 409 or 422 from the PUT reads the file again: a new SHA is a conflict; the same SHA means the
+   branch head moved (try again, three times at most) or a rule refused the commit. */
 async function writeCanvas(env, request, session) {
   if (!editorConfigured(env)) return json({ error: 'Editing is not set up on this site.' }, 404);
   if (request.method !== 'POST') return json({ error: 'Use POST.' }, 405);
@@ -447,18 +547,12 @@ async function writeCanvas(env, request, session) {
   if (!token) return writeError('signin', cookie);
   const path = (root ? root + '/' : '') + '.horsemen/canvas/' + name + '.canvas';
   const contents = `/repos/${repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
-  const gh = (target, init = {}) => fetch(apiBase(env) + target, { ...init, headers: { ...githubHeaders(token), ...(init.body ? { 'content-type': 'application/json' } : {}) } });
+  const gh = editorGitHub(env, token, repo);
+  let main = null;
   try {
-    const meta = await gh(`/repos/${repo}`);
-    if (meta.status === 404 || meta.status === 403) throw new GitHubFailure('install');
-    if (meta.status === 401) throw new GitHubFailure('signin');
-    if (!meta.ok) throw new GitHubFailure('github');
-    const info = await meta.json();
-    if (!info.permissions || info.permissions.push !== true) throw new GitHubFailure('push');
-    const branch = info.default_branch;
-    if (typeof branch !== 'string' || !branch || branch.length > 255) throw new GitHubFailure('github');
-    const current = async () => {
-      const res = await gh(`${contents}?ref=${encodeURIComponent(branch)}`);
+    main = await gh.repository();
+    const current = async branch => {
+      const res = await gh.call(`${contents}?ref=${encodeURIComponent(branch)}`);
       if (res.status === 404) return { sha: null, text: null };
       if (res.status === 401) throw new GitHubFailure('signin');
       if (!res.ok) throw new GitHubFailure('github');
@@ -467,29 +561,113 @@ async function writeCanvas(env, request, session) {
       let content = null; try { content = file.encoding === 'base64' ? fromBase64(file.content) : null; } catch { /* Not UTF-8: the file is replaced, and the message counts it as new. */ }
       return { sha: file.sha, text: content };
     };
-    const conflict = sha => json({ error: 'The canvas changed on GitHub. Merge, then save again.', code: 'conflict', current: sha }, 409, cookieOf(cookie));
-    const now = await current();
-    if (now.sha !== base) return conflict(now.sha);
-    if (now.text === canonical) return json({ unchanged: true, canvas_sha: now.sha }, 200, cookieOf(cookie));
-    const before = now.text === null ? null : F.parse(now.text);
-    const message = E.message(name, E.changes(before && !before.fatal ? before.doc : null, parsed.doc));
+    /* What the reply says about horsemen/canvas: the branch and the page that opens or shows its pull request. */
+    const sideFacts = () => ({ branch: SIDE, default_branch: main, pull_request: { compare_url: compareURL(env, repo, main) } });
+    const conflict = (sha, branch) => json({ error: 'The canvas changed on GitHub. Merge, then save again.', code: 'conflict', current: sha, ...(branch === SIDE ? { branch: SIDE } : {}) }, 409, cookieOf(cookie));
+    const unchanged = (sha, branch) => json({ unchanged: true, canvas_sha: sha, ...(branch === SIDE ? sideFacts() : {}) }, 200, cookieOf(cookie));
     const content = base64(new TextEncoder().encode(canonical));
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const res = await gh(contents, { method: 'PUT', body: JSON.stringify({ message, content, branch, ...(base ? { sha: base } : {}) }) });
-      if (res.ok) {
-        const out = await res.json().catch(() => ({}));
-        const commit = String(out?.commit?.sha || ''), blob = String(out?.content?.sha || '');
-        if (!BLOB.test(commit) || !BLOB.test(blob)) throw new GitHubFailure('github');
-        return json({ commit, canvas_sha: blob, url: `${web(env)}/${repo}/commit/${commit}`, message }, 200, cookieOf(cookie));
+
+    /* 1. The target: horsemen/canvas when the default branch is protected, or when the draft continues it. */
+    let side = await gh.protectedBranch(main);
+    let now = null;
+    if (!side) {
+      now = await current(main);
+      if (now.sha !== base) {
+        if (!(await gh.head(SIDE)) || (await current(SIDE)).sha !== base) return conflict(now.sha, main);
+        side = true;
       }
-      if (res.status === 401) throw new GitHubFailure('signin');
-      if (res.status === 403 || res.status === 404) throw new GitHubFailure('install');
-      if (res.status !== 409 && res.status !== 422) throw new GitHubFailure('github');
-      const again = await current();
-      if (again.sha !== base) return conflict(again.sha);
-      if (res.status === 422) throw new GitHubFailure('github');
     }
-    throw new GitHubFailure('busy');
+    /* 2. The default branch. A commit that GitHub refuses for a reason other than a changed file goes to horsemen/canvas. */
+    if (!side) {
+      if (now.text === canonical) return unchanged(now.sha, main);
+      for (let attempt = 0; attempt < 3 && !side; attempt++) {
+        const body = putBody(name, now, parsed, content, base, main, false);
+        const res = await gh.call(contents, { method: 'PUT', body });
+        if (res.ok) return finish(res, body, main);
+        if (res.status === 401) throw new GitHubFailure('signin');
+        if (res.status === 404) throw new GitHubFailure('install');
+        if (res.status === 403) { side = true; break; }
+        if (res.status !== 409 && res.status !== 422) throw new GitHubFailure('github');
+        const again = await current(main);
+        if (again.sha !== base) return conflict(again.sha, main);
+        if (res.status === 422) side = true;
+      }
+      side = true;
+    }
+    /* 3. horsemen/canvas: up to date with the default branch, then the same conflict check on its own file. */
+    await gh.prepareSide(main);
+    let remade = false;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      now = await current(SIDE);
+      if (now.sha !== base) return conflict(now.sha, SIDE);
+      if (now.text === canonical) return unchanged(now.sha, SIDE);
+      const body = putBody(name, now, parsed, content, base, SIDE, true);
+      const res = await gh.call(contents, { method: 'PUT', body });
+      if (res.ok) return finish(res, body, SIDE);
+      if (res.status === 401) throw new GitHubFailure('signin');
+      if (res.status === 403) throw new GitHubFailure('install');
+      if (res.status === 404 || res.status === 422) {
+        /* Deleted during the save (a merged pull request): make it again, once, from the default branch. */
+        if (!remade && !(await gh.head(SIDE))) { remade = true; await gh.prepareSide(main); continue; }
+        if (res.status === 404) throw new GitHubFailure('install');
+        throw new GitHubFailure('refused');
+      }
+      if (res.status !== 409) throw new GitHubFailure('github');
+    }
+    throw new GitHubFailure('refused');
+
+    async function finish(res, body, branch) {
+      const out = await res.json().catch(() => ({}));
+      const commit = String(out?.commit?.sha || ''), blob = String(out?.content?.sha || '');
+      if (!BLOB.test(commit) || !BLOB.test(blob)) throw new GitHubFailure('github');
+      return json({ commit, canvas_sha: blob, url: `${web(env)}/${repo}/commit/${commit}`, message: JSON.parse(body).message, ...(branch === SIDE ? sideFacts() : {}) }, 200, cookieOf(cookie));
+    }
+  } catch (error) {
+    if (error instanceof GitHubFailure) {
+      const extra = error.name === 'branch-conflict' && main ? { pull_request: { compare_url: compareURL(env, repo, main) } } : {};
+      return writeError(error.name, error.name === 'signin' ? await writeSession(env, { ...session, w: null }) : cookie, extra);
+    }
+    return json({ error: 'GitHub request failed. Retry.', code: 'github' }, 502, cookieOf(cookie));
+  }
+}
+/* The body of one PUT. The Worker writes the message from counts of the old and the new file. */
+function putBody(name, now, parsed, content, base, branch, pullRequest) {
+  const before = now.text === null ? null : F.parse(now.text);
+  const message = E.message(name, E.changes(before && !before.fatal ? before.doc : null, parsed.doc), { pullRequest });
+  return JSON.stringify({ message, content, branch, ...(base ? { sha: base } : {}) });
+}
+
+/* GET /write/target?repo=&root=&canvas=: where the next save of this canvas goes, and the blob SHA of the file that the
+   draft starts from on that branch. Reads only, with the editor token. Reply: { branch, default_branch, protected,
+   sha, pull_request? }. */
+async function writeTarget(env, request, session) {
+  if (!editorConfigured(env)) return json({ error: 'Editing is not set up on this site.' }, 404);
+  if (request.method !== 'GET') return json({ error: 'Use GET.' }, 405);
+  const p = new URL(request.url).searchParams, repo = p.get('repo'), root = p.get('root'), name = p.get('canvas');
+  if (!validRepo(repo)) return json({ error: 'The repository name is not valid.' }, 400);
+  if (!validRoot(root)) return json({ error: 'The project root is not valid.' }, 400);
+  if (!F.validName(name) || name === 'home') return json({ error: 'The canvas name is not valid.' }, 400);
+  const { token, cookie } = await editorToken(env, session);
+  if (!token) return writeError('signin', cookie);
+  const path = (root ? root + '/' : '') + '.horsemen/canvas/' + name + '.canvas';
+  const gh = editorGitHub(env, token, repo);
+  const blobAt = async branch => {
+    const res = await gh.call(`/repos/${repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(branch)}`);
+    if (res.status === 404) return null;
+    if (res.status === 401) throw new GitHubFailure('signin');
+    if (!res.ok) throw new GitHubFailure('github');
+    const sha = String((await res.json())?.sha || '');
+    if (!BLOB.test(sha)) throw new GitHubFailure('github');
+    return sha;
+  };
+  try {
+    const main = await gh.repository();
+    if (!(await gh.protectedBranch(main))) return json({ branch: main, default_branch: main, protected: false, sha: await blobAt(main) }, 200, cookieOf(cookie));
+    /* A save first brings horsemen/canvas up to the default branch: a branch with no commits of its own starts from the
+       file of the default branch. */
+    const { state } = await gh.sideState(main);
+    const sha = await blobAt(state === 'ahead' || state === 'diverged' ? SIDE : main);
+    return json({ branch: SIDE, default_branch: main, protected: true, sha, pull_request: { compare_url: compareURL(env, repo, main) } }, 200, cookieOf(cookie));
   } catch (error) {
     if (error instanceof GitHubFailure) return writeError(error.name, error.name === 'signin' ? await writeSession(env, { ...session, w: null }) : cookie);
     return json({ error: 'GitHub request failed. Retry.', code: 'github' }, 502, cookieOf(cookie));
@@ -611,6 +789,7 @@ async function handle(request, env) {
   }
   if (path === '/write/canvas') return writeCanvas(env, request, session);
   if (path === '/write/access') return writeAccess(env, request, session);
+  if (path === '/write/target') return writeTarget(env, request, session);
   if (path.startsWith('/gh/')) return proxy(env, request, session, path.slice(3));
   return json({ error: 'Not found.' }, 404);
 }

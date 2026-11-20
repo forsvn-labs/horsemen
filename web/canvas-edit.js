@@ -118,10 +118,24 @@
   }
   const WORDS = [['added', 'add'], ['moved', 'move'], ['edited', 'edit'], ['connected', 'connect'], ['removed', 'remove']];
   const summary = counts => WORDS.filter(([key]) => counts[key] > 0).map(([key, word]) => word + ' ' + Math.floor(counts[key])).join(', ') || 'update';
-  /* The commit message: the canvas name and counts only, never text from the file. */
-  function message(name, counts) {
+  /* The commit message: the canvas name and counts only, never text from the file. A save to the pull request branch
+     (slice 4c) has no [skip ci]: the checks that the pull request needs must run on its head commit. */
+  function message(name, counts, { pullRequest = false } = {}) {
     if (!F.validName(name)) throw new Error('canvas name is not valid');
-    return 'canvas(' + name + '): ' + summary(counts) + ' [skip ci]';
+    return 'canvas(' + name + '): ' + summary(counts) + (pullRequest ? '' : ' [skip ci]');
+  }
+  /* The one branch besides the default branch that a save can write (slice 4c), when the default branch is protected. */
+  const PR_BRANCH = 'horsemen/canvas';
+  /* The link after a save to horsemen/canvas: the open pull request of that branch, else the compare page that opens one.
+     compareURL comes from the Worker; it must be the compare page of this repository and horsemen/canvas. The address of
+     a pull request is built from its number on the same host, never taken from GitHub text. Null when the link is not valid. */
+  function pullRequestLink(repo, compareURL, pulls) {
+    let url;
+    try { url = new URL(String(compareURL)); } catch { return null; }
+    if (!['https:', 'http:'].includes(url.protocol) || !url.pathname.startsWith('/' + repo + '/compare/') || !url.pathname.endsWith('...' + PR_BRANCH)) return null;
+    const number = Array.isArray(pulls) && pulls[0] ? pulls[0].number : null;
+    if (Number.isInteger(number) && number > 0 && number < 1e9) return { url: url.origin + '/' + repo + '/pull/' + number, label: 'Pull request #' + number, number };
+    return { url: url.href, label: 'Open a pull request', number: null };
   }
   /* The lines that a save removes and adds. The canonical text has one element on each line. */
   function changedLines(before, after) {
@@ -195,6 +209,6 @@
   /* The key of a draft in sessionStorage: the repository, the project root, and the canvas name. */
   const draftKey = (repo, projectRoot, name) => 'horsemen.draft.v1:' + repo + ':' + (projectRoot || '') + ':' + name;
 
-  const api = { NOTE, SECTION, newId, emptyDoc, stable, same, moveNode, addNote, setText, connect, connected, disconnect, remove, saveSection, changes, summary, message, changedLines, merge, draftKey };
+  const api = { PR_BRANCH, pullRequestLink, NOTE, SECTION, newId, emptyDoc, stable, same, moveNode, addNote, setText, connect, connected, disconnect, remove, saveSection, changes, summary, message, changedLines, merge, draftKey };
   if (node) module.exports = api; else root.HorsemenCanvasEdit = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

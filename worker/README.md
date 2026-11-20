@@ -128,11 +128,23 @@ browser ──POST /write/canvas (CSRF token + cookie with editor token)──�
   SHA; the browser reads that file, merges by element ID
   (`web/canvas-edit.js`), and saves again. When the branch head moves during
   the commit, the Worker tries again, three times at most.
+- **Protected branches.** When GitHub does not allow a direct commit on the
+  default branch (classic branch protection, a ruleset rule such as
+  `pull_request` or `update`, or a refused commit), the Worker saves to the
+  branch `horsemen/canvas`. It makes the branch from the head of the default
+  branch, fast-forwards it, or merges the default branch into it. It never
+  forces or deletes a ref, and it writes no other branch. The reply adds
+  `branch`, `default_branch`, and `pull_request.compare_url`. The message has
+  no `[skip ci]`, so the checks of the pull request run. Horsemen does not make
+  the pull request; the person opens it on GitHub. `GET /write/target` tells
+  the editor where the next save goes, with reads only. See
+  [slice 4c as built](../docs/product/canvas-workspace.md#slice-4c-as-built).
 - **Drafts.** A draft stays in the browser tab (`sessionStorage`) until it is
   saved or discarded. Sign-out removes drafts. The page warns before it
   closes with an unsaved draft.
 - **What stays read-only.** The public view (`/pub/*`) and the read proxy
-  (`/gh/*`) accept GET only. The public view and the local app do not load
+  (`/gh/*`) accept GET only. The read proxy lists open pull requests only for
+  the head `<owner>:horsemen/canvas`, and only in the signed-in view. The public view and the local app do not load
   the edit script. An instance without the three editor secrets has no write
   route and keeps the read-only text on the sign-in page.
 
