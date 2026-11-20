@@ -816,7 +816,7 @@ try:
     assert browser('get','text','#peek-content').strip()==''
     assert browser('get','text','#project-name').strip()=='Workspace cleared'
     assert not browser('errors').strip()
-    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, generated canvases with section links and keyboard use, canvas files (boards, elements, connectors, list, messages, hostile content, the SVG blob test), mobile bounds, every theme at desktop and phone width, no browser errors.')
+    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, generated canvases with section links and keyboard use, canvas files (boards, elements, connectors, list, messages, hostile content, the SVG blob test), players and tables against a fake player, mobile bounds, every theme at desktop and phone width, no browser errors.')
 except BaseException:
     try:
         browser('screenshot',str(args.output/'failure.png'))
