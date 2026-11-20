@@ -14,7 +14,8 @@ const EDIT_STATE = '__Host-horsemen-edit-state';
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+/* frame-src: the players that a canvas link card loads after a click (web/canvas-embeds.js has the same list). */
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 const SECURITY = {
   'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY', 'strict-transport-security': 'max-age=31536000', 'permissions-policy': 'camera=(), microphone=(), geolocation=()',

@@ -61,6 +61,40 @@ def decode_image(blob, path):
     if not _image_matches(kind, data): raise ProviderError('The file does not match its image type.', 415)
     return kind, data
 
+# CSV and TSV tables that a canvas or a record names: text up to 1 MiB, the same limit as images.
+# The browser splits the text into rows (web/canvas-table.js). XLSX is not read; it stays a file card.
+TABLE_TYPES = {'.csv':'csv', '.tsv':'tsv'}
+MAX_TABLE = MAX_IMAGE
+TABLE_TOO_LARGE = 'The table is larger than 1 MiB. Open it on GitHub.'
+TABLE_MISSING = 'The table is not in the repository at this commit.'
+TABLE_NOT_TEXT = 'The table is not UTF-8 text. Open it on GitHub.'
+TABLE_LFS = 'Stored in Git LFS; not shown. Open it on GitHub.'
+TABLE_TYPE = 'The file is not a CSV or TSV table.'
+
+def table_type(path):
+    name = PurePosixPath(path or '').name; dot = name.rfind('.')
+    return TABLE_TYPES.get(name[dot:].lower()) if dot > 0 else None
+
+def decode_table(blob, path):
+    """The text of a CSV or TSV file from a contents-API response."""
+    kind = table_type(path)
+    if not isinstance(blob, dict) or blob.get('type') != 'file': raise ProviderError('The linked path is not a readable file.', 422)
+    if not kind: raise ProviderError(TABLE_TYPE, 415)
+    size = blob.get('size')
+    if not isinstance(size, int) or isinstance(size, bool) or size < 0: raise ProviderError('The linked path is not a readable file.', 422)
+    if size > MAX_TABLE or blob.get('encoding') == 'none': raise ProviderError(TABLE_TOO_LARGE, 413)
+    if blob.get('encoding') != 'base64' or not isinstance(blob.get('content'), str): raise ProviderError('Unsupported table encoding.')
+    encoded = re.sub(r'\s', '', blob['content'])
+    if len(encoded) > MAX_TABLE * 2: raise ProviderError(TABLE_TOO_LARGE, 413)
+    try: data = base64.b64decode(encoded, validate=True)
+    except ValueError as error: raise ProviderError('The table could not be decoded.') from error
+    if len(data) > MAX_TABLE: raise ProviderError(TABLE_TOO_LARGE, 413)
+    if data.startswith(b'version https://git-lfs.github.com/spec/'): raise ProviderError(TABLE_LFS, 415)
+    try: text = data.decode('utf-8-sig')
+    except UnicodeDecodeError as error: raise ProviderError(TABLE_NOT_TEXT, 415) from error
+    if '\x00' in text: raise ProviderError(TABLE_NOT_TEXT, 415)
+    return {'text':text, 'format':kind, 'size':len(data)}
+
 def now(): return datetime.now(timezone.utc).isoformat(timespec='seconds')
 
 class ProviderError(Exception):
@@ -226,6 +260,15 @@ class GitHubReader:
         kind,data=decode_image(blob,path)
         return {'type':kind,'bytes':data,'size':len(data)}
 
+    def load_table(self, project, link):
+        path=link['path']
+        if not table_type(path): raise ProviderError(TABLE_TYPE, 415)
+        try: blob=self.api(f'/repos/{project["repo"]}/contents/{quote(path,safe="/")}?ref={project["revision"]}')
+        except ProviderError as error:
+            if error.status==404: raise ProviderError(TABLE_MISSING,404) from error
+            raise
+        return decode_table(blob,path)
+
     def pull_request(self, project, number):
         if not re.fullmatch(r'[1-9][0-9]{0,8}', str(number)): raise ProviderError('Invalid PR number.', 400)
         data = self.api(f'/repos/{project["repo"]}/pulls/{number}')
@@ -330,6 +373,19 @@ class ScanState:
             if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
         return image
 
+    def load_table(self, key, link_id):
+        """Text of a CSV or TSV file that a loaded record or canvas links to, at the scanned revision."""
+        with self.lock:generation=self.generation
+        project=self.project(key)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+            link=copy.deepcopy(self.links.get(key,{}).get(link_id))
+            if not link or link['kind']!='attachment' or not table_type(link.get('path')):raise ProviderError('Open a table linked from a loaded record or canvas.',404)
+        table=self.reader.load_table(project,link)
+        with self.lock:
+            if generation!=self.generation:raise ProviderError('Discovery changed. Open the project again.',409)
+        return table
+
     def project(self, key):
         with self.lock:
             project=self.projects.get(key);account=self.data['account'];generation=self.generation
@@ -351,7 +407,8 @@ ASSET_NAME=re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
 ASSET_TYPES={'.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.txt':'text/plain; charset=utf-8'}
 
 # Repository images show as blob: URLs. Script stays same-origin only, with no eval.
-PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+# frame-src: the players that a canvas link card loads after a click (web/canvas-embeds.js has the same list).
+PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 # Image bytes never run as a document, even an SVG opened on its own.
 IMAGE_CSP="default-src 'none'; style-src 'unsafe-inline'; sandbox"
 
@@ -383,13 +440,15 @@ class Handler(BaseHTTPRequestHandler):
             if path=='/api/image':
                 image=self.server.state.load_image(query.get('id',[''])[0],query.get('link',[''])[0])
                 return self.respond(200,image['bytes'],image['type'],IMAGE_CSP)
+            if path=='/api/table':
+                return self.respond(200,self.server.state.load_table(query.get('id',[''])[0],query.get('link',[''])[0]))
             if path=='/api/pr':
                 project=self.server.state.project(query.get('project',[''])[0])
                 generation=self.server.state.generation
                 result=self.server.state.reader.pull_request(project,query.get('number',[''])[0])
                 if generation!=self.server.state.generation:raise ProviderError('Discovery changed. Open the project again.',409)
                 return self.respond(200,result)
-            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/canvas-sections.js':('canvas-sections.js','text/javascript; charset=utf-8'),'/canvas-format.js':('canvas-format.js','text/javascript; charset=utf-8'),'/canvas-view.js':('canvas-view.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
+            files={'/':('index.html','text/html; charset=utf-8'),'/canvas-state.js':('canvas-state.js','text/javascript; charset=utf-8'),'/canvas-sections.js':('canvas-sections.js','text/javascript; charset=utf-8'),'/canvas-format.js':('canvas-format.js','text/javascript; charset=utf-8'),'/canvas-view.js':('canvas-view.js','text/javascript; charset=utf-8'),'/canvas-embeds.js':('canvas-embeds.js','text/javascript; charset=utf-8'),'/canvas-table.js':('canvas-table.js','text/javascript; charset=utf-8'),'/previews.js':('previews.js','text/javascript; charset=utf-8'),'/app.js':('app.js','text/javascript; charset=utf-8'),'/style.css':('style.css','text/css; charset=utf-8'),'/theme.js':('theme.js','text/javascript; charset=utf-8'),'/markdown.js':('markdown.js','text/javascript; charset=utf-8'),'/media.js':('media.js','text/javascript; charset=utf-8'),'/vendor/mermaid.min.js':('vendor/mermaid.min.js','text/javascript; charset=utf-8')}
             if path.startswith('/assets/'):
                 # Bundled fonts and icons only: plain names, known types, no traversal or links.
                 parts=path[len('/assets/'):].split('/')

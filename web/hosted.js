@@ -147,6 +147,8 @@
         case '/api/pr': return await state.pullRequest(q('project'), q('number'));
         /* Image bytes for a registered image link; the app shows them as a blob: URL. */
         case '/api/image': return await state.loadImage(q('id'), q('link'));
+        /* The text of a registered CSV or TSV link; the app draws it as a table. */
+        case '/api/table': return await state.loadTable(q('id'), q('link'));
       }
     } catch (error) { throw Error(error instanceof R.ProviderError ? error.message : 'Request failed. Retry.'); }
     throw Error('Not found.');

@@ -2,7 +2,9 @@
 
 Runs the real Worker with `wrangler dev`, signs in through a fake OAuth flow,
 reads a fictional project, detects a new commit, shows canvas files that a push
-adds (also a file that is not valid, hostile content, and the public view), and
+adds (also a file that is not valid, hostile content, and the public view), shows
+tables and click-to-load players under the Worker's content security policy (a local fake player answers each
+provider, so no real provider is contacted), and
 signs out. Saves screenshots and the command log to --output (outside the repository).
 
     python3 scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check
@@ -24,7 +26,7 @@ import urllib.request
 from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from canvas_fixture import BOARDS, CANVASES, HEAVY_SIZE, MEDIA, canvas, node
+from canvas_fixture import BOARDS, CANVASES, HEAVY_SIZE, MEDIA, PLAYER_ORIGINS, canvas, node
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--output', required=True, type=Path)
@@ -156,6 +158,12 @@ def browser(*parts):
 def value(code):
     result = json.loads(browser('eval', code))
     return json.loads(result) if isinstance(result, str) else result
+
+
+def player_requests():
+    """Requests to the player origins, with their Referer header. The fake player answers them in the browser."""
+    found = json.loads(browser('--json', 'network', 'requests'))['data']['requests']
+    return [[r['url'], (r.get('headers') or {}).get('Referer')] for r in found if any(r['url'].startswith(o + '/') for o in PLAYER_ORIGINS)]
 
 
 def until(code, seconds=30):
@@ -291,6 +299,21 @@ try:
         assert value("JSON.stringify([document.querySelector('#canvas-notice p').textContent, document.querySelectorAll('.canvas-node').length])") == [words, 0], name
     assert world['heavy_reads'] == 0
     assert value("(t => t.includes('.horsemen/canvas/structure.canvas') && !t.includes('the map is one week old') && !t.includes('pwned'))(localStorage.getItem('horsemen.discovery.v1') || '')"), 'the saved index has canvas paths, not canvas text'
+    # Players and tables (slice 2b) under the Worker's content security policy. A local fake player answers each provider.
+    for o in PLAYER_ORIGINS: browser('network', 'route', o + '/**', '--body', '{"player":"fake"}')
+    browser('network', 'requests', '--clear'); watch_csp(); open_canvas('proof')
+    until("document.querySelectorAll('[data-node^=table-] .sheet-stage[data-state=shown]').length === 2 && !!document.querySelector('[data-node=table-missing] .sheet-stage[data-state=error]')", 20)
+    assert value("JSON.stringify((n => [[...n.querySelectorAll('thead th')].map(e => e.textContent), n.querySelectorAll('tbody tr').length, n.querySelector('tbody tr:nth-child(3) td:nth-child(3)').textContent, n.querySelectorAll('img, script, [onerror]').length, n.querySelector('.sheet-size').textContent])(document.querySelector('[data-node=table-signups]')))") == [['week', 'guests', 'note'], 40, '<img src=x onerror="window.pwned=1">', 0, '40 rows, 3 columns.'], 'a CSV file loads through the read-only proxy as a table; markup in a cell is text'
+    assert value("JSON.stringify([document.querySelector('[data-node=table-missing] .sheet-stage').textContent, document.querySelectorAll('#map iframe').length, document.querySelector('[data-node=file-budget]').dataset.kind])") == ['The table did not load. The table is not in the repository at this commit.', 0, 'file'], 'a missing table says so; no frame before a click; XLSX is a file card'
+    assert player_requests() == [], 'before a click the browser sends no request to a provider'
+    browser('click', '[data-node="vid-demo"] .embed-load'); until("!!document.querySelector('[data-node=vid-demo] iframe')")
+    until("performance.getEntriesByType('resource').some(e => e.name.startsWith('https://www.youtube-nocookie.com/embed/'))", 15)
+    assert value("JSON.stringify((f => [f.getAttribute('src'), f.getAttribute('sandbox'), f.referrerPolicy])(document.querySelector('[data-node=vid-demo] iframe')))") == ['https://www.youtube-nocookie.com/embed/Pilot-Demo1?start=65', 'allow-scripts allow-same-origin allow-presentation', 'strict-origin-when-cross-origin']
+    assert player_requests() == [['https://www.youtube-nocookie.com/embed/Pilot-Demo1?start=65', origin + '/']], 'the player loads after the click, with the site origin and no repository path as the referrer'
+    assert value("JSON.stringify([window.__csp, window.pwned ?? null])") == [[], None], 'the Worker policy allows the player frame; nothing ran'
+    browser('wait', '--fn', 'document.querySelector("#toast").hidden')
+    browser('screenshot', str(args.output / '03e-canvas-embeds-tables.png'))
+    browser('network', 'unroute')
     # The SVG blob test: the image address opened as a page runs no script.
     open_canvas('structure'); until("document.querySelectorAll('.file-node.image .md-image[data-state=shown] img').length === 2", 20)
     browser('eval', 'location.href=document.querySelector("[data-node=img-logo] img").src')
@@ -384,6 +407,15 @@ try:
     assert value(place) == '/example/open?canvas=structure', 'a portal opens its canvas in the public view'
     browser('wait', '--fn', 'document.querySelector("#toast").hidden')
     browser('screenshot', str(args.output / '09-public-canvas-file.png'))
+    # Public view of players and tables: a table through the public route; a player after a click, under the same policy.
+    for o in PLAYER_ORIGINS: browser('network', 'route', o + '/**', '--body', '{"player":"fake"}')
+    browser('network', 'requests', '--clear'); browser('open', origin + '/example/open?canvas=proof')
+    until("document.querySelector('meta[name=horsemen-mode]')?.content === 'public' && typeof canvasKey !== 'undefined' && canvasKey === 'proof' && document.querySelectorAll('[data-node^=table-] .sheet-stage[data-state=shown]').length === 2", 20)
+    watch_csp(); assert player_requests() == [], 'the public view contacts no provider before a click'
+    browser('click', '[data-node="sheet-budget"] .embed-load'); until("!!document.querySelector('[data-node=sheet-budget] iframe')")
+    until("performance.getEntriesByType('resource').some(e => e.name.startsWith('https://docs.google.com/'))", 15)
+    assert player_requests() == [['https://docs.google.com/spreadsheets/d/PILOT-BUDGET-FICTIONAL-0001/preview', None]] and value("JSON.stringify(window.__csp)") == [], 'the public view loads a sheet preview after a click, with no referrer'
+    browser('network', 'unroute')
     assert world['app_calls'] > 0
     print('Hosted E2E passed:', args.output)
 finally:

@@ -14,6 +14,8 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   ├── canvas-view.js     Rules that make one drawing from a canvas file and the generated canvas: elements, connectors, list order, and messages
 │   ├── canvas-edit.js     Edit rules shared by the browser and the Worker: draft operations, the commit message, and the merge by element ID
 │   ├── canvas-editor.js   Hosted edit mode (signed-in only): move, add a note, connect, delete, save, and merge; canvas-editor.css styles it
+│   ├── canvas-embeds.js   Click-to-load players: a provider address to a frame address, and the frame-src list of both servers
+│   ├── canvas-table.js    CSV and TSV tables: rows, limits, and escaped markup
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
 │   └── hosted.js          Hosted mode: proxy reads, the editor sign-in and saves, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in, read-only proxy, and the optional canvas write route
@@ -64,7 +66,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.
-- Canvas file checks in the browser code: `node tests/test_canvas_format.cjs` (the reader, with the shared cases of both languages) and `node tests/test_canvas_view.cjs` (the drawing rules). The browser checks use the fictional canvas files in `scripts/canvas_fixture.py`.
+- Canvas file checks in the browser code: `node tests/test_canvas_format.cjs` (the reader, with the shared cases of both languages), `node tests/test_canvas_view.cjs` (the drawing rules), `node tests/test_canvas_embeds.cjs` (players and the frame-src list), and `node tests/test_canvas_table.cjs` (tables). Table reads: `python3 -B -m unittest tests.test_gui_tables`. The browser checks use the fictional canvas files in `scripts/canvas_fixture.py`.
 - Browser check: `python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check`.
 - Verify: `.venv/bin/python -B scripts/verify.py --output /tmp/horsemen-verification`.
 - Read one record: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core brain --json`.
