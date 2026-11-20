@@ -9,6 +9,8 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ├── web/                   GitHub canvas (local and hosted), Markdown, diagrams (vendored Mermaid in web/vendor/), images, themes, previews, and setup guide
 │   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
 │   ├── canvas-sections.js Rules for the generated canvas of a record: sections, card IDs, layout, card text, and links
+│   ├── canvas-format.js   Browser reader of canvas files (`.horsemen/canvas/*.canvas`): the same rules, limits, and errors as the Python reader
+│   ├── canvas-view.js     Rules that make one drawing from a canvas file and the generated canvas: elements, connectors, list order, and messages
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
 │   └── hosted.js          Hosted mode: proxy reads, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in and read-only proxy
@@ -58,6 +60,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.
+- Canvas file checks in the browser code: `node tests/test_canvas_format.cjs` (the reader, with the shared cases of both languages) and `node tests/test_canvas_view.cjs` (the drawing rules). The browser checks use the fictional canvas files in `scripts/canvas_fixture.py`.
 - Browser check: `python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check`.
 - Verify: `.venv/bin/python -B scripts/verify.py --output /tmp/horsemen-verification`.
 - Read one record: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core brain --json`.
