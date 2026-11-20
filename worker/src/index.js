@@ -153,7 +153,7 @@ ul{margin:18px 0 26px;padding:0;list-style:none;border-top:1px solid var(--rule)
 }
 /* The first promise depends on the instance: with no editor app, this site never writes. */
 const writePromise = env => editorConfigured(env)
-  ? '<li><b>Read-only by default.</b> Sign-in asks GitHub for read access only. To edit canvases, add the separate Horsemen Editor app later, on the repositories you choose; each save is then one commit by you.</li>'
+  ? '<li><b>Read-only by default.</b> Sign-in asks for read access only. Canvas editing is a separate, optional editor app; each save is one commit by you.</li>'
   : '<li><b>Read-only.</b> This site never writes to your repositories.</li>';
 const signInPage = (env, headers = {}, target = null, next = null) => page('Horsemen · Sign in', `
 ${target ? `<p class="share-target">Sign in to open <b>${escapeHTML(target)}</b>. You need GitHub access to this repository.</p>` : ''}

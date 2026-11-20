@@ -833,15 +833,22 @@ async function boot(){
 /* Hosted mode: the background check of the saved discovery index finished. */
 document.addEventListener('horsemen:projects',event=>{
   const state=event.detail;if(!['ready','partial'].includes(state.phase))return;
+  /* The background check can find a new commit of the open project before its own check does. Then the open project reloads too. */
+  const open=shownProject&&projects[current]?.id===shownProject?projects[current]:null;
   receiveProjects(state.projects);
   showStatus(state,' · Checked '+new Date(state.finished_at).toLocaleTimeString());
+  const now=open&&projects[current]?.id===open.id?projects[current]:null;
+  if(now&&now.revision!==open.revision)reloadOpen(now);
 });
 /* Hosted mode: an open project moved to a new commit. Reload it, but never under an open record. */
+function reloadOpen(next){
+  const reload=()=>{if(projects[current]?.id!==next.id)return;selectProject(current);showToast('Updated to commit '+next.revision.slice(0,7)+'.')};
+  if($('#peek').open){showToast('A new commit is ready. It loads when you close this record.');$('#peek').addEventListener('close',reload,{once:true})}else reload();
+}
 document.addEventListener('horsemen:updated',event=>{
   const next=event.detail,index=projects.findIndex(p=>p.id===next.id);if(index<0)return;
   projects[index]={...projects[index],...next};if(index!==current)return;
-  const reload=()=>{if(projects[current]?.id!==next.id)return;selectProject(current);showToast('Updated to commit '+next.revision.slice(0,7)+'.')};
-  if($('#peek').open){showToast('A new commit is ready. It loads when you close this record.');$('#peek').addEventListener('close',reload,{once:true})}else reload();
+  reloadOpen(next);
 });
 /* Phone: Fit would shrink canvas cards below reading size, so the list comes first. The canvas stays one tap away. */
 if(matchMedia('(max-width: 640px)').matches)setView(true);

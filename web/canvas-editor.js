@@ -123,9 +123,15 @@
   function addNote() {
     if (!active() || busy) return;
     if (world.classList.contains('list')) setView(false);
-    const at = worldPoint({ x: canvas.clientWidth / 2 - E.NOTE.width / 2, y: canvas.clientHeight / 2 - E.NOTE.height / 2 });
+    /* The middle of the view, or the first free place below it: a new note does not cover a card. */
+    const start = worldPoint({ x: canvas.clientWidth / 2 - E.NOTE.width / 2, y: canvas.clientHeight / 2 - E.NOTE.height / 2 }), gap = 24;
+    const boxes = [...sectionNodes.values()].filter(n => n.kind !== 'group');
+    const free = (x, y) => boxes.every(n => x + E.NOTE.width + gap <= n.x || n.x + n.width + gap <= x || y + E.NOTE.height + gap <= n.y || n.y + n.height + gap <= y);
+    const x = Math.round(start.x), y = Math.round(start.y);
+    let at = { x, y };
+    for (let step = 0; step < 60; step++) if (free(x, y + step * E.NOTE.height / 2)) { at = { x, y: y + step * E.NOTE.height / 2 }; break; }
     const { doc, id } = E.addNote(editing.doc, { x: at.x, y: at.y });
-    apply(doc, [id]); editNote(id);
+    apply(doc, [id]); if (!inView(cardOf(id))) revealNode(id); editNote(id);
   }
   function connect() {
     const ids = [...selected].filter(id => sectionNodes.has(id));
@@ -252,7 +258,9 @@
       form.append(facts);
       if (!project().private) para(form, 'This repository is public. Anyone can see this canvas and its files.', 'edit-warning');
       const diff = el('pre', { class: 'edit-diff', 'aria-label': 'Changed lines' });
-      for (const [sign, list] of [['−', lines.removed], ['+', lines.added]]) for (const line of list.slice(0, 30)) diff.append(el('span', { class: sign === '+' ? 'add' : 'del' }, sign + ' ' + (line.length > 160 ? line.slice(0, 159) + '…' : line)));
+      /* Element lines only: the frame of the file ("nodes":[ and so on) is not a change to read. */
+      const elements = list => list.filter(line => line.startsWith('{"id":'));
+      for (const [sign, list] of [['−', elements(lines.removed)], ['+', elements(lines.added)]]) for (const line of list.slice(0, 30)) diff.append(el('span', { class: sign === '+' ? 'add' : 'del' }, sign + ' ' + (line.length > 160 ? line.slice(0, 159) + '…' : line)));
       if (lines.removed.length > 30 || lines.added.length > 30) diff.append(el('span', {}, '…'));
       form.append(diff);
     }, [['', 'Cancel'], ['commit', 'Commit', 'primary']]);
@@ -277,6 +285,7 @@
     if (res.status === 409 && data.code === 'conflict' && attempt < 3 && (data.current === null || SHA.test(String(data.current)))) {
       try { if (!(await mergeWith(await theirs(data.current), data.current))) { render(); return; } }
       catch (e) { render(); showToast(e.message); return; }
+      if (!dirty()) { render(); showToast('Merged. Your draft now matches GitHub, so there is nothing to save.'); return; }
       showToast('Merged the changes from GitHub. Saving again…');
       return commit(attempt + 1);
     }
@@ -296,14 +305,15 @@
 
   /* ---------------------------------------------------------------- enter and leave */
   async function start() {
-    const p = project(), key = canvasKey;
-    if (!p || key === 'home' || busy) return;
+    const p = project(), key = canvasKey, version = request;
+    if (!p || key === 'home' || busy || !recordsLoaded) return;
     const reason = blocked(key);
     if (reason) { showToast(reason); return; }
     let state;
     try { state = await hostedEditor.access(p.repo); } catch (e) { showToast(e.message); return; }
     if (state !== 'ok') { explain(state); return; }
-    if (project()?.id !== p.id || canvasKey !== key) return;
+    /* The project reloaded during the check (a new commit): the files of the canvas changed under it. */
+    if (project()?.id !== p.id || canvasKey !== key || request !== version || !recordsLoaded) { showToast('The canvas reloaded. Select Edit again.'); return; }
     const file = canvasFiles.get(key), baseDoc = file?.parsed?.doc ? clone(file.parsed.doc) : E.emptyDoc(), baseSha = file?.blob || null;
     editing = { project: p.id, repo: p.repo, root: p.root, key, baseSha, baseDoc, doc: clone(baseDoc) };
     changedOnGitHub = false;
