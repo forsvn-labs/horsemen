@@ -1,6 +1,6 @@
 # Progress
 
-Updated: 2026-11-19 · Stage: live · Health: On track
+Updated: 2026-11-20 · Stage: live · Health: On track
 
 ## Latest day
 
@@ -10,6 +10,8 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 Next action: Merge slices 2b (embeds and tables) and 4a (editing in the browser), which agents are building. The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
 
 ## Shipped
+
+- **Quiet Stop hook** (2026-11-20): The Stop hook blocked at every stop, so hosts that show only the last turn, such as T3 Code, hid each task report behind a note about the record review. Now it blocks only for new record drift, and then asks the agent to end with its full task report again. Available from main; the owner's global skill is refreshed. Other installations get it after a refresh.
 
 - **Short session start for agents** (2026-11-20): A person can select a short start for agent sessions with `hooks install --pointer`. The agent then gets the next action and the gates in 700 characters or less and reads the rest when the task needs it. The Stop hook also tells the agent when it breaks a canvas, and when canvas files are not on GitHub yet. Off until a person selects it. Available from main; other installations get it after a refresh.
 
@@ -29,11 +31,7 @@ Next action: Merge slices 2b (embeds and tables) and 4a (editing in the browser)
 
 - **Share links** (2026-11-19): Each project and record on horsemen.forsvn.com has a readable link, such as `/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository open the same record after sign-in. Live on horsemen.forsvn.com.
 
-- **Publish reminder** (2026-11-19): When an agent changes a record but the change has not reached the remote default branch, the Stop hook asks it to commit and push. Then the hosted viewer shows the update. Available from main; other installations get it after a refresh.
-
 ## In progress
-
-- **Quiet Stop hook** (started 2026-11-20): The Stop hook blocked at every stop, so hosts that show only the last turn hid each task report behind a note about the record review. Now it blocks only for new record drift, and then asks the agent to end with its full task report again. In review in [PR #38](https://github.com/hungv47/horsemen/pull/38); installed copies change after a refresh from main.
 
 - **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 (record canvases) shipped. Slice 2a (canvas files) shipped. The owner chose to build all slices now. Later slices add canvas files, editing by people and agents, and tools for agents.
 
@@ -44,6 +42,7 @@ Next action: Merge slices 2b (embeds and tables) and 4a (editing in the browser)
 | Public view | Worker tests cover public and private repositories, no user token on public reads, repository routes only, cross-site requests, and the edge cache; the hosted browser check opens a public repository without sign-in. Merged in [PR #25](https://github.com/hungv47/horsemen/pull/25) and [PR #26](https://github.com/hungv47/horsemen/pull/26) after CI passed; deployed from main. GitHub refused anonymous reads from the shared Cloudflare IP (rate limit used up), so the Worker now reads public repositories with a read-only public token (5,000 requests an hour). Live checks: horsemen.forsvn.com/hungv47/horsemen opens in public mode and shows all seven records in a signed-out browser; a private repository still asks for sign-in; `/pub/user` returns 404 and cross-site requests return 403. |
 | Diagrams and images | Markdown, media, reader parity, and Worker tests cover Mermaid figures, parse errors, theme colours, image links, path traversal, non-image files, SVG checks, the 1 MiB limit, and the CSP (`blob:` images only, no `eval`). The fixture and hosted browser checks draw diagrams in three themes and load repository images; full verification passed locally. Merged in [PR #27](https://github.com/hungv47/horsemen/pull/27) after CI passed; deployed from main, and the live files match main. Live check: the Tech stack record of hungv47/horsemen draws both of its diagrams in the public view. |
 | Share links | Link, Worker, and browser checks pass: a signed-out visitor returns to the shared record after sign-in; sign-in never redirects outside the app; a repository without access shows a clear message. Merged in [PR #16](https://github.com/hungv47/horsemen/pull/16) after CI passed; deployed from main, the live files match main, and a live share link keeps its target through sign-in. |
+| Quiet Stop hook | Merged in [PR #38](https://github.com/hungv47/horsemen/pull/38) after CI passed. Hook scenarios (205), unit tests, and full verification passed. The owner's global skill was refreshed with `npx skills update horsemen -g -y` and matches main; a live check of the installed hook printed nothing for a clean stop and blocked for new folders. |
 | Publish reminder | Hook scenario S20 passes: uncommitted and unpushed record edits fire once, published edits and repositories without a remote do not. All 150 hook scenarios and full verification passed locally. Merged in [PR #14](https://github.com/hungv47/horsemen/pull/14) after CI passed. The owner's global skill now installs from this repository and matches main; the Claude Code and Codex hooks run it. |
 | Style themes | Theme tests check every theme and mode for contrast (4.5:1 for text, 7:1 in High contrast), the 12px floor, licensed fonts, and that each theme differs from the others in at least three style traits. The fixture browser check applies each theme, reloads it, checks its fonts, and checks for overflow at desktop and phone width. The hosted browser check, Worker tests, and full verification passed locally. Squash-merged in [PR #20](https://github.com/hungv47/horsemen/pull/20) after CI passed, with a fix for Terminal small-card titles; deployed from main, and the live files match main. |
 | Calm workspace | [Design audit, minimal pass](docs/product/design-audit.md#minimal-pass-2026-11-19) and [artifact views](docs/product/artifact-views.md). Impeccable critique went from 27/40 to 31/40; the rendered-page detector went from 2 findings to 0 at desktop, tablet, and phone width. View, preview, theme, canvas, Worker, fixture browser, and hosted browser checks passed locally, and full verification passed. Squash-merged in [PR #18](https://github.com/hungv47/horsemen/pull/18) after CI passed; deployed from main, and the live files match main. |
@@ -67,6 +66,8 @@ Canvas workspace: slices 1 and 2a are live and read-only, and slices 3a and 3b (
 <summary>Historical ships</summary>
 
 ### 2026-11-19
+
+- **Publish reminder** (2026-11-19): When an agent changes a record but the change has not reached the remote default branch, the Stop hook asks it to commit and push. Then the hosted viewer shows the update. Available from main; other installations get it after a refresh.
 
 - **Readable type and design audit** (2026-11-19): The workspace now has three type sets: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Small labels are larger, phones open in List view, and keyboard focus is easier to see. The audit lists the fixes and the larger ideas still open. Live on horsemen.forsvn.com.
 
