@@ -1,0 +1,18 @@
+{"nodes":[
+{"id":"u1","type":"link","x":0,"y":0,"width":320,"height":120,"url":"JAVASCRIPT:alert(1)"},
+{"id":"u2","type":"link","x":0,"y":0,"width":320,"height":120,"url":" javascript:alert(1)"},
+{"id":"u3","type":"link","x":0,"y":0,"width":320,"height":120,"url":"data:text/html,<script>alert(1)</script>"},
+{"id":"u4","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://ok.example/\njavascript:alert(1)"},
+{"id":"u5","type":"link","x":0,"y":0,"width":320,"height":120,"url":"http://"},
+{"id":"u6","type":"link","x":0,"y":0,"width":320,"height":120,"url":"HTTPS://EXAMPLE.COM"},
+{"id":"u7","type":"link","x":0,"y":0,"width":320,"height":120,"url":"vbscript:x"},
+{"id":"u8","type":"link","x":0,"y":0,"width":320,"height":120,"url":"//example.com"},
+{"id":"u9","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://exa mple.com"},
+{"id":"u10","type":"link","x":0,"y":0,"width":320,"height":120,"url":5},
+{"id":"u11","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://example.com/\u00a0x"},
+{"id":"u12","type":"link","x":0,"y":0,"width":320,"height":120},
+{"id":"u13","type":"link","x":0,"y":0,"width":320,"height":120,"url":"javascript:alert(1)//https://example.com"},
+{"id":"u14","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://example.com/\ufeffx"},
+{"id":"u15","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://example.com/a\tb"},
+{"id":"u16","type":"link","x":0,"y":0,"width":320,"height":120,"url":"javascript:alert(1)"}
+]}

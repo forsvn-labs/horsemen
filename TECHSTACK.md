@@ -8,6 +8,9 @@
 | Git (optional) | Local change context | An existing repository | Adds branch and working-file evidence |
 | setuptools 77.0.3 in verification | Build the wheel | Isolated build environment | Packages the shared CLI source |
 | unittest and subprocess | Regression checks | Python standard library | Tests real command results and old hooks |
+| JSON Canvas 1.0 with the Horsemen profile | Canvas files in `.horsemen/canvas/` | No package; the reader is in the shared source | Other tools can open the files; one element on each line keeps Git changes small |
+| Model Context Protocol, stdio transport (2025-06-18) | Give agents the `read` and `canvas_edit` tools | A host that supports MCP, such as Claude Code or Codex; no package, network, or token | Agents read a workspace and edit a canvas with few tokens |
+| check-jsonschema through `uvx` (optional) | Compare the reader with the canvas JSON Schema | `uvx`; only with `HORSEMEN_SCHEMA_CHECK=1` | Shows that the schema accepts and refuses the same cases |
 | GitHub Actions | Cross-platform verification | Repository workflow | Tests Linux/macOS with Python 3.10/3.14 |
 | skills.sh CLI (`skills`) | Agent skill installation | Node.js and npm through `npx` | Downloads Horsemen and prompts for agent and scope |
 | Cloudflare Workers, Wrangler 4.165.0 | Host the viewer at horsemen.forsvn.com | A Cloudflare account with the domain; Bun to install Wrangler | Serves the app and a read-only GitHub proxy; no database, KV, or logs. The edge cache holds public repository data briefly for public views |
@@ -34,6 +37,9 @@ flowchart LR
   Agent --> Checker[Shared checker]
   CLI --> Checker
   Checker --> Records[Local project records]
+  Agent -->|read, canvas_edit| MCP[Local MCP server or CLI]
+  MCP --> Records
+  MCP --> Canvases[Canvas files in .horsemen/]
   Agent --> Originals[Authorized provider originals]
   Agent -->|commit and push| GitHub[GitHub repository]
   Browser[Browser viewer] --> Worker[Cloudflare Worker]

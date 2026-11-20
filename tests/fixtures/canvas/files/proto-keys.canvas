@@ -1,0 +1,1 @@
+{"__proto__":{"polluted":true},"constructor":"top","nodes":[{"id":"n","type":"text","x":0,"y":0,"width":320,"height":140,"text":"Keys that are special in JavaScript are plain data.","__proto__":{"polluted":true},"constructor":{"prototype":1},"toString":"x","hasOwnProperty":false}]}

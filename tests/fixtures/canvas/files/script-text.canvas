@@ -1,0 +1,12 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"g-x","type":"group","x":0,"y":0,"width":400,"height":300,"label":"<img src=x onerror=alert(1)>"},
+{"id":"img-x","type":"file","x":0,"y":400,"width":400,"height":250,"alt":"\"><script>alert(3)</script>","file":".horsemen/media/route-map.svg"},
+{"id":"link-x","type":"link","x":0,"y":700,"width":320,"height":120,"title":"\"><svg onload=alert(2)>","url":"https://example.com/?q=<script>alert(4)</script>"},
+{"id":"note-x","type":"text","x":20,"y":20,"width":320,"height":140,"text":"<script>alert(1)</script>\n\n[click](javascript:alert(5)) <iframe src=\"https://example.com\"></iframe>"}
+],
+"edges":[
+{"id":"e-x","fromNode":"note-x","toNode":"link-x","label":"<b onmouseover=alert(6)>label</b>"}
+]
+}
