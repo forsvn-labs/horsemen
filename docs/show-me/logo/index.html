@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Horsemen logo study</title>
+  <style>
+    :root { color-scheme: light; background: #f8f6f1; color: #251f35; font: 16px/1.5 system-ui, sans-serif; }
+    body { max-width: 1120px; margin: 0 auto; padding: clamp(20px, 5vw, 64px); }
+    h1, h2, h3, p, figure { margin: 0; }
+    h1 { font: 400 clamp(2.5rem, 7vw, 5rem)/1 Georgia, serif; letter-spacing: -.05em; }
+    h2 { font: 400 2rem/1.1 Georgia, serif; }
+    h3, figcaption { font-size: .875rem; }
+    header p, section > p { margin-top: .75rem; }
+    nav { display: flex; flex-wrap: wrap; gap: 1.5rem; margin-top: 1.5rem; }
+    a { color: inherit; text-underline-offset: .25em; }
+    section { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid #c9c2d4; }
+    .samples { margin-top: 1rem; }
+    .surface { padding: 16px; }
+    .light { background: #fff; color: #251f35; }
+    .dark { background: #14111e; color: #f8f6f1; }
+    .sizes { display: flex; align-items: end; gap: clamp(12px, 2vw, 24px); overflow-x: auto; padding: 12px 0 8px; }
+    figure { display: grid; justify-items: center; gap: 8px; min-width: max-content; }
+    figcaption { font-variant-numeric: tabular-nums; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Horsemen logo study</h1>
+    <p>Compare three marks at actual size. Scroll each row to see sizes that extend past the screen.</p>
+    <nav aria-label="Logo directions">
+      <a href="#junction">Junction</a>
+      <a href="#fan">Fan</a>
+      <a href="#compass">Compass</a>
+    </nav>
+  </header>
+  <main>
+    <section id="junction">
+      <h2>Junction</h2>
+      <p>Four tiles represent the four records. A shared path connects them.</p>
+      <div class="samples" data-mark="junction.svg"></div>
+    </section>
+    <section id="fan">
+      <h2>Fan</h2>
+      <p>Four slanted sheets fan out like documents held in one hand.</p>
+      <div class="samples" data-mark="fan.svg"></div>
+    </section>
+    <section id="compass">
+      <h2>Compass</h2>
+      <p>Four points face a common center.</p>
+      <div class="samples" data-mark="compass.svg"></div>
+    </section>
+  </main>
+  <template id="surface">
+    <div class="surface">
+      <h3></h3>
+      <div class="sizes" role="group" tabindex="0"></div>
+    </div>
+  </template>
+  <script>
+    const surface = document.querySelector('#surface');
+    for (const samples of document.querySelectorAll('[data-mark]')) {
+      const mark = samples.closest('section').querySelector('h2').textContent;
+      for (const mode of ['Light', 'Dark']) {
+        const row = surface.content.cloneNode(true);
+        row.querySelector('.surface').classList.add(mode.toLowerCase());
+        row.querySelector('h3').textContent = mode;
+        const sizes = row.querySelector('.sizes');
+        sizes.setAttribute('aria-label', mark + ' on a ' + mode.toLowerCase() + ' background');
+        for (const size of [16, 32, 64, 180, 512]) {
+          const figure = document.createElement('figure');
+          const image = new Image(size, size);
+          image.src = samples.dataset.mark;
+          image.alt = mark;
+          const caption = document.createElement('figcaption');
+          caption.textContent = size + ' px';
+          figure.append(image, caption);
+          sizes.append(figure);
+        }
+        samples.append(row);
+      }
+    }
+  </script>
+</body>
+</html>

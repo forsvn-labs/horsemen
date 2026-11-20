@@ -2,8 +2,16 @@
 
 Original SVG artwork for the local web app. The small icons serve controls and
 record labels. The workspace does not show the seals by default; they stay
-available for larger artwork. The app mark
-uses four horse profiles that face inward. No font or external image is required.
+available for larger artwork.
+
+## App mark
+
+Junction connects four tiles in one loop. The tiles represent Vision, Progress,
+Brain, and Structure, in reading order. The tiles and the open center stay
+visible at 16 px. A dark violet background sets the same contrast in every theme.
+
+Open the [logo study](../show-me/logo/index.html) in a browser to compare Junction,
+Fan, and Compass at five sizes on light and dark backgrounds.
 
 ## Files
 
@@ -14,7 +22,9 @@ uses four horse profiles that face inward. No font or external image is required
 | `app-icon.svg` | Full colour master on a 1024 × 1024 grid |
 | `app-icon.png` | 1024 × 1024 transparent-corner export |
 | `apple-touch-icon.png` | 180 × 180 export of the app master |
-| `favicon.svg` | Simplified four-head mark on a 32 × 32 grid |
+| `favicon.svg` | App mark on a 32 × 32 grid |
+
+The repository root also has `favicon.png`, a 128 × 128 export of `favicon.svg`.
 
 ## Use
 
@@ -68,7 +78,7 @@ meaning; colour alone is insufficient.
 
 Use bone paper `#F3EEE3` and ink `#16130F` as grounds. All sprite shapes inherit
 paint from the consumer. Use bone strokes on dark grounds when a pigment lacks
-contrast. The favicon uses lighter versions of the four pigments on ink.
+contrast. The app mark uses lighter versions of the four pigments on dark violet.
 
 ## Control inventory
 
@@ -117,8 +127,6 @@ attributes and engraving idea follow the supplied art direction. The seals share
 an original horse profile, ring construction, and hatch pattern. The GitHub glyph
 is a custom connector symbol, not an official GitHub logo.
 
-The assets are ready for integration; this change does not wire them into the app.
-Sprites need explicit consumer fill and stroke. Seals are decorative at small sizes.
-The app mark is suitable from 32 px; use the simplified favicon at 16 px. Pigments
-are identity accents, not a guarantee of text or control contrast. Apple can apply
-its own icon mask; the PNG retains the supplied rounded-square design.
+Sprites need explicit fill and stroke. Use the favicon SVG at 16 px. Pigments
+are identity accents. Use theme colors for text and controls. Apple can apply
+its own icon mask to the 180 × 180 PNG.

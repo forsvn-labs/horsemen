@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><title>Horsemen</title><rect x="0" y="0" width="32" height="32" rx="7" fill="#16130F"/><path d="M2 12c0-3 1-5 3-6L4 4V1l2 2 1-2 2 3 3 3-2 2-2-1v4Z" transform="translate(2 2) scale(1 1)" fill="#D9B66E"/><path d="M2 12c0-3 1-5 3-6L4 4V1l2 2 1-2 2 3 3 3-2 2-2-1v4Z" transform="translate(30 2) scale(-1 1)" fill="#EE7157"/><path d="M2 12c0-3 1-5 3-6L4 4V1l2 2 1-2 2 3 3 3-2 2-2-1v4Z" transform="translate(2 16) scale(1 1)" fill="#A8B4F0"/><path d="M2 12c0-3 1-5 3-6L4 4V1l2 2 1-2 2 3 3 3-2 2-2-1v4Z" transform="translate(30 16) scale(-1 1)" fill="#89C5AF"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title">
+  <title id="title">Horsemen</title>
+  <rect width="32" height="32" rx="7" fill="#251F35"/>
+  <path d="M9 9H23V23H9Z" fill="none" stroke="#C7B9DC" stroke-width="4"/>
+  <rect x="4" y="4" width="10" height="10" rx="2" fill="#F8C97D"/>
+  <rect x="18" y="4" width="10" height="10" rx="2" fill="#FFA08C"/>
+  <rect x="4" y="18" width="10" height="10" rx="2" fill="#BDBBFF"/>
+  <rect x="18" y="18" width="10" height="10" rx="2" fill="#96DEC1"/>
+</svg>

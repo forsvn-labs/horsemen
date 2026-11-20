@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="title">
+  <title id="title">Fan</title>
+  <rect width="32" height="32" rx="7" fill="#251F35"/>
+  <path d="M8 5L12 7L8 27H4Z" fill="#F8C97D"/>
+  <path d="M14 7L18 9L14 27H10Z" fill="#FFA08C"/>
+  <path d="M20 9L24 11L20 27H16Z" fill="#BDBBFF"/>
+  <path d="M26 11L30 13L26 27H22Z" fill="#96DEC1"/>
+</svg>
