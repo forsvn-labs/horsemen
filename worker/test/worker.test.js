@@ -385,3 +385,23 @@ test('a signed-in visitor can open the public view of a public repository', asyn
 test('the sign-in page links to a public example', async () => {
   assert.match(await (await call('/')).text(), /<a href="\/hungv47\/horsemen">See this project without signing in<\/a>/);
 });
+
+/* Click-to-load players (canvas slice 2b). Failure modes: a page without the frame list (players stay blank);
+   a wildcard, a scheme, or 'self' in frame-src; a host that is not a provider; another site can frame Horsemen;
+   one kind of response (app, public view, sign-in, static file, error) has another policy. */
+test('every response allows frames from the five player origins only, and no site can frame Horsemen', async () => {
+  const FRAMES = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com'];
+  const directive = (csp, name) => (csp.split(';').map(p => p.trim()).find(p => p.startsWith(name + ' ')) || '').split(/\s+/).slice(1);
+  const { headers } = await signIn();
+  publicGitHub(); const pub = await call('/example/open?canvas=pilot', {}, env({ CACHE: memoryCache() }));
+  const responses = { signIn: await call('/'), app: await call('/', { headers }), public: pub, script: await call('/app.js'), missing: await call('/unknown'), api: await call('/api/session', { headers }) };
+  for (const [name, res] of Object.entries(responses)) {
+    const csp = res.headers.get('content-security-policy');
+    assert.deepEqual(directive(csp, 'frame-src'), FRAMES, name);
+    assert.deepEqual(directive(csp, 'frame-ancestors'), ["'none'"], name);
+    assert.equal(res.headers.get('x-frame-options'), 'DENY', name);
+    assert.equal(res.headers.get('referrer-policy'), 'no-referrer', name + ': the page keeps no-referrer; only the YouTube frame sends the origin');
+    assert.deepEqual(directive(csp, 'img-src'), ["'self'", 'blob:'], name + ': no provider thumbnail loads before a click');
+    assert.deepEqual(directive(csp, 'connect-src'), ["'self'"], name);
+  }
+});

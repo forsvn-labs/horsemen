@@ -351,7 +351,8 @@ ASSET_NAME=re.compile(r'[A-Za-z0-9][A-Za-z0-9._-]*')
 ASSET_TYPES={'.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.txt':'text/plain; charset=utf-8'}
 
 # Repository images show as blob: URLs. Script stays same-origin only, with no eval.
-PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+# frame-src: the players that a canvas link card loads after a click (web/canvas-embeds.js has the same list).
+PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 # Image bytes never run as a document, even an SVG opened on its own.
 IMAGE_CSP="default-src 'none'; style-src 'unsafe-inline'; sandbox"
 
