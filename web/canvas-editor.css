@@ -11,6 +11,10 @@
 .edit-bar .btn{min-height:32px;padding:4px 10px}
 .edit-status{padding:0 8px;color:var(--ink-2);font-size:var(--fs-s);white-space:nowrap;max-width:28ch;overflow:hidden;text-overflow:ellipsis}
 #edit-merge{border-color:var(--signal)}
+.edit-where{padding:2px 8px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);color:var(--ink-2);font:var(--fs-s)/1.4 var(--mono);white-space:nowrap}
+.edit-where[hidden],.edit-pr[hidden]{display:none}
+.edit-bar .edit-pr{padding:0 6px;font-size:var(--fs-s);white-space:nowrap}
+.edit-dialog .edit-where-note{color:var(--ink);padding:8px 10px;border-left:3px solid var(--signal);background:var(--surface-2)}
 #edit-merge[hidden]{display:none}
 body[data-editing] .canvas .canvas-node{cursor:move}
 body[data-editing] .canvas .canvas-node:not(.saved){border-style:dashed}

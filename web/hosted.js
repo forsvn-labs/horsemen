@@ -187,6 +187,20 @@
       if (res.data.code === 'editor-install' || res.data.code === 'no-push') access.clear();  // Ask GitHub again next time.
       return res;
     },
+    /* Where the next save of a canvas goes (slice 4c): { branch, default_branch, protected, sha, pull_request? }.
+       A read with the editor token; the Worker checks the protection of the default branch. */
+    async target(repo, root, canvas) {
+      const res = await writeJSON('/write/target?' + new URLSearchParams({ repo, root: root || '', canvas }));
+      if (res.data.code === 'editor-signin') { editorInfo.signed_in = false; access.clear(); }
+      if (res.data.code === 'editor-install' || res.data.code === 'no-push') access.clear();
+      return res;
+    },
+    /* The open pull requests of horsemen/canvas, through the read-only proxy with the viewer token; null when GitHub
+       does not answer. */
+    async pullRequests(repo) {
+      try { return await gh(`/repos/${repo}/pulls?` + new URLSearchParams({ state: 'open', head: repo.split('/')[0] + ':horsemen/canvas', per_page: '1' })); }
+      catch { return null; }
+    },
     /* The text of a canvas file by its blob SHA, through the read-only proxy with the viewer token. */
     async readBlob(repo, sha) {
       const data = await gh(`/repos/${repo}/git/blobs/${sha}`);

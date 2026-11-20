@@ -64,31 +64,59 @@ const NOTE = { id: 'note-first', type: 'text', x: 0, y: 0, width: 320, height: 1
 const canvasText = nodes => F.canonical({ horsemen: { version: 1 }, nodes, edges: [] });
 const ORIGINAL = canvasText([NOTE]);
 const imageNode = (name, id = 'img-route') => ({ id, type: 'file', x: 400, y: 0, width: 400, height: 300, file: '.horsemen/media/' + name, alt: 'Route map' });
-const HEAD = 'a'.repeat(40);
+const SIDE = 'horsemen/canvas';
+const MUTATING = new Set(['PUT', 'POST', 'PATCH', 'DELETE']);
 
-function fakeRepo({ files = { [PATH]: ORIGINAL }, permission = 'WRITE', repoMissing = false, httpStatus = null, moves = 0, onMove = null, mutationError = null } = {}) {
-  const repo = { files: { ...files }, head: HEAD, mutations: [], commits: 0 };
+/* A fake GitHub with commits and branches: the REST reads and ref writes of slices 4a and 4c, and the GraphQL mutation.
+   options: push (permission), repoMissing, protect (classic protection of trunk), httpStatus (of the GraphQL call),
+   moves (the head of trunk moves before that many mutations), onMove (runs after a move), mutationError (an error type
+   for every mutation, with an unmoved head). */
+function fakeRepo({ files = { [PATH]: ORIGINAL }, push = true, repoMissing = false, protect = false, httpStatus = null, moves = 0, onMove = null, mutationError = null } = {}) {
+  let count = 0;
+  const commits = new Map();
+  const commit = (parent, tree) => { const sha = (++count).toString(16).padStart(40, '0'); commits.set(sha, { parent, files: { ...tree } }); return sha; };
+  const repo = { heads: {}, mutations: [], commits: 0, writes: [] };
+  repo.heads.trunk = commit(null, files);
+  repo.first = repo.heads.trunk;
+  repo.fileAt = (branch, path) => commits.get(repo.heads[branch])?.files[path];
+  repo.change = (branch, path, text) => { repo.heads[branch] = commit(repo.heads[branch], { ...commits.get(repo.heads[branch]).files, [path]: text }); };
   mockFetch(async req => {
     if (req.headers.get('authorization') !== 'Bearer ghu_editor') return json({ message: 'Bad credentials for this test' }, 401);
-    const u = new URL(req.url);
-    if (u.pathname !== '/graphql' || req.method !== 'POST') return json({ message: 'Not Found' }, 404);
-    if (httpStatus) return json({ message: 'provider detail: secret path' }, httpStatus);
-    const { query, variables } = await req.json();
-    if (/createCommitOnBranch/.test(query)) {
-      const input = variables.input; repo.mutations.push(input);
+    const u = new URL(req.url), p = decodeURIComponent(u.pathname), method = req.method;
+    const body = MUTATING.has(method) ? await req.json() : null;
+    if (MUTATING.has(method)) repo.writes.push({ method, path: p, body });
+    if (p === '/graphql' && method === 'POST') {
+      if (httpStatus) return json({ message: 'provider detail: secret path' }, httpStatus);
+      const { query, variables } = body;
+      if (!/^mutation/.test(query)) return json({ errors: [{ type: 'UNEXPECTED', message: 'only the mutation' }] });
+      const input = variables.input, branch = input.branch.branchName; repo.mutations.push(input);
+      assert.equal(input.branch.repositoryNameWithOwner, 'example/alpha');
       if (mutationError) return json({ data: { createCommitOnBranch: null }, errors: [{ type: mutationError, message: 'provider detail: secret path' }] });
-      if (moves > 0) { moves--; repo.head = gitSha(repo.head + 'moved'); onMove?.(repo); }
-      if (input.expectedHeadOid !== repo.head) return json({ data: { createCommitOnBranch: null }, errors: [{ type: 'STALE_DATA', message: 'Expected branch to point to ' + input.expectedHeadOid + ' but it did not.' }] });
-      for (const add of input.fileChanges.additions) repo.files[add.path] = Buffer.from(add.contents, 'base64');
-      repo.commits++; repo.head = gitSha(repo.head + 'commit');
-      const canvas = repo.files[variables.path];
-      return json({ data: { createCommitOnBranch: { commit: { oid: repo.head, url: 'https://github.test/x', file: canvas === undefined ? null : { oid: gitSha(canvas) } } } } });
+      if (!repo.heads[branch]) return json({ data: { createCommitOnBranch: null }, errors: [{ type: 'NOT_FOUND', message: 'no branch' }] });
+      if (protect && branch === 'trunk') return json({ data: { createCommitOnBranch: null }, errors: [{ type: 'FORBIDDEN', message: 'Protected branch update failed: secret path' }] });
+      if (moves > 0 && branch === 'trunk') { moves--; repo.change('trunk', 'PROGRESS.md', '# Progress ' + count + '\n'); onMove?.(repo); }
+      if (input.expectedHeadOid !== repo.heads[branch]) return json({ data: { createCommitOnBranch: null }, errors: [{ type: 'STALE_DATA', message: 'Expected branch to point to ' + input.expectedHeadOid }] });
+      const tree = { ...commits.get(repo.heads[branch]).files };
+      for (const add of input.fileChanges.additions) tree[add.path] = Buffer.from(add.contents, 'base64');
+      repo.heads[branch] = commit(repo.heads[branch], tree); repo.commits++;
+      return json({ data: { createCommitOnBranch: { commit: { oid: repo.heads[branch], file: tree[variables.path] === undefined ? null : { oid: gitSha(tree[variables.path]) } } } } });
     }
-    assert.deepEqual([variables.owner, variables.name], ['example', 'alpha']);
-    if (repoMissing) return json({ data: { repository: null }, errors: [{ type: 'NOT_FOUND', message: 'private detail' }] });
-    const text = repo.files[variables.path];
-    return json({ data: { repository: { viewerPermission: permission, defaultBranchRef: { name: 'trunk', target: { oid: repo.head,
-      file: text === undefined ? null : { oid: gitSha(text), object: { text: Buffer.from(text).toString('utf8'), isBinary: false, isTruncated: false } } } } } } });
+    if (p === '/repos/example/alpha' && method === 'GET') return repoMissing ? json({ message: 'private detail' }, 404) : json({ full_name: 'example/alpha', default_branch: 'trunk', private: true, permissions: { pull: true, push } });
+    if (p === '/repos/example/alpha/branches/trunk') return json({ name: 'trunk', protected: protect });
+    if (p === '/repos/example/alpha/rules/branches/trunk') return json([]);
+    let m = p.match(/^\/repos\/example\/alpha\/git\/ref\/heads\/(.+)$/);
+    if (m && method === 'GET') return repo.heads[m[1]] ? json({ ref: 'refs/heads/' + m[1], object: { type: 'commit', sha: repo.heads[m[1]] } }) : json({ message: 'Not Found' }, 404);
+    if (p === '/repos/example/alpha/git/refs' && method === 'POST') {
+      const name = String(body.ref).replace(/^refs\/heads\//, '');
+      if (repo.heads[name] || !commits.has(body.sha)) return json({ message: 'Reference already exists' }, 422);
+      repo.heads[name] = body.sha; return json({ ref: body.ref, object: { sha: body.sha } }, 201);
+    }
+    m = p.match(/^\/repos\/example\/alpha\/contents\/(.+)$/);
+    if (m && method === 'GET') {
+      const ref = u.searchParams.get('ref'), at = repo.heads[ref] || (commits.has(ref) ? ref : null), text = at ? commits.get(at).files[m[1]] : undefined;
+      return text === undefined ? json({ message: 'Not Found' }, 404) : json({ type: 'file', sha: gitSha(text), size: text.length, encoding: 'base64', content: Buffer.from(text).toString('base64') });
+    }
+    return json({ message: 'Not Found' }, 404);
   });
   return repo;
 }
@@ -201,15 +229,10 @@ test('each media file must be on the canvas; a new media reference must be in th
   assert.equal(ghost.status, 422); assert.deepEqual(await ghost.json(), { error: 'The canvas names .horsemen/media/ghost-0123abcd.png, which is not in this save and not on the canvas on GitHub. Remove the card, or add the file again.', code: 'media' });
   assert.equal(repo.mutations.length, 0);
   /* Without media (the REST path of slice 4a) the same rule holds. */
-  mockFetch(async req => {
-    const u = new URL(req.url);
-    if (u.pathname === '/repos/example/alpha') return json({ default_branch: 'trunk', permissions: { push: true } });
-    if (u.pathname.startsWith('/repos/example/alpha/contents/') && req.method === 'GET') return json({ type: 'file', sha: gitSha(ORIGINAL), encoding: 'base64', content: Buffer.from(ORIGINAL).toString('base64') });
-    return json({ message: 'unexpected' }, 500);
-  });
+  repo = fakeRepo();
   const restGhost = await post(s, { repo: 'example/alpha', root: '', canvas: 'progress', base: gitSha(ORIGINAL), text: canvasText([NOTE, imageNode('ghost-0123abcd.png')]) });
   assert.equal(restGhost.status, 422); assert.equal((await restGhost.json()).code, 'media');
-  assert.equal(calls.filter(r => r.method === 'PUT').length, 0);
+  assert.deepEqual(repo.writes, [], 'no write reaches GitHub');
   /* A media file that the canvas on GitHub names already is fine, with or without a new upload. */
   const existing = canvasText([NOTE, imageNode('old-0123abcd.png', 'img-old')]);
   repo = fakeRepo({ files: { [PATH]: existing } });
@@ -232,16 +255,16 @@ test('a save with media is one GraphQL commit: the canvas and the files, paths t
   assert.equal(repo.mutations.length, 1); assert.equal(repo.commits, 1);
   const m = repo.mutations[0];
   assert.deepEqual(Object.keys(m).sort(), ['branch', 'expectedHeadOid', 'fileChanges', 'message']);
-  assert.deepEqual(m.branch, { repositoryNameWithOwner: 'example/alpha', branchName: 'trunk' }); assert.equal(m.expectedHeadOid, HEAD);
+  assert.deepEqual(m.branch, { repositoryNameWithOwner: 'example/alpha', branchName: 'trunk' }); assert.equal(m.expectedHeadOid, repo.first);
   assert.deepEqual(m.message, { headline: out.message }); assert.deepEqual(Object.keys(m.fileChanges), ['additions'], 'a save never deletes');
   const paths = m.fileChanges.additions.map(a => a.path);
   assert.deepEqual(paths, ['apps/web/.horsemen/canvas/progress.canvas', 'apps/web/.horsemen/media/' + p.media[0].name, 'apps/web/.horsemen/media/' + csvName]);
   assert.ok(paths.every(path => /^apps\/web\/\.horsemen\/(?:canvas|media)\/[a-z0-9][a-z0-9.-]*$/.test(path)));
-  const written = repo.files['apps/web/' + PATH].toString('utf8');
+  const written = repo.fileAt('trunk', 'apps/web/' + PATH).toString('utf8');
   assert.equal(written, F.canonical(JSON.parse(text)), 'the canonical text'); assert.equal(out.canvas_sha, gitSha(written));
-  assert.ok(repo.files['apps/web/.horsemen/media/' + p.media[0].name].equals(PNG), 'the bytes as sent');
-  assert.ok(calls.every(r => r.headers.get('authorization') === 'Bearer ghu_editor') && calls.every(r => r.method === 'POST' && new URL(r.url).pathname === '/graphql'), 'two GraphQL calls with the editor token, no REST write');
-  assert.equal(calls.length, 2);
+  assert.ok(repo.fileAt('trunk', 'apps/web/.horsemen/media/' + p.media[0].name).equals(PNG), 'the bytes as sent');
+  assert.ok(calls.every(r => r.headers.get('authorization') === 'Bearer ghu_editor'), 'the editor token only');
+  assert.deepEqual(repo.writes.map(w => w.method + ' ' + w.path), ['POST /graphql'], 'one write: the GraphQL commit; no REST write');
 });
 
 test('a canvas that changed on GitHub is a conflict; a new file has a null base', async () => {
@@ -262,18 +285,20 @@ test('a head that moves during the commit is tried again, three times at most; a
   let repo = fakeRepo({ moves: 1 });
   assert.equal((await post(s, await payload())).status, 200); assert.equal(repo.mutations.length, 2); assert.equal(repo.commits, 1);
   assert.notEqual(repo.mutations[1].expectedHeadOid, repo.mutations[0].expectedHeadOid, 'the second try names the new head');
+  /* A default branch that moves at each try: after three tries the save goes to horsemen/canvas, as a refused commit does (4c). */
   repo = fakeRepo({ moves: 5 });
-  const busy = await post(s, await payload());
-  assert.equal(busy.status, 409); assert.equal((await busy.json()).code, 'busy'); assert.equal(repo.mutations.length, 3);
-  repo = fakeRepo({ moves: 1, onMove: r => { r.files[PATH] = canvasText([{ ...NOTE, text: 'Changed on GitHub.' }]); } });
+  const busy = await post(s, await payload()), out = await busy.json();
+  assert.equal(busy.status, 200, JSON.stringify(out)); assert.equal(out.branch, SIDE); assert.deepEqual(repo.mutations.map(m => m.branch.branchName), ['trunk', 'trunk', 'trunk', SIDE]);
+  repo = fakeRepo({ moves: 1, onMove: r => r.change('trunk', PATH, canvasText([{ ...NOTE, text: 'Changed on GitHub.' }])) });
   const changed = await post(s, await payload());
   assert.equal(changed.status, 409); assert.equal((await changed.json()).code, 'conflict'); assert.equal(repo.mutations.length, 1);
 });
 
 test('missing access maps to plain messages without GitHub text', async () => {
   const s = await editorSignIn();
-  for (const [options, status, code] of [[{ permission: 'READ' }, 403, 'no-push'], [{ permission: 'TRIAGE' }, 403, 'no-push'], [{ repoMissing: true }, 403, 'editor-install'], [{ httpStatus: 403 }, 403, 'editor-install'],
-    [{ httpStatus: 502 }, 502, 'github'], [{ mutationError: 'FORBIDDEN' }, 403, 'editor-install'], [{ mutationError: 'UNPROCESSABLE' }, 502, 'github']]) {
+  /* A mutation error with an unmoved head is a refusal: the save goes to horsemen/canvas; a refusal there ends it. */
+  for (const [options, status, code] of [[{ push: false }, 403, 'no-push'], [{ repoMissing: true }, 403, 'editor-install'], [{ httpStatus: 403 }, 403, 'editor-install'],
+    [{ httpStatus: 502 }, 502, 'github'], [{ mutationError: 'FORBIDDEN' }, 403, 'editor-install'], [{ mutationError: 'UNPROCESSABLE' }, 409, 'refused']]) {
     fakeRepo(options);
     const res = await post(s, await payload()), out = await res.json();
     assert.equal(res.status, status, JSON.stringify(options)); assert.equal(out.code, code, JSON.stringify(options));
@@ -284,6 +309,25 @@ test('missing access maps to plain messages without GitHub text', async () => {
   assert.equal(ended.status, 403); assert.equal((await ended.json()).code, 'editor-signin'); assert.ok(cookieOf(ended), 'the editor token leaves the cookie');
   mockFetch(async () => { throw new TypeError('down'); });
   assert.equal((await post(s, await payload())).status, 502);
+});
+
+test('a protected default branch: the canvas and its files go to horsemen/canvas in one commit, without [skip ci]', async () => {
+  const s = await editorSignIn(), repo = fakeRepo({ protect: true });
+  const res = await post(s, await payload()), out = await res.json();
+  assert.equal(res.status, 200, JSON.stringify(out));
+  assert.equal(out.branch, SIDE); assert.equal(out.default_branch, 'trunk'); assert.match(out.pull_request.compare_url, /\/compare\/trunk\.\.\.horsemen\/canvas\?expand=1$/);
+  assert.equal(out.message, 'canvas(progress): add 1');
+  assert.deepEqual(repo.mutations.map(m => m.branch.branchName), [SIDE], 'no try on the protected branch');
+  assert.equal(repo.mutations[0].fileChanges.additions.length, 2);
+  assert.equal(repo.fileAt('trunk', '.horsemen/media/' + (await payload()).media[0].name), undefined, 'the default branch does not change');
+  assert.ok(repo.fileAt(SIDE, '.horsemen/media/' + (await payload()).media[0].name).equals(PNG));
+  assert.deepEqual(repo.writes.map(w => w.method + ' ' + w.path), ['POST /repos/example/alpha/git/refs', 'POST /graphql'], 'the branch from the head of trunk, then one commit');
+  /* A refusal on trunk that no check found (a rule): the same, after one try there. */
+  const ruled = fakeRepo({ files: { [PATH]: ORIGINAL } });
+  mockFetch(((inner) => async req => (new URL(req.url).pathname === '/graphql' && (await req.clone().json()).variables.input.branch.branchName === 'trunk')
+    ? json({ data: { createCommitOnBranch: null }, errors: [{ type: 'FORBIDDEN', message: 'Repository rule violations found' }] }) : inner(req))(globalThis.fetch));
+  const again = await post(s, await payload());
+  assert.equal(again.status, 200); assert.equal((await again.json()).branch, SIDE); assert.equal(ruled.mutations.map(m => m.branch.branchName).join(), SIDE);
 });
 
 test('the signed-in app loads the media rules before edit mode; the public view does not', async () => {

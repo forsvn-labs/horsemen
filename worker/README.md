@@ -138,22 +138,36 @@ browser ──POST /write/canvas (CSRF token + cookie with editor token)──�
   `web/canvas-media.js`, shared with the browser.
 - **The GitHub call.** A save without media uses the REST contents API (one
   `PUT`). A save with media uses the GraphQL `createCommitOnBranch` mutation:
-  one commit for the canvas and its files. One query reads the permission,
-  the default branch, its head, and the canvas blob; the mutation names that
-  head (`expectedHeadOid`).
+  one commit for the canvas and its files, on the default branch or on
+  `horsemen/canvas`. The mutation names the head that the Worker read
+  (`expectedHeadOid`).
 - **Conflicts.** The Worker reads the file on the default branch. A blob SHA
   that is not `base` returns `409` with `code: "conflict"` and the current
   SHA; the browser reads that file, merges by element ID
   (`web/canvas-edit.js`), and saves again. When the branch head moves during
   the commit, the Worker tries again, three times at most. With media, the
-  Worker reads the head again after a refused mutation: a new canvas blob is
-  a conflict; the same blob means that another file changed, and the Worker
-  tries again with the new head.
+  Worker reads the head of the target branch, then the canvas at that commit,
+  and names that head in the mutation. After a refused mutation it reads the
+  head again: a moved head is tried again with a new conflict check; an
+  unmoved head is a refusal (on the default branch, the save goes to
+  `horsemen/canvas`).
+- **Protected branches.** When GitHub does not allow a direct commit on the
+  default branch (classic branch protection, a ruleset rule such as
+  `pull_request` or `update`, or a refused commit), the Worker saves to the
+  branch `horsemen/canvas`. It makes the branch from the head of the default
+  branch, fast-forwards it, or merges the default branch into it. It never
+  forces or deletes a ref, and it writes no other branch. The reply adds
+  `branch`, `default_branch`, and `pull_request.compare_url`. The message has
+  no `[skip ci]`, so the checks of the pull request run. Horsemen does not make
+  the pull request; the person opens it on GitHub. `GET /write/target` tells
+  the editor where the next save goes, with reads only. See
+  [slice 4c as built](../docs/product/canvas-workspace.md#slice-4c-as-built).
 - **Drafts.** A draft stays in the browser tab (`sessionStorage`) until it is
   saved or discarded. Sign-out removes drafts. The page warns before it
   closes with an unsaved draft.
 - **What stays read-only.** The public view (`/pub/*`) and the read proxy
-  (`/gh/*`) accept GET only. The public view and the local app do not load
+  (`/gh/*`) accept GET only. The read proxy lists open pull requests only for
+  the head `<owner>:horsemen/canvas`, and only in the signed-in view. The public view and the local app do not load
   the edit script. An instance without the three editor secrets has no write
   route and keeps the read-only text on the sign-in page.
 

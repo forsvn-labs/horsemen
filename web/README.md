@@ -229,6 +229,14 @@ read-only and do not load the edit code.
    commit message, the branch, and the changed elements. For a public repository it says that anyone can see the
    canvas. One save is one commit by you on the default branch, with a
    message such as `canvas(progress): add 1, move 2 [skip ci]`.
+
+   When the default branch is protected, the bar says **Saves to
+   horsemen/canvas**. The save goes to the branch `horsemen/canvas`, without
+   `[skip ci]`, and the default branch does not change. After the save, the
+   bar links **Open a pull request**, or **Pull request #N** when one is
+   open. Open the pull request on GitHub to merge the change. The draft
+   starts from the file on `horsemen/canvas`, so earlier saves stay. The
+   canvas shows the default branch until the pull request merges.
 4. If the file changed on GitHub since your draft started, the app merges
    the two versions by element ID and saves again. When the same element
    changed on both sides, a dialog asks which version to keep for each
@@ -257,7 +265,11 @@ Files that you add (slice 4b):
   video or a large file, put it on a host and paste its address.
 - Removing a card does not delete its file.
 
-Not in this step: resize, groups, colours, undo, and protected branches.
+- On a protected default branch, the files go to `horsemen/canvas` with the
+  canvas. The viewer shows them after the pull request merges.
+
+Not in this step: resize, groups, colours, undo, and a choice of the target
+branch.
 
 ### Home canvas
 

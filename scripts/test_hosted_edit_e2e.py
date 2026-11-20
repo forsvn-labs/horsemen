@@ -5,9 +5,10 @@ A person signs in with the viewer, opts in to the editor, moves a section card, 
 the two, and saves one commit. Then a commit from outside arrives while a draft is open (Merge now),
 and a save meets a conflict on the same note (the person takes the GitHub version). Slice 4b: the person
 drops an image, pastes a video address and a CSV table, confirms the public-repository warning, and saves
-one GraphQL commit with the canvas and both files. It also checks the
-keyboard, phone width, the themes, the public view, and that a viewer-only sign-in asks for no write
-permission. Saves screenshots, a recording, and logs to --output (outside the repository).
+one GraphQL commit with the canvas and both files. Then the default
+branch becomes protected (slice 4c): Edit says that saves go to horsemen/canvas, the save makes that
+branch, and the bar links the compare page, then the open pull request. It also checks the keyboard,
+phone width, the themes, the public view, and that a viewer-only sign-in asks for no write permission. Saves screenshots, a recording, and logs to --output (outside the repository).
 
     python3 scripts/test_hosted_edit_e2e.py --output /tmp/horsemen-edit-check
 """
@@ -44,7 +45,12 @@ SOURCES = {
     'BRAIN.md': '# Brain\n## Providers\n- Research notebook.\n',
 }
 CANVAS = '.horsemen/canvas/progress.canvas'
-world = {'rev': 'a' * 40, 'files': dict(SOURCES), 'commits': [], 'authorize': [], 'tokens': [], 'put_tokens': set(), 'revoked': [], 'graphql': []}
+SIDE = 'horsemen/canvas'
+world = {'rev': 'a' * 40, 'files': dict(SOURCES), 'commits': [], 'authorize': [], 'tokens': [], 'put_tokens': set(), 'revoked': [],
+         # Slice 4c: classic protection of main, the branch horsemen/canvas ({files, base, own, sha} or None),
+         # the open pull requests of that branch, the ref writes, and the tokens that read the pull requests.
+         'protected': False, 'side': None, 'pulls': [], 'ref_writes': [], 'pull_tokens': set(),
+         'graphql': []}
 lock = threading.Lock()
 def raw(value): return value if isinstance(value, bytes) else value.encode()
 def sha(value): return hashlib.sha1(raw(value)).hexdigest()
@@ -86,6 +92,18 @@ class FakeGitHub(BaseHTTPRequestHandler):
         if p == '/repos/example/alpha' and editor: return self.send(200, {'full_name': 'example/alpha', 'default_branch': 'main', 'private': True, 'permissions': {'pull': True, 'push': True}})
         with lock:
             files = dict(world['files'])
+            side = dict(world['side']) if world['side'] else None
+        if p == '/repos/example/alpha/branches/main': return self.send(200, {'name': 'main', 'protected': world['protected']})
+        if p == '/repos/example/alpha/rules/branches/main': return self.send(200, [])
+        if p == '/repos/example/alpha/git/ref/heads/main': return self.send(200, {'ref': 'refs/heads/main', 'object': {'type': 'commit', 'sha': world['rev']}})
+        if p == '/repos/example/alpha/git/ref/heads/' + SIDE:
+            return self.send(200, {'ref': 'refs/heads/' + SIDE, 'object': {'type': 'commit', 'sha': side['sha']}}) if side else self.send(404, {'message': 'Not Found'})
+        if p == '/repos/example/alpha/compare/main...' + SIDE:
+            if not side: return self.send(404, {'message': 'Not Found'})
+            return self.send(200, {'ahead_by': side['own'], 'behind_by': 0 if side['base'] == world['rev'] else 1})
+        if p == '/repos/example/alpha/pulls':
+            world['pull_tokens'].add(auth)
+            return self.send(200, world['pulls'] if q.get('head') == ['example:' + SIDE] and q.get('state') == ['open'] else [])
         if p == '/repos/example/alpha/commits/main':
             etag = f'"{world["rev"]}"'
             if self.headers.get('If-None-Match') == etag: return self.send(304, None, {'ETag': etag})
@@ -93,10 +111,10 @@ class FakeGitHub(BaseHTTPRequestHandler):
         if p.startswith('/repos/example/alpha/git/trees/'):
             return self.send(200, {'truncated': False, 'tree': [{'path': k, 'type': 'blob', 'mode': '100644', 'sha': sha(v), 'size': len(raw(v))} for k, v in files.items()]})
         if p.startswith('/repos/example/alpha/git/blobs/'):
-            for v in files.values():
+            for v in [*files.values(), *(side['files'].values() if side else [])]:
                 if sha(v) == p.rsplit('/', 1)[1]: return self.send(200, {'encoding': 'base64', 'content': base64.b64encode(raw(v)).decode()})
         if p.startswith('/repos/example/alpha/contents/'):
-            v = files.get(p.split('/contents/', 1)[1])
+            v = (side['files'] if side and q.get('ref') == [SIDE] else files).get(p.split('/contents/', 1)[1])
             if v is None: return self.send(404, {'message': 'Not Found'})
             return self.send(200, {'type': 'file', 'sha': sha(v), 'size': len(raw(v)), 'encoding': 'base64', 'content': base64.b64encode(raw(v)).decode()})
         return self.send(404, {'message': 'Not Found'})
@@ -109,6 +127,17 @@ class FakeGitHub(BaseHTTPRequestHandler):
         if not p.startswith('/repos/example/alpha/contents/'): return self.send(404, {'message': 'Not Found'})
         path = p.split('/contents/', 1)[1]
         with lock:
+            if body.get('branch') == SIDE:
+                side = world['side']
+                if not side: return self.send(404, {'message': 'Branch not found'})
+                current = side['files'].get(path)
+                if (current is None) != ('sha' not in body) or (current is not None and sha(current) != body.get('sha')):
+                    return self.send(409, {'message': 'does not match'})
+                text = base64.b64decode(body['content']).decode()
+                side['files'][path] = text; side['own'] += 1; side['sha'] = hashlib.sha1((side['sha'] + text).encode()).hexdigest()
+                world['commits'].append({'path': path, 'message': body['message'], 'branch': SIDE, 'text': text})
+                return self.send(200, {'content': {'sha': sha(text)}, 'commit': {'sha': side['sha']}})
+            if world['protected']: return self.send(409, {'message': 'Protected branch update failed'})
             current = world['files'].get(path)
             if (current is None) != ('sha' not in body) or (current is not None and sha(current) != body.get('sha')):
                 return self.send(409 if current is not None else 422, {'message': 'does not match'})
@@ -118,31 +147,47 @@ class FakeGitHub(BaseHTTPRequestHandler):
             return self.send(200, {'content': {'sha': sha(text)}, 'commit': {'sha': world['rev']}})
 
     def graphql(self, body):
-        """The two GraphQL calls of a save with media: the head query and createCommitOnBranch (slice 4b)."""
+        """createCommitOnBranch: the one commit of a save with media on main (slice 4b)."""
         world['graphql'].append(body['query'].split('(')[0])
         world['put_tokens'].add(self.headers.get('Authorization', ''))
         if self.headers.get('Authorization') != 'Bearer ghu_editor': return self.send(401, {'message': 'Bad credentials'})
         v = body['variables']
+        if not body['query'].startswith('mutation'): return self.send(200, {'data': None, 'errors': [{'type': 'UNEXPECTED', 'message': 'only the mutation'}]})
         with lock:
-            if body['query'].startswith('mutation'):
-                change = v['input']
-                if change['branch'] != {'repositoryNameWithOwner': 'example/alpha', 'branchName': 'main'}: return self.send(200, {'data': None, 'errors': [{'type': 'NOT_FOUND', 'message': 'no branch'}]})
-                if change['expectedHeadOid'] != world['rev']: return self.send(200, {'data': {'createCommitOnBranch': None}, 'errors': [{'type': 'STALE_DATA', 'message': 'Expected branch to point to another commit'}]})
-                paths = [a['path'] for a in change['fileChanges']['additions']]
-                for a in change['fileChanges']['additions']:
-                    data = base64.b64decode(a['contents'])
-                    world['files'][a['path']] = data.decode() if a['path'].endswith('.canvas') else data
-                bump()
-                world['commits'].append({'path': paths[0], 'paths': paths, 'message': change['message']['headline'], 'branch': 'main', 'text': world['files'][v['path']], 'graphql': True})
-                return self.send(200, {'data': {'createCommitOnBranch': {'commit': {'oid': world['rev'], 'file': {'oid': sha(world['files'][v['path']])}}}}})
-            assert (v['owner'], v['name']) == ('example', 'alpha'), v
-            text = world['files'].get(v['path'])
-            entry = None if text is None else {'oid': sha(text), 'object': {'text': text, 'isBinary': False, 'isTruncated': False}}
-            return self.send(200, {'data': {'repository': {'viewerPermission': 'WRITE', 'defaultBranchRef': {'name': 'main', 'target': {'oid': world['rev'], 'file': entry}}}}})
+            change = v['input']
+            if change['branch'] != {'repositoryNameWithOwner': 'example/alpha', 'branchName': 'main'}: return self.send(200, {'data': None, 'errors': [{'type': 'NOT_FOUND', 'message': 'no branch'}]})
+            if world['protected']: return self.send(200, {'data': {'createCommitOnBranch': None}, 'errors': [{'type': 'FORBIDDEN', 'message': 'Protected branch update failed'}]})
+            if change['expectedHeadOid'] != world['rev']: return self.send(200, {'data': {'createCommitOnBranch': None}, 'errors': [{'type': 'STALE_DATA', 'message': 'Expected branch to point to another commit'}]})
+            paths = [a['path'] for a in change['fileChanges']['additions']]
+            for a in change['fileChanges']['additions']:
+                data = base64.b64decode(a['contents'])
+                world['files'][a['path']] = data.decode() if a['path'].endswith('.canvas') else data
+            bump()
+            world['commits'].append({'path': paths[0], 'paths': paths, 'message': change['message']['headline'], 'branch': 'main', 'text': world['files'][v['path']], 'graphql': True})
+            return self.send(200, {'data': {'createCommitOnBranch': {'commit': {'oid': world['rev'], 'file': {'oid': sha(world['files'][v['path']])}}}}})
+
+    def do_PATCH(self):
+        body = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
+        if self.headers.get('Authorization') != 'Bearer ghu_editor': return self.send(403, {'message': 'Resource not accessible by integration'})
+        with lock:
+            world['ref_writes'].append(('PATCH', urlsplit(self.path).path, body))
+            if urlsplit(self.path).path != '/repos/example/alpha/git/refs/heads/' + SIDE or not world['side'] or body.get('force') is not False: return self.send(422, {'message': 'Not allowed here'})
+            if world['side']['own'] or body.get('sha') != world['rev']: return self.send(422, {'message': 'Update is not a fast forward'})
+            world['side'].update({'files': dict(world['files']), 'base': world['rev'], 'sha': world['rev']})
+            return self.send(200, {'object': {'sha': world['rev']}})
 
     def do_POST(self):
-        if self.path == '/graphql': return self.graphql(json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0))))
-        form = parse_qs(self.rfile.read(int(self.headers.get('Content-Length') or 0)).decode())
+        data = self.rfile.read(int(self.headers.get('Content-Length') or 0)).decode()
+        if self.path == '/graphql': return self.graphql(json.loads(data))
+        if self.path == '/repos/example/alpha/git/refs':
+            body = json.loads(data or '{}')
+            if self.headers.get('Authorization') != 'Bearer ghu_editor': return self.send(403, {'message': 'Resource not accessible by integration'})
+            with lock:
+                world['ref_writes'].append(('POST', self.path, body))
+                if body.get('ref') != 'refs/heads/' + SIDE or world['side'] or body.get('sha') != world['rev']: return self.send(422, {'message': 'Reference already exists'})
+                world['side'] = {'files': dict(world['files']), 'base': world['rev'], 'own': 0, 'sha': world['rev']}
+                return self.send(201, {'ref': body['ref'], 'object': {'sha': world['rev']}})
+        form = parse_qs(data)
         if self.path == '/login/oauth/access_token':
             client = form.get('client_id', [''])[0]; world['tokens'].append(client)
             token = 'ghu_editor' if client == 'Iv1.editor' else 'ghu_viewer'
@@ -173,7 +218,7 @@ local_wrangler = root / 'worker/node_modules/.bin/wrangler'
 command = [str(local_wrangler) if local_wrangler.exists() else 'bunx', *([] if local_wrangler.exists() else ['wrangler']), 'dev', '--port', str(args.port), '--ip', '127.0.0.1', '--local', '--local-upstream', f'localhost:{args.port}', '--show-interactive-dev-session=false', '--persist-to', str(args.output / 'wrangler-state')]
 for k, v in variables.items(): command += ['--var', f'{k}:{v}']
 dev = subprocess.Popen(command, cwd=root / 'worker', stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, start_new_session=True)
-SESSION = 'horsemen-edit-test'
+SESSION = f'horsemen-edit-test-{os.getpid()}'  # One browser session for each run: runs in other checkouts do not share it.
 
 
 def browser(*parts):
@@ -382,7 +427,7 @@ try:
     assert last['paths'][0] == CANVAS and all(p.startswith('.horsemen/media/') for p in last['paths'][1:]), last['paths']
     media = {p: world['files'][p] for p in last['paths'][1:]}
     assert sorted(media.values(), key=len) == sorted([image, table.encode()], key=len), 'the bytes as dropped and pasted'
-    assert world['graphql'][graphql_before:] == ['query', 'mutation'], 'one head query and one commit'
+    assert world['graphql'][graphql_before:] == ['mutation'], 'one GraphQL commit'
     kinds = sorted((n['type'], n.get('file', n.get('url', ''))) for n in saved()['nodes'] if n['type'] == 'link' or n.get('file', '').startswith('.horsemen/media/'))
     assert kinds == sorted([('file', p) for p in media] + [('link', 'https://www.youtube.com/watch?v=EXAMPLE0000')]), kinds
     # The next check loads the commit; the image and the table still show (images load when they come into view).
@@ -418,6 +463,7 @@ try:
     browser('eval', 'location.reload()')
     until("typeof canvasKey !== 'undefined' && document.body.dataset.state === 'ready' && canvasKey === 'progress' && !document.querySelector('#edit-canvas').hidden", 20)
     until("document.querySelector('#scan-status').textContent.includes('Checked') && document.querySelector('#project-description').textContent.includes(" + json.dumps(world['rev'][:7]) + ") && document.body.dataset.state === 'ready'", 20)
+    browser('eval', 'window.__errors=[];window.__csp=[];addEventListener("error",e=>__errors.push(String(e.message)));document.addEventListener("securitypolicyviolation",e=>__csp.push(e.violatedDirective+" "+e.blockedURI))')
     browser('click', '#edit-canvas')
     until("document.querySelector('#edit-status').textContent === 'Draft: add 1'", 10)
     # Phone width: the bar wraps and nothing scrolls sideways.
@@ -430,6 +476,61 @@ try:
     until("document.querySelector('#edit-status').textContent === 'No changes'")
     browser('click', '#edit-done')
     until("document.querySelector('#edit-bar').hidden && document.querySelector('#edit-canvas').getAttribute('aria-pressed') === 'false'")
+
+    # Slice 4c: the default branch is protected. Edit says where the save goes; the save makes horsemen/canvas from the
+    # head of main and commits there; main does not change; the bar links the compare page, then the open pull request.
+    with lock: world['protected'] = True
+    main_before, rev_before, made = world['files'][CANVAS], world['rev'], len(world['commits'])
+    browser('click', '#edit-canvas')
+    until("!document.querySelector('#edit-bar').hidden && !document.querySelector('#edit-target').hidden && document.querySelector('#edit-target').textContent === 'Saves to horsemen/canvas'")
+    assert value("document.querySelector('#edit-pr').hidden"), 'no pull request link before the first save'
+    drag('[data-node="s-up-next"]', 0, 140)
+    until("document.querySelector('#edit-status').textContent === 'Draft: move 1'")
+    browser('press', 'Control+s')
+    until("document.querySelector('#edit-dialog').open && document.querySelector('#edit-dialog').innerText.includes('Save to horsemen/canvas')")
+    preview = value("JSON.stringify(document.querySelector('#edit-dialog').innerText)")
+    assert 'main is protected' in preview and 'horsemen/canvas, as you' in preview and 'canvas(progress): move 1' in preview and '[skip ci]' not in preview, preview
+    shot('12-protected-preview.png')
+    answer('commit')
+    wait_commits(made + 1)
+    side_commit = world['commits'][-1]
+    assert side_commit['branch'] == SIDE and side_commit['message'] == 'canvas(progress): move 1', side_commit
+    assert world['files'][CANVAS] == main_before and world['rev'] == rev_before, 'main does not change'
+    assert [(m, w['ref']) for m, _, w in world['ref_writes']] == [('POST', 'refs/heads/' + SIDE)], world['ref_writes']
+    until("!document.querySelector('#edit-pr').hidden && document.querySelector('#edit-pr').textContent === 'Open a pull request'", 10)
+    assert value("JSON.stringify(document.querySelector('#edit-pr').href)") == github + '/example/alpha/compare/main...horsemen/canvas?expand=1'
+    shot('13-protected-saved.png')
+    # The person opens the pull request on GitHub. The next save continues the branch; the bar links that pull request.
+    with lock: world['pulls'] = [{'number': 7, 'html_url': 'https://elsewhere.example/not-used'}]
+    drag('[data-node="note-outside"]', 0, 120)
+    until("document.querySelector('#edit-status').textContent === 'Draft: move 1'")
+    browser('press', 'Control+s'); answer('commit')
+    wait_commits(made + 2)
+    assert world['commits'][-1]['branch'] == SIDE and world['side']['own'] == 2 and len(world['ref_writes']) == 1, 'the second save continues the branch'
+    assert world['files'][CANVAS] == main_before
+    until("document.querySelector('#edit-pr').textContent === 'Pull request #7'", 10)
+    assert value("JSON.stringify(document.querySelector('#edit-pr').href)") == github + '/example/alpha/pull/7', 'the address is built from the number'
+    assert world['pull_tokens'] == {'Bearer ghu_viewer'}, 'the pull request list is read with the viewer token'
+    for style in ['engraved', 'modern', 'editorial', 'terminal', 'swiss', 'blueprint', 'soft', 'contrast']:
+        browser('eval', f"applyTheme({{style:'{style}'}})")
+        assert value("[...document.querySelectorAll('#edit-target, #edit-pr')].every(e => e.getBoundingClientRect().width > 40 && getComputedStyle(e).color !== getComputedStyle(document.querySelector('#edit-bar')).backgroundColor)"), style
+        if style == 'blueprint': shot('14-protected-theme-blueprint.png')
+    browser('eval', "applyTheme({style:'engraved'})")
+    browser('set', 'viewport', '390', '844')
+    until("(r => r.right <= innerWidth && r.left >= 0)(document.querySelector('#edit-bar').getBoundingClientRect()) && document.documentElement.scrollWidth <= innerWidth && document.querySelector('#edit-pr').getBoundingClientRect().right <= innerWidth", 10)
+    shot('15-protected-phone.png')
+    browser('set', 'viewport', *desktop)
+    # Keyboard: Tab reaches the link in the bar.
+    browser('eval', "document.querySelector('#edit-done').focus()")
+    for _ in range(6):
+        if value("document.activeElement?.id === 'edit-pr'"): break
+        browser('press', 'Shift+Tab')
+    assert value("document.activeElement?.id === 'edit-pr'"), 'the pull request link is reachable with the keyboard'
+    browser('click', '#edit-done')
+    until("document.querySelector('#edit-bar').hidden && document.querySelector('#toast').textContent.includes('until the pull request merges')", 10)
+    # Known and not from this slice: the paper texture of the editorial theme is a data: image, which the hosted CSP blocks.
+    errors, csp = value("JSON.stringify([window.__errors, window.__csp])")
+    assert errors == [] and set(csp) <= {'img-src data'}, (errors, csp)
 
     # Sign-out revokes both tokens and removes drafts; a viewer-only sign-in asks for no write permission.
     browser('click', '#menu-toggle'); browser('click', '#sign-out')

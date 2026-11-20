@@ -10,7 +10,9 @@
    - merge: each row of the conflict table; a choice for one element changes another; an unknown key is lost;
      a merged file that the reader refuses
    - slice 4b: a dropped file or a pasted address makes a node that the reader refuses (a path outside the project,
-     a script address, a size out of range, an alt text or a title too long), or a node in place of a refused input */
+     a script address, a size out of range, an alt text or a title too long), or a node in place of a refused input
+   - the pull request link (slice 4c): a link that is not the GitHub page of this repository and horsemen/canvas, a pull
+     request number that is not a positive integer, an address of the pull request taken from GitHub text */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const F = require('../web/canvas-format.js');
@@ -134,6 +136,8 @@ test('the commit message counts the changes and holds no text from the file', ()
   assert.equal(E.message('progress', E.changes(null, doc([note('a'), note('b')]))), 'canvas(progress): add 2 [skip ci]', 'a new file counts its nodes');
   assert.equal(E.message('progress', E.changes(base, base)), 'canvas(progress): update [skip ci]');
   assert.throws(() => E.message('Bad name', changes));
+  assert.equal(E.message('progress', E.changes(base, base), { pullRequest: true }), 'canvas(progress): update', 'a save to the pull request branch lets its checks run');
+  assert.equal(E.PR_BRANCH, 'horsemen/canvas');
   assert.equal(E.changes(base, E.moveNode(E.setText(base, 'a', 'x'), 'a', 9, 9)).edited, 1, 'a moved and edited element is an edit');
 });
 
@@ -242,4 +246,16 @@ test('merge never changes its inputs', () => {
   const frozen = JSON.stringify([B, mine, theirs]);
   E.merge(B, mine, theirs); E.merge(B, mine, theirs, { a: 'theirs' });
   assert.equal(JSON.stringify([B, mine, theirs]), frozen);
+});
+
+test('the pull request link: the open pull request, else the compare page; never another address', () => {
+  const compare = 'https://github.com/example/alpha/compare/trunk...horsemen/canvas?expand=1';
+  assert.deepEqual(E.pullRequestLink('example/alpha', compare, []), { url: compare, label: 'Open a pull request', number: null });
+  assert.deepEqual(E.pullRequestLink('example/alpha', compare, null), { url: compare, label: 'Open a pull request', number: null }, 'the list could not be read');
+  assert.deepEqual(E.pullRequestLink('example/alpha', compare, [{ number: 7, html_url: 'https://evil.example/x' }]), { url: 'https://github.com/example/alpha/pull/7', label: 'Pull request #7', number: 7 }, 'the address is built, not taken from GitHub');
+  assert.deepEqual(E.pullRequestLink('example/alpha', 'http://127.0.0.1:9/example/alpha/compare/main...horsemen/canvas?expand=1', [{ number: 3 }]).url, 'http://127.0.0.1:9/example/alpha/pull/3', 'the GitHub host of the site');
+  for (const number of [0, -1, 1.5, '7', 1e12, null]) assert.equal(E.pullRequestLink('example/alpha', compare, [{ number }]).number, null, String(number));
+  for (const bad of ['javascript:alert(1)//github.com/example/alpha/compare/a...horsemen/canvas', 'https://github.com/other/repo/compare/main...horsemen/canvas?expand=1', 'https://github.com/example/alpha/compare/main...evil?expand=1', 'https://github.com/example/alpha/pulls', 'not a url', '', null]) {
+    assert.equal(E.pullRequestLink('example/alpha', bad, [{ number: 7 }]), null, String(bad));
+  }
 });
