@@ -29,7 +29,8 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   project opens, the browser reads each canvas file (20 at most) as a blob,
   checks it with `web/canvas-format.js`, and draws it. A file larger than
   512 KiB is not requested. An image that a canvas names loads through the
-  contents route when it comes into view. The Worker has no new route and no
+  contents route when it comes into view; a CSV or TSV file loads the same
+  way and shows as a table. The Worker has no new route and no
   new permission: canvas files and their media use the blob and contents
   reads that are already on the list, in the signed-in view and in the
   public view. The server does not parse or keep a canvas file. See
@@ -146,6 +147,13 @@ Run `bun install` in `worker/` first, so that the check uses the local
 - Private PR image attachments open on GitHub; the viewer does not load them.
 - Canvas files are read-only here. A project shows 20 canvas files at most;
   each one is one blob read when the project opens. A canvas loads 100
-  images at most, one contents read for each image that comes into view.
+  images at most, one contents read for each image that comes into view,
+  and 20 tables at most, one contents read for each table.
+- Players: the content security policy has
+  `frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com`.
+  A player frame loads only after a click; before it, the browser contacts
+  no provider. The Worker fetches nothing from a provider. `frame-ancestors
+  'none'` stays, so no other site can frame Horsemen. `web/canvas-embeds.js`
+  has the same list, and a test fails when the two differ.
 - Cloudflare's free plan allows 100,000 Worker requests a day. Each GitHub
   read is one request.

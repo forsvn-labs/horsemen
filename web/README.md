@@ -115,8 +115,10 @@ it: this step is read-only. The format and its limits are in
   | Record or document | `file` node with a `.md` file and no `subpath` | A card that opens the record or the document in the reading view. |
   | Portal | `file` node with a `.canvas` file of the same project | "Open canvas". Enter or double-click opens that canvas. |
   | Image | `file` node with a PNG, JPEG, GIF, WebP, or SVG file | The image, from a `blob:` address, with its `alt` text. The limit is 1 MiB for a file and 100 images for a canvas. |
-  | Other file | `file` node with another file, such as CSV | A file card with a link to the file on GitHub. |
-  | Link card | `link` node | The stored `title`, the host, and "Open link". The app fetches nothing from the address. |
+  | Table | `file` node with a CSV or TSV file | A table: the first row is the header, then the first 200 rows and 30 columns. A long or wide table scrolls in its card. The limit is 1 MiB for a file and 20 tables for a canvas. |
+  | Other file | `file` node with another file, such as XLSX | A file card with a link to the file on GitHub. |
+  | Player | `link` node with a YouTube, Vimeo, Loom, Figma, Google Docs, Google Sheets, or Google Slides address | "Load video" or "Load preview". The player loads only after you select the button. See [players and tables](#players-and-tables). |
+  | Link card | `link` node with another address | The stored `title`, the host, and "Open link". The app fetches nothing from the address. |
   | Group | `group` node | A frame with its label, behind the other elements. |
   | Connector | edge | A curve with an arrow and its label. |
   | Other type | any other node type | "Not supported". |
@@ -146,9 +148,53 @@ it: this step is read-only. The format and its limits are in
   element names its connectors as text lines, such as "proof → Pilot board".
   The list is the form of a canvas for a phone and for assistive technology.
 
-Not in this step: editing in the browser, video and design embeds, CSV
-tables, group background images, a canvas file for Home (`home.canvas` is
-not shown), and the overview of references between canvases.
+Not in this step: editing in the browser, an XLSX preview, group background
+images, a canvas file for Home (`home.canvas` is not shown), and the overview
+of references between canvases.
+
+### Players and tables
+
+A link card for a known provider shows a player. A CSV or TSV file shows as a
+table. The rules are in `web/canvas-embeds.js` and `web/canvas-table.js`.
+
+- **Before you select the button.** The card shows the title, a button, the
+  host, and "Open on YouTube" (or the provider name). The browser contacts no
+  provider: there is no frame and no thumbnail.
+- **After you select the button.** The app makes a frame with the sandbox
+  `allow-scripts allow-same-origin allow-presentation`. The app builds the
+  frame address from an ID that it reads from the stored address, such as
+  `https://www.youtube-nocookie.com/embed/<ID>`. A stored address never goes
+  into a frame. The provider then sees your IP address and the site origin.
+  Only the YouTube frame sends the site origin as the referrer, because the
+  YouTube player needs it; no frame sends the repository path.
+- **Addresses that give a player.**
+
+  | Provider | Addresses | Frame |
+  | --- | --- | --- |
+  | YouTube | `youtube.com/watch?v=`, `youtu.be/`, `/embed/`, `/shorts/`, `/live/`; a `t` or `start` time | `www.youtube-nocookie.com/embed/<ID>` |
+  | Vimeo | `vimeo.com/<ID>`, `vimeo.com/<ID>/<hash>`, `vimeo.com/channels/<name>/<ID>`, `player.vimeo.com/video/<ID>` | `player.vimeo.com/video/<ID>?dnt=1` |
+  | Loom | `loom.com/share/<ID>`, `loom.com/embed/<ID>` | `www.loom.com/embed/<ID>` |
+  | Figma | `figma.com/file`, `/design`, `/proto`, `/board`, `/slides`, or `/deck` with a file key; a `node-id` | `www.figma.com/embed?embed_host=horsemen&url=…` |
+  | Google Docs, Sheets, Slides | `docs.google.com/document/d/<ID>`, `/spreadsheets/d/<ID>`, `/presentation/d/<ID>`, and published `/d/e/<ID>` files | `/preview`, or `/embed` for slides |
+
+  Any other address, also a look-alike host such as
+  `youtube.com.example.net`, stays a link card.
+- **When the player stays empty.** A provider can refuse the frame, or you
+  can have no access to the file. Then use "Open on …" in the card. A private
+  Google file asks for a Google sign-in, which the page does not allow in a
+  frame.
+- **Tables.** The first row is the header. A field in double quotes can hold
+  a comma, a tab, a line break, or a doubled quote. A column of numbers
+  aligns right. Each cell is text: no cell becomes a link or markup. The line
+  under the table gives its size, such as "Shows 200 of 1,234 rows and 30 of
+  45 columns." A file that is not UTF-8 text, is larger than 1 MiB, or is a
+  Git LFS pointer shows a message and the link to GitHub.
+- **Keyboard and pointer.** Tab reaches the button of a player; Enter or
+  Space loads it. Over a table, the wheel and the arrow keys scroll the table;
+  Ctrl or Cmd with the wheel still zooms the canvas.
+- **List view and phones.** A player keeps its shape (16:9 for a video). A
+  table scrolls inside its card. A live update of the canvas draws the cards
+  again, so a loaded player returns to its button.
 
 ### Home canvas
 
@@ -280,6 +326,9 @@ is a preset or `#RRGGBB`. A path cannot leave the project. A file larger
 than 512 KiB is not requested. An SVG image shows only as an image from a
 `blob:` address, so its script does not run, also when a person opens that
 address as a page. The app reads only the files that a loaded canvas names.
+A table cell is always text. A player frame loads only after a click, from an
+address that the app builds, and the content security policy allows frames
+from five origins only (see [players and tables](#players-and-tables)).
 
 Discovery reads default branches, including archived repositories. A project
 needs at least two core records and either VISION or PROGRESS (legacy STATUS

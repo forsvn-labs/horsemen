@@ -6,15 +6,19 @@
    - A file that is not valid, or that the reader could not load, gives a message and the generated canvas.
    - A section card refers to the record: the text comes from the record that is loaded now.
    Pure rules, shared by the app and tests/test_canvas_view.cjs. File text is always escaped;
-   only the tags written here and by markdown.js reach the page. Read-only: nothing is saved. */
+   only the tags written here and by markdown.js reach the page. Read-only: nothing is saved.
+   Slice 2b: a link card of a known provider is a player that loads after a click (canvas-embeds.js), and a CSV or
+   TSV file that the reader registered is a table (canvas-table.js). The app loads both; these rules write the card. */
 (function (root) {
   const node = typeof module !== 'undefined' && module.exports;
   const F = node ? require('./canvas-format.js') : root.HorsemenCanvasFormat;
   const S = node ? require('./canvas-sections.js') : root.HorsemenSections;
   const M = node ? require('./markdown.js') : root.HorsemenMarkdown;
   const P = node ? require('./previews.js') : root.HorsemenPreview;
+  const E = node ? require('./canvas-embeds.js') : root.HorsemenEmbeds;
+  const T = node ? require('./canvas-table.js') : root.HorsemenTable;
   const esc = M.escapeHTML;
-  const MAX_IMAGES = 100, GAP = 80;
+  const MAX_IMAGES = 100, MAX_TABLES = 20, GAP = 80;
   const icon = name => '<svg class="icon" aria-hidden="true"><use href="/assets/icons/icons.svg#' + name + '"/></svg>';
   const clip = (text, max) => text.length > max ? text.slice(0, max - 1).trimEnd() + '…' : text;
   const baseName = path => String(path).split('/').filter(Boolean).pop() || String(path);
@@ -77,16 +81,21 @@
     const full = path => (projectRoot ? projectRoot + '/' : '') + path;
     const recordAt = path => Object.keys(S.TITLES).find(name => records[name] && !records[name].error && typeof records[name].content === 'string' && records[name].path === full(path)) || null;
     const linkOf = path => (file.links || []).find(l => l && l.path === full(path)) || null;
-    const shown = new Set(); let images = 0;
+    const shown = new Set(); let images = 0, tables = 0;
     const saved = usable.nodes.map(n => {
       const kind = F.kind(n), out = { id: n.id, kind, x: n.x, y: n.y, width: n.width, height: n.height, color: F.safeColor(n.color) ? n.color : null, saved: true, links: [] };
       if (kind === 'note') return { ...out, text: n.text, base };
       if (kind === 'group') return { ...out, label: typeof n.label === 'string' ? n.label : '' };
-      if (kind === 'link') { let host = ''; try { host = new URL(n.url).hostname; } catch { /* The reader checked the address; an empty host is safe. */ } return { ...out, url: n.url, title: n.title || host || n.url, host }; }
+      if (kind === 'link') {
+        let host = ''; try { host = new URL(n.url).hostname; } catch { /* The reader checked the address; an empty host is safe. */ }
+        const embed = E.embed(n.url);
+        return { ...out, kind: embed ? 'embed' : 'link', url: n.url, title: n.title || host || n.url, host, embed };
+      }
       if (kind === 'unknown') return { ...out, type: String(n.type) };
       const link = linkOf(n.file), href = link ? link.href : base + encodePath(n.file);
       if (kind === 'portal') { const target = F.portalTarget(n); return target ? { ...out, target, title: title(target), exists: canvases.includes(target) } : { ...out, kind: 'file', title: baseName(n.file), path: n.file, href }; }
       if (kind === 'image') { const load = !!link && images < MAX_IMAGES; if (load) images++; return { ...out, alt: n.alt || '', title: n.alt || baseName(n.file), path: n.file, href, link, load, capped: !!link && !load }; }
+      if (kind === 'sheet' && T.format(n.file)) { const load = !!link && tables < MAX_TABLES; if (load) tables++; return { ...out, kind: 'table', format: T.format(n.file), title: baseName(n.file), path: n.file, href, link, load, capped: !!link && !load }; }
       if (kind === 'sheet' || kind === 'file') return { ...out, kind: 'file', title: baseName(n.file), path: n.file, href };
       /* A Markdown file: a section of a record, a whole record, or another document. */
       const name = recordAt(n.file), wanted = typeof n.subpath === 'string' ? n.subpath.split('#').filter(part => part.trim()).pop()?.trim() || '' : '';
@@ -140,7 +149,8 @@
     if (n.kind === 'record') return 'Open ' + name;
     if (n.kind === 'portal') return (n.exists ? 'Open canvas: ' : 'Canvas not found: ') + name;
     if (n.kind === 'document') return 'Open document: ' + name;
-    return ({ note: 'Note: ', link: 'Link: ', image: 'Image: ', file: 'File: ', group: 'Group: ' }[n.kind] ?? '') + name;
+    if (n.kind === 'embed') return n.embed.name + (n.embed.kind === 'video' ? ' video: ' : ': ') + name;
+    return ({ note: 'Note: ', link: 'Link: ', image: 'Image: ', file: 'File: ', group: 'Group: ', table: 'Table: ' }[n.kind] ?? '') + name;
   }
 
   const head = (name, text, extra = '') => '<span class="cardhead">' + (name ? icon(name) : '') + '<b>' + esc(text) + '</b>' + extra + '</span>';
@@ -164,9 +174,27 @@
         if (n.load) return '<span class="md-image" data-image="' + esc(n.link.href) + '" data-alt="' + esc(n.alt) + '"><a target="_blank" rel="noopener noreferrer" href="' + esc(n.link.href) + '">Image: ' + esc(n.title) + '</a></span>';
         return head('document', n.title) + body(line(n.path) + (n.capped ? note('Not loaded. A canvas loads ' + MAX_IMAGES + ' images at most.') : '') + openLink(n.href, 'Open on GitHub'));
       case 'file': return head('document', n.title) + body(line(n.path) + openLink(n.href, 'Open on GitHub'));
+      /* A player: no frame, no frame address, and no thumbnail before the click. The app makes the frame. */
+      case 'embed': {
+        const e = n.embed;
+        return head('link', n.title) + '<div class="embed-stage" data-state="idle"><button type="button" class="btn embed-load">' + icon(e.kind === 'video' ? 'play' : 'expand') + '<span>' + esc(e.action) + '</span></button>' +
+          '<span class="embed-note">' + esc('Nothing loads from ' + e.name + ' before you select ' + e.action + '.') + '</span></div>' +
+          '<span class="embed-foot">' + (n.host ? line(n.host) : '') + openLink(n.url, 'Open on ' + e.name) + '</span>';
+      }
+      /* A table: the app puts the rows in the stage when the reader returns the text. */
+      case 'table':
+        if (!n.load) return head('table', n.title) + body(line(n.path) + (n.capped ? note('Not loaded. A canvas loads ' + MAX_TABLES + ' tables at most.') : '') + openLink(n.href, 'Open on GitHub'));
+        return head('table', n.title) + '<div class="sheet-stage" data-state="loading"><p class="card-note">Loading the table…</p></div><span class="sheet-foot">' + line(n.path) + openLink(n.href, 'Open on GitHub') + '</span>';
       default: return head('', 'Not supported') + body(note('This element has the type “' + clip(n.type || '', 40) + '”. Horsemen does not show it.'));
     }
   }
+  /* The rows of a loaded table, in a scroll area with a name, and one line about its size. Each cell is escaped text. */
+  function sheetHTML(n, text) {
+    const table = T.parse(text, n.format);
+    if (!table.header.length) return T.html(table);
+    return '<div class="sheet-scroll" tabindex="0" role="region" aria-label="' + esc('Table: ' + n.title) + '">' + T.html(table, n.title) + '</div><p class="card-meta sheet-size">' + esc(T.summary(table)) + '</p>';
+  }
+  const sheetErrorHTML = message => '<p class="card-note">' + esc('The table did not load. ' + String(message || 'Open it on GitHub.')) + '</p>';
   /* The connectors of an element as text. The list shows them; on the canvas the lines show them. */
   const linksHTML = n => n.links && n.links.length ? '<span class="card-links">' + n.links.map(line).join('') + '</span>' : '';
 
@@ -202,6 +230,6 @@
     return [...rest.filter(n => !home.has(n.id)).sort(order), ...groups.flatMap(g => [g, ...rest.filter(n => home.get(n.id) === g.id).sort(order)])];
   }
 
-  const api = { MAX_IMAGES, title, tone, notice, compose, nodeTitle, openable, cardLabel, cardHTML, linksHTML, edgeGeometry, listOrder };
+  const api = { MAX_IMAGES, MAX_TABLES, sheetHTML, sheetErrorHTML, title, tone, notice, compose, nodeTitle, openable, cardLabel, cardHTML, linksHTML, edgeGeometry, listOrder };
   if (node) module.exports = api; else root.HorsemenCanvasView = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
