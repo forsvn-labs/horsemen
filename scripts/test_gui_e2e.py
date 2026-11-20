@@ -2,6 +2,7 @@
 import argparse
 import base64
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -77,7 +78,7 @@ server=make_server(0,ScanState(GitHubReader(fake)),root/'web')
 thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 log=[]
 def browser(*args):
-    p=subprocess.run(['agent-browser','--session','horsemen-live-test',*args],capture_output=True,text=True,timeout=60)
+    p=subprocess.run(['agent-browser','--session',f'horsemen-live-test-{os.getpid()}',*args],capture_output=True,text=True,timeout=60)
     log.append(p.stdout+p.stderr)
     if p.returncode:raise AssertionError(p.stderr)
     return p.stdout

@@ -149,7 +149,7 @@ dev = subprocess.Popen(command, cwd=root / 'worker', stdout=subprocess.PIPE, std
 
 
 def browser(*parts):
-    p = subprocess.run(['agent-browser', '--session', 'horsemen-hosted-test', *parts], capture_output=True, text=True, timeout=60)
+    p = subprocess.run(['agent-browser', '--session', f'horsemen-hosted-test-{os.getpid()}', *parts], capture_output=True, text=True, timeout=60)
     log.append(f'$ agent-browser {" ".join(parts)[:160]}\n{p.stdout}{p.stderr}')
     if p.returncode: raise AssertionError(p.stderr or p.stdout)
     return p.stdout

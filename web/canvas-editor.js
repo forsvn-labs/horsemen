@@ -5,6 +5,8 @@
    - Move, add a note, edit a note, connect, and delete change the draft (canvas-edit.js). The canvas shows the draft.
    - Save sends the canonical text to the Worker's one write route. One save is one commit by the person.
    - A conflict (the file changed on GitHub) reads the new file and merges by element ID, then saves again.
+   - Slice 4c: when the default branch is protected, the Worker saves to horsemen/canvas. Edit asks the Worker where a save
+     goes and starts the draft from the file on that branch; the bar says so, and after a save it links the pull request.
    It reads the app's shared state (app.js is a classic script) and talks to GitHub only through HorsemenHosted.editor. */
 (function () {
   const hostedEditor = window.HorsemenHosted && window.HorsemenHosted.editor, E = window.HorsemenCanvasEdit;
@@ -13,7 +15,9 @@
   const el = (tag, attrs = {}, text = null) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? '' : v); if (text !== null) n.textContent = text; return n; };
   const clone = value => JSON.parse(JSON.stringify(value));
   const SHA = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
-  /* editing: { project, repo, root, key, baseSha, baseDoc, doc } while edit mode is on, else null. */
+  /* editing: { project, repo, root, key, baseSha, baseDoc, doc, target, link, saved } while edit mode is on, else null.
+     target: { side, defaultBranch, compareURL }; side is true when saves go to horsemen/canvas. link: the pull request
+     link (canvas-edit.js pullRequestLink). saved: a save to horsemen/canvas happened in this edit session. */
   let editing = null, busy = false, changedOnGitHub = false, info = hostedEditor.info();
 
   /* ---------------------------------------------------------------- controls */
@@ -24,6 +28,8 @@
   const connectButton = button('edit-connect', 'Connect', 'Connect the two selected elements (C)');
   const deleteButton = button('edit-delete', 'Delete', 'Delete the selected elements (Delete)');
   const status = el('span', { class: 'edit-status', id: 'edit-status', role: 'status' }); bar.append(status);
+  const where = el('span', { class: 'edit-where', id: 'edit-target', hidden: true }); bar.append(where);
+  const prLink = el('a', { class: 'link-btn edit-pr', id: 'edit-pr', target: '_blank', rel: 'noopener', hidden: true }); bar.append(prLink);
   const mergeButton = button('edit-merge', 'Merge now', 'Merge the new version from GitHub into your draft');
   const discardButton = button('edit-discard', 'Discard', 'Discard the changes in this draft');
   const saveButton = button('edit-save', 'Save', 'Save as one commit (Ctrl S)', 'btn primary');
@@ -81,6 +87,10 @@
     const counts = E.changes(editing.baseDoc, editing.doc), changed = dirty();
     status.textContent = busy ? 'Saving…' : changedOnGitHub ? 'The canvas changed on GitHub.' : changed ? 'Draft: ' + E.summary(counts) : 'No changes';
     mergeButton.hidden = !changedOnGitHub || !changed;
+    const side = editing.target.side, link = editing.link;
+    where.hidden = !side; where.textContent = side ? 'Saves to ' + E.PR_BRANCH : '';
+    prLink.hidden = !(side && link && (editing.saved || link.number));
+    if (link) { prLink.href = link.url; prLink.textContent = link.label; prLink.title = link.number ? 'Open pull request #' + link.number + ' on GitHub' : 'Open a pull request from ' + E.PR_BRANCH + ' on GitHub'; }
     saveButton.disabled = busy || !changed; discardButton.disabled = busy || !changed; addButton.disabled = busy;
     selectionChanged();
   }
@@ -172,7 +182,7 @@
       const go = await ask('Edit canvases of ' + p.repo, form => {
         para(form, 'Editing uses a second GitHub App, Horsemen Editor. It is separate from the viewer and you add it only if you want to edit.');
         const list = el('ul', { class: 'edit-facts' });
-        for (const t of ['GitHub asks for Contents: Read and write on the repositories where you install it. GitHub has no permission for one folder.', 'Horsemen uses it only to save canvas files in .horsemen/canvas/. It never changes your records.', 'Each save is one commit by you on the default branch, with [skip ci].', 'The viewer, the public view, and the local app stay read-only.']) list.append(el('li', {}, t));
+        for (const t of ['GitHub asks for Contents: Read and write on the repositories where you install it. GitHub has no permission for one folder.', 'Horsemen uses it only to save canvas files in .horsemen/canvas/. It never changes your records.', 'Each save is one commit by you on the default branch, with [skip ci]. When that branch is protected, the save goes to the branch horsemen/canvas, and you open a pull request.', 'The viewer, the public view, and the local app stay read-only.']) list.append(el('li', {}, t));
         form.append(list);
       }, [['', 'Cancel'], ['go', 'Continue to GitHub', 'primary']]);
       if (go === 'go') hostedEditor.signIn();
@@ -237,9 +247,9 @@
     return true;
   }
   /* Their version of the file at a blob SHA (null: the file is gone). */
-  async function theirs(sha) {
+  async function theirs(sha, repo = editing.repo) {
     if (sha === null) return E.emptyDoc();
-    const parsed = F.parse(await hostedEditor.readBlob(editing.repo, sha));
+    const parsed = F.parse(await hostedEditor.readBlob(repo, sha));
     if (parsed.fatal || parsed.errors.length || parsed.readOnly) throw new Error('The canvas file on GitHub is not valid now. Fix it there, or discard the draft.');
     return parsed.doc;
   }
@@ -251,10 +261,12 @@
   async function save() {
     if (!active() || busy || !dirty()) return;
     const text = F.canonical(editing.doc), before = editing.baseSha === null ? null : F.canonical(editing.baseDoc);
-    const lines = E.changedLines(before, text), message = E.message(editing.key, E.changes(editing.baseSha === null ? null : editing.baseDoc, editing.doc));
-    const go = await ask('Save to GitHub', form => {
+    const side = editing.target.side, main = editing.target.defaultBranch || project().branch || 'the default branch';
+    const lines = E.changedLines(before, text), message = E.message(editing.key, E.changes(editing.baseSha === null ? null : editing.baseDoc, editing.doc), { pullRequest: side });
+    const go = await ask(side ? 'Save to ' + E.PR_BRANCH : 'Save to GitHub', form => {
+      if (side) para(form, main + ' is protected, so this save goes to the branch ' + E.PR_BRANCH + '. Then open a pull request on GitHub to merge it into ' + main + '.', 'edit-where-note');
       const facts = el('dl', { class: 'edit-facts' });
-      for (const [k, v] of [['File', canvasPath(editing.key)], ['Commit', message], ['Branch', (project().branch || 'default branch') + ', as you']]) { const row = el('div'); row.append(el('dt', {}, k), el('dd', {}, v)); facts.append(row); }
+      for (const [k, v] of [['File', canvasPath(editing.key)], ['Commit', message], ['Branch', (side ? E.PR_BRANCH : main) + ', as you']]) { const row = el('div'); row.append(el('dt', {}, k), el('dd', {}, v)); facts.append(row); }
       form.append(facts);
       if (!project().private) para(form, 'This repository is public. Anyone can see this canvas and its files.', 'edit-warning');
       const diff = el('pre', { class: 'edit-diff', 'aria-label': 'Changed lines' });
@@ -273,6 +285,16 @@
     catch (e) { busy = false; render(); showToast(e.message); return; }
     busy = false;
     const data = res.data || {};
+    if (res.status === 200 && data.branch === E.PR_BRANCH) {
+      /* Saved on horsemen/canvas: the default branch, and so the viewer, do not change until the pull request merges. */
+      const sha = String(data.canvas_sha || '');
+      editing.baseDoc = clone(editing.doc); editing.baseSha = SHA.test(sha) ? sha : editing.baseSha; saveDraft();
+      editing.target = { side: true, defaultBranch: String(data.default_branch || editing.target.defaultBranch || ''), compareURL: data.pull_request?.compare_url || editing.target.compareURL };
+      editing.saved = true; editing.link = editing.link || E.pullRequestLink(editing.repo, editing.target.compareURL, null);
+      render(); refreshLink();
+      showToast(data.unchanged ? 'Nothing to save: ' + E.PR_BRANCH + ' has the same file.' : 'Saved to ' + E.PR_BRANCH + ' as commit ' + String(data.commit).slice(0, 7) + '. Open the pull request to merge it.');
+      return;
+    }
     if (res.status === 200) {
       const text = F.canonical(editing.doc), sha = String(data.canvas_sha || '');
       editing.baseDoc = clone(editing.doc); editing.baseSha = SHA.test(sha) ? sha : editing.baseSha; saveDraft();
@@ -282,6 +304,7 @@
       showToast(data.unchanged ? 'Nothing to save: GitHub has the same file.' : 'Saved as commit ' + String(data.commit).slice(0, 7) + '. The viewer shows it after the next check.');
       return;
     }
+    if (res.status === 409 && data.code === 'conflict' && data.branch === E.PR_BRANCH) editing.target = { ...editing.target, side: true };
     if (res.status === 409 && data.code === 'conflict' && attempt < 3 && (data.current === null || SHA.test(String(data.current)))) {
       try { if (!(await mergeWith(await theirs(data.current), data.current))) { render(); return; } }
       catch (e) { render(); showToast(e.message); return; }
@@ -292,7 +315,20 @@
     render();
     if (data.code === 'editor-signin') { info = hostedEditor.info(); return explain('signin'); }
     if (data.code === 'editor-install') return explain('install');
+    if (data.code === 'branch-conflict') {
+      /* horsemen/canvas conflicts with the default branch: the person resolves it in the pull request. */
+      editing.target = { ...editing.target, side: true }; editing.saved = true;
+      editing.link = E.pullRequestLink(editing.repo, data.pull_request?.compare_url, null) || editing.link; render(); refreshLink();
+    }
     showToast(data.error || 'The save failed. Try again.');
+  }
+  /* The open pull request of horsemen/canvas, read with the viewer token; the compare page when there is none. */
+  async function refreshLink() {
+    const now = editing;
+    if (!now || !now.target.side || !now.target.compareURL) return;
+    const pulls = await hostedEditor.pullRequests(now.repo);
+    if (editing !== now) return;
+    now.link = E.pullRequestLink(now.repo, now.target.compareURL, pulls) || now.link; render();
   }
   async function discard() {
     if (!active() || !dirty()) return;
@@ -312,10 +348,25 @@
     let state;
     try { state = await hostedEditor.access(p.repo); } catch (e) { showToast(e.message); return; }
     if (state !== 'ok') { explain(state); return; }
-    /* The project reloaded during the check (a new commit): the files of the canvas changed under it. */
+    /* Where a save goes. On a protected default branch, saves go to horsemen/canvas, and the draft starts from the file
+       on that branch, which can have earlier saves. */
+    let where;
+    try { where = await hostedEditor.target(p.repo, p.root, key); } catch (e) { showToast(e.message); return; }
+    if (where.status !== 200) {
+      const codes = { 'editor-signin': 'signin', 'editor-install': 'install', 'no-push': 'no-push' };
+      if (codes[where.data.code]) { info = hostedEditor.info(); explain(codes[where.data.code]); } else showToast(where.data.error || 'GitHub did not answer. Try again.');
+      return;
+    }
+    const t = where.data, side = t.branch === E.PR_BRANCH;
+    const target = { side, defaultBranch: String(t.default_branch || ''), compareURL: side ? String(t.pull_request?.compare_url || '') : '' };
+    const file = canvasFiles.get(key);
+    let baseDoc = file?.parsed?.doc ? clone(file.parsed.doc) : E.emptyDoc(), baseSha = file?.blob || null;
+    if (side && (t.sha === null || SHA.test(String(t.sha))) && t.sha !== baseSha) {
+      try { baseDoc = clone(await theirs(t.sha, p.repo)); baseSha = t.sha; } catch (e) { showToast(e.message); return; }
+    }
+    /* The project reloaded during the checks (a new commit): the files of the canvas changed under it. */
     if (project()?.id !== p.id || canvasKey !== key || request !== version || !recordsLoaded) { showToast('The canvas reloaded. Select Edit again.'); return; }
-    const file = canvasFiles.get(key), baseDoc = file?.parsed?.doc ? clone(file.parsed.doc) : E.emptyDoc(), baseSha = file?.blob || null;
-    editing = { project: p.id, repo: p.repo, root: p.root, key, baseSha, baseDoc, doc: clone(baseDoc) };
+    editing = { project: p.id, repo: p.repo, root: p.root, key, baseSha, baseDoc, doc: clone(baseDoc), target, link: null, saved: false };
     changedOnGitHub = false;
     if (world.classList.contains('list')) setView(false);
     const draft = readDraft(p, key);
@@ -327,14 +378,17 @@
     }
     buildCanvas(); renderHeader(); setSelection(selected); render();
     if (dirty()) showToast('Your unsaved draft of ' + canvasTitle(key) + ' is back.');
+    else if (side) showToast(target.defaultBranch + ' is protected. Saves go to ' + E.PR_BRANCH + ', for a pull request.');
+    refreshLink();
     addButton.focus({ preventScroll: true });
   }
   /* Leave edit mode. An unsaved draft stays in this tab and comes back with Edit. */
   function stop(quiet = false) {
     if (!editing) return;
-    const had = dirty(), key = editing.key;
+    const had = dirty(), key = editing.key, onSide = editing.saved ? editing.target : null;
     saveDraft(); editing = null; changedOnGitHub = false;
     if (!quiet && had) showToast('Your draft of ' + canvasTitle(key) + ' stays in this tab. Select Edit to continue.');
+    else if (!quiet && onSide) showToast('Your saves are on ' + E.PR_BRANCH + '. The canvas shows ' + (onSide.defaultBranch || 'the default branch') + ' until the pull request merges.');
     buildCanvas(); renderHeader(); setSelection(selected); render();
   }
   async function done() {
@@ -347,7 +401,8 @@
   /* app.js calls this when the header changes: a new canvas, a new project, or a new load of the same project. */
   function sync() {
     if (editing && (editing.project !== project()?.id || editing.key !== canvasKey)) stop();
-    if (editing && recordsLoaded) {
+    /* On horsemen/canvas, a new commit on the default branch does not change the draft's base: the save merges it in. */
+    if (editing && recordsLoaded && !editing.target.side) {
       const file = canvasFiles.get(editing.key), sha = file?.blob || null;
       if (sha !== editing.baseSha) {
         if (!dirty() && file?.parsed && !blocked(editing.key)) { editing.baseDoc = clone(file.parsed.doc); editing.baseSha = sha; editing.doc = clone(file.parsed.doc); changedOnGitHub = false; buildCanvas(); }
@@ -399,6 +454,7 @@
       if (!active()) return [{ icon: 'canvas', label: 'Edit this canvas', hint: 'Commit', run: start }];
       return [{ icon: 'plus', label: 'Add a note', hint: 'N', run: addNote }, { icon: 'link', label: 'Connect the two selected elements', hint: 'C', run: connect },
         { icon: 'check', label: 'Save the draft', hint: 'Ctrl S', run: save }, { icon: 'close', label: 'Leave edit mode', hint: 'Done', run: done },
+        ...(!prLink.hidden ? [{ icon: 'link', label: prLink.textContent, hint: E.PR_BRANCH, run: () => window.open(prLink.href, '_blank', 'noopener') }] : []),
         ...(info.signed_in ? [{ icon: 'back', label: 'Stop editing on this site', hint: 'Sign out of the editor', run: () => { stop(); hostedEditor.stop(); } }] : [])];
     },
   };
