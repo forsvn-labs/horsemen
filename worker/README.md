@@ -1,7 +1,9 @@
 # Hosted viewer
 
 A Cloudflare Worker that serves the Horsemen visual workspace to anyone who
-signs in with GitHub. It is read-only and keeps no project data.
+signs in with GitHub. It keeps no project data. The viewer is read-only. An
+optional second GitHub App, Horsemen Editor, lets a person save canvas edits;
+see [canvas editing](#canvas-editing).
 
 ## How it works
 
@@ -79,6 +81,7 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   read-only proxy and shows it from a `blob:` URL; SVG files load as images,
   so their scripts never run. External images stay links. Images larger than
   1 MiB stay links.
+- **Canvas editing.** Optional. See [canvas editing](#canvas-editing).
 - **Agents.** Agents update records and canvas files the normal way: edit,
   commit, and push. A canvas file that an agent writes by hand shows after
   the push, at the next check of the branch. A file that is not valid shows
@@ -87,6 +90,51 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   Horsemen Stop hook reminds the agent when a record it changed has not
   reached the remote default branch (see the Publish rule in
   [hooks](../horsemen/references/hooks.md)).
+
+## Canvas editing
+
+A person can move elements, add and edit notes, connect and delete
+elements on a record canvas or a board, and save. Each save is one commit by
+that person. Editing needs a second GitHub App, **Horsemen Editor**, with
+Contents: Read and write. The viewer app does not change, so a person who only
+reads sees no new permission request.
+
+```text
+browser ──POST /write/canvas (CSRF token + cookie with editor token)──▶ Worker ──editor token──▶ GitHub contents API
+           { repo, root, canvas, base, text }                       checks, builds the path, one commit
+```
+
+- **Opt-in.** In edit mode, Edit explains the permission. **Continue to
+  GitHub** starts `/auth/edit/login`. The editor sign-in needs a viewer
+  session of the same GitHub account; a token of another account is revoked
+  and not kept. The editor token goes into the same encrypted cookie, in its
+  own field. Reads always use the viewer token; writes always use the editor
+  token. Sign-out revokes both tokens. **Stop editing on this site** (in
+  Jump) revokes only the editor token.
+- **Install.** The person installs Horsemen Editor on the repositories that
+  they want to edit. `GET /write/access?repo=` tells the app whether the
+  editor app is installed there and whether the person can push.
+- **The write route.** `POST /write/canvas` is the only write. It needs the
+  session cookie with an editor token, an `Origin` header of this site, the
+  CSRF token, `Content-Type: application/json`, and a body of 2 MiB or less.
+  The body has exactly `repo`, `root`, `canvas`, `base` (the blob SHA of the
+  file that the draft started from, or `null`), and `text`. The Worker builds
+  the path `<root>/.horsemen/canvas/<canvas>.canvas` and the commit message
+  `canvas(<canvas>): add 1, move 2 [skip ci]` from counts. It checks the text
+  with the same reader as the browser (`web/canvas-format.js`) and writes the
+  canonical text. The browser never sends a path, a branch, or a message.
+- **Conflicts.** The Worker reads the file on the default branch. A blob SHA
+  that is not `base` returns `409` with `code: "conflict"` and the current
+  SHA; the browser reads that file, merges by element ID
+  (`web/canvas-edit.js`), and saves again. When the branch head moves during
+  the commit, the Worker tries again, three times at most.
+- **Drafts.** A draft stays in the browser tab (`sessionStorage`) until it is
+  saved or discarded. Sign-out removes drafts. The page warns before it
+  closes with an unsaved draft.
+- **What stays read-only.** The public view (`/pub/*`) and the read proxy
+  (`/gh/*`) accept GET only. The public view and the local app do not load
+  the edit script. An instance without the three editor secrets has no write
+  route and keeps the read-only text on the sign-in page.
 
 ## Deploy
 
@@ -108,6 +156,30 @@ organization. The script saves `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`,
 prints them. It discards the app private key, which read-only user access
 does not need. Then install the app from the link that the script prints.
 
+Optional, for canvas editing: create the editor app. It saves
+`EDITOR_CLIENT_ID`, `EDITOR_CLIENT_SECRET`, and `EDITOR_APP_SLUG`, and uses
+the same `SESSION_KEY`. The script opens the same kind of local page:
+
+```sh
+bun scripts/create-github-app.mjs --editor --origin https://your.domain
+bun scripts/create-github-app.mjs --editor --origin https://your.domain --print-manifest   # see the request first
+```
+
+The editor app asks for Contents: Read and write and Metadata: Read only, and
+its callback is `/auth/edit/callback`. To turn editing off, delete the three
+editor secrets with `bunx wrangler secret delete <name>`; the instance is a
+viewer again.
+
+Before the first deploy with editing, check the GitHub calls on a disposable
+repository that you own. The name must contain `check` or `disposable`. The
+script uses your `gh` sign-in, writes and deletes one canvas file with four
+commits marked `[skip ci]`, and prints statuses and SHAs only:
+
+```sh
+node scripts/live-edit-check.mjs --repo you/horsemen-edit-check          # reads only, then asks
+node scripts/live-edit-check.mjs --repo you/horsemen-edit-check --yes
+```
+
 To rotate the session key, which signs everyone out:
 `openssl rand -base64 32 | bunx wrangler secret put SESSION_KEY`.
 
@@ -117,7 +189,9 @@ To rotate the session key, which signs everyone out:
 
 ```sh
 node --test ../tests/test_hosted_reader.cjs test/       # unit tests
+node --test test/editor.test.js test/setup.test.js ../tests/test_canvas_edit.cjs   # editing
 python3 ../scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check
+python3 ../scripts/test_hosted_edit_e2e.py --output /tmp/horsemen-edit-check
 python3 ../scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench
 ```
 
@@ -135,6 +209,13 @@ link. It needs `agent-browser` and saves screenshots and logs to `--output`.
 Run `bun install` in `worker/` first, so that the check uses the local
 `wrangler`.
 
+The edit check runs the same way with both apps on the fake GitHub. It opts
+in to the editor, moves a section card, adds and connects a note, and saves
+one commit. Then a commit from outside arrives while a draft is open (Merge
+now), and a save meets a conflict on the same note. It also checks Delete
+and N on the keyboard, a phone width, the eight themes, the public view, and
+sign-out. It saves screenshots and `edit-flow.webm` to `--output`.
+
 ## Limits
 
 - Only default branches are shown. Branch and pull request views are not built.
@@ -145,7 +226,10 @@ Run `bun install` in `worker/` first, so that the check uses the local
 - Links to private repositories work only for people with GitHub access.
   Public links to private repositories would need stored share settings.
 - Private PR image attachments open on GitHub; the viewer does not load them.
-- Canvas files are read-only here. A project shows 20 canvas files at most;
+- Editing covers canvas files only: move, notes, connectors, and delete. It
+  does not resize, upload media, or change record text. Saves go to the
+  default branch; a protected branch refuses the commit (code `busy`).
+- A project shows 20 canvas files at most;
   each one is one blob read when the project opens. A canvas loads 100
   images at most, one contents read for each image that comes into view,
   and 20 tables at most, one contents read for each table.

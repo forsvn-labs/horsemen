@@ -2,7 +2,7 @@
 
 Open real Horsemen projects as a calm canvas. Double-click a record to read it
 or inspect its exact Markdown. Each record also opens as a canvas of its
-sections. The app reads GitHub; it does not edit files.
+sections. The local app reads GitHub; it does not edit files.
 
 From this source checkout, with Python 3.10+ and GitHub CLI installed:
 
@@ -18,7 +18,9 @@ Refresh GitHub (in the account menu) repeats discovery. Clear workspace
 removes the in-memory scan; it does not sign out of GitHub. Stop the server
 with Ctrl+C.
 
-The same app also runs as a hosted, read-only viewer with GitHub sign-in.
+The same app also runs as a hosted viewer with GitHub sign-in. It is
+read-only, unless the site offers the optional editor app for canvas files
+(see [edit a canvas](#edit-a-canvas-hosted)).
 See [the hosted viewer](../worker/README.md).
 
 ## Reading and navigation
@@ -93,8 +95,9 @@ A [canvas file](#canvas-files) can add elements to it.
 
 A canvas file is a JSON Canvas 1.0 file in `<project root>/.horsemen/canvas/`,
 such as `.horsemen/canvas/progress.canvas`. A person or an agent writes the
-file and pushes it. The app reads it and draws it. The app does not change
-it: this step is read-only. The format and its limits are in
+file and pushes it. The app reads it and draws it. The local app and the
+public view do not change it. In the hosted app, a person with the editor app
+can [edit a canvas](#edit-a-canvas-hosted). The format and its limits are in
 [the canvas workspace design](../docs/product/canvas-workspace.md#canvas-file-format).
 
 - **Which canvas.** A file with the name of a record (`vision`, `progress`,
@@ -148,7 +151,7 @@ it: this step is read-only. The format and its limits are in
   element names its connectors as text lines, such as "proof → Pilot board".
   The list is the form of a canvas for a phone and for assistive technology.
 
-Not in this step: editing in the browser, an XLSX preview, group background
+Not in this step: an XLSX preview, group background
 images, a canvas file for Home (`home.canvas` is not shown), and the overview
 of references between canvases.
 
@@ -195,6 +198,45 @@ table. The rules are in `web/canvas-embeds.js` and `web/canvas-table.js`.
 - **List view and phones.** A player keeps its shape (16:9 for a video). A
   table scrolls inside its card. A live update of the canvas draws the cards
   again, so a loaded player returns to its button.
+
+### Edit a canvas (hosted)
+
+The hosted app can edit the canvas of a record and a board when the site has
+the optional Horsemen Editor app. The local app and the public view stay
+read-only and do not load the edit code.
+
+1. Open a record canvas or a board and select **Edit** in the header. The
+   first time, a dialog explains the permission: Horsemen Editor asks GitHub
+   for Contents: Read and write on the repositories where you install it, and
+   uses it only to save files in `.horsemen/canvas/`. Select **Continue to
+   GitHub**. If the editor app is not installed on the repository, the dialog
+   links to its install page.
+2. Edit. A bar shows the actions and the state of the draft.
+
+   | Action | Mouse | Keyboard |
+   | --- | --- | --- |
+   | Move | Drag an element. A section card that the record makes is saved into the file when it moves. | Arrow keys move the selected elements (Shift: 10 px, Alt: 20 px). |
+   | Add a note | **Add note**. The note goes in free space in the middle of the view. | N |
+   | Edit a note | Double-click the note. The text is Markdown. | Enter on the selected note; Ctrl + Enter closes the editor. |
+   | Connect | Select two elements (Shift-click), then **Connect**. The connector goes from the first to the second. With a connector between them, the button is **Disconnect**. | C |
+   | Delete | **Delete**. The connectors of an element go with it. A section card that the record makes stays. | Delete or Backspace |
+   | Save | **Save**, then **Commit** in the preview. | Ctrl + S (Command + S on macOS) |
+
+3. The preview shows the file, the commit message, the branch, and the
+   changed elements. For a public repository it says that anyone can see the
+   canvas. One save is one commit by you on the default branch, with a
+   message such as `canvas(progress): add 1, move 2 [skip ci]`.
+4. If the file changed on GitHub since your draft started, the app merges
+   the two versions by element ID and saves again. When the same element
+   changed on both sides, a dialog asks which version to keep for each
+   element. When the 60-second check finds a new commit while a draft is open,
+   the bar says so and offers **Merge now**.
+
+The draft stays in this browser tab until you save or discard it; **Done**
+asks first. The page warns before it closes with an unsaved draft, and
+sign-out removes drafts. **Stop editing on this site** in Jump signs out of
+the editor app only. Not in this step: resize, images and files, links,
+groups, colours, undo, and protected branches.
 
 ### Home canvas
 

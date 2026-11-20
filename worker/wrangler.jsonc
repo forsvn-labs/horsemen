@@ -1,5 +1,6 @@
 // Horsemen hosted viewer. Secrets (set with `wrangler secret put`):
 // GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET, GITHUB_APP_SLUG, SESSION_KEY.
+// Optional canvas editing: EDITOR_CLIENT_ID, EDITOR_CLIENT_SECRET, EDITOR_APP_SLUG.
 // Self-hosting: change `name` and the custom domain. See README.md.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
