@@ -27,7 +27,8 @@ The screen shows few controls. Everything else is in one of three places:
 the account menu, the Jump field, and the keyboard.
 
 - **Rail.** The rail has the project switcher, then the canvases of the open
-  project: Home and each record that the project has. Select the switcher to
+  project: Home, each record that the project has, and then the boards (see
+  [canvas files](#canvas-files)). Select the switcher to
   see your projects. A lock marks a private repository. A search field
   appears when you have more than eight projects. Multiple search words
   narrow the result. Nested project roots are separate entries. The Up and
@@ -39,8 +40,9 @@ the account menu, the Jump field, and the keyboard.
   gallery, and Clear workspace. In hosted mode it also holds Choose
   repositories and Sign out.
 - **Header.** The header names the open canvas: the project on Home, the
-  record on a record canvas. One line follows: the number of sections (on a
-  record canvas), the repository, when PROGRESS says it was updated, and the
+  record on a record canvas, the board on a board. One line follows: the
+  number of sections (on a record canvas), the number of elements from the
+  canvas file, the repository, when PROGRESS says it was updated, and the
   commit that the app read. It has Jump, Canvas or List, and in hosted mode
   Copy link.
 - **Jump.** Press Ctrl + K (Command + K on macOS) or select Jump. One field
@@ -58,6 +60,7 @@ the account menu, the Jump field, and the keyboard.
 
 Select a record in the rail to open its canvas. The canvas is generated from
 the record each time. It needs no file, and the app saves nothing about it.
+A [canvas file](#canvas-files) can add elements to it.
 
 - The canvas has one card for each second-level heading (`## Heading`), in
   reading order, in three columns. A card shows the heading and a few lines
@@ -75,17 +78,77 @@ the record each time. It needs no file, and the app saves nothing about it.
   layout names the section; if not, it uses the full document. Close the
   view to return to the same card.
 - List view shows the same cards in reading order. One click opens a card.
-- A record canvas has no connectors. Connectors between cards come with
-  saved canvas files, which are a later step of
-  [the canvas workspace design](../docs/product/canvas-workspace.md). Home
-  keeps its connectors between records and linked documents.
+- A record canvas without a canvas file has no connectors. Connectors
+  between cards come from a [canvas file](#canvas-files). Home keeps its
+  connectors between records and linked documents.
 - The address names the canvas and the selected card. In the local app it is
   `#p=<project>&c=progress&n=s-shipped`; `&r=progress` is added while the
   reading view is open. The hosted form is
   `/owner/repo?canvas=progress&node=s-shipped`. A link to a section whose
-  heading changed opens the canvas and says that the section is not there.
+  heading changed opens the canvas and says that the card is not there.
   Links from before canvases, such as `?record=progress`, open the record
   over Home as before.
+
+### Canvas files
+
+A canvas file is a JSON Canvas 1.0 file in `<project root>/.horsemen/canvas/`,
+such as `.horsemen/canvas/progress.canvas`. A person or an agent writes the
+file and pushes it. The app reads it and draws it. The app does not change
+it: this step is read-only. The format and its limits are in
+[the canvas workspace design](../docs/product/canvas-workspace.md#canvas-file-format).
+
+- **Which canvas.** A file with the name of a record (`vision`, `progress`,
+  `brain`, `structure`, `readme`, `changelog`, `techstack`) belongs to the
+  canvas of that record. A file with another name is a board. The rail lists
+  the boards after the records, in name order, with the name in title case
+  (`launch-plan` shows as "Launch plan"). A project can have 20 canvas files.
+- **A record with a file.** The elements of the file show at their saved
+  places and sizes. Each section that the file does not place still shows as
+  a generated card, in one column at the left of the saved elements. The
+  cards do not overlap, and the same input gives the same layout.
+- **Elements.**
+
+  | Element | In the file | Shows as |
+  | --- | --- | --- |
+  | Note | `text` node | Markdown from the same safe renderer as the records. |
+  | Section card | `file` node with a `.md` file and a `subpath` (`#Heading`) | The live text of that section. A card of another record says "from Progress". Enter or double-click opens the reading view of that record at the section. |
+  | Record or document | `file` node with a `.md` file and no `subpath` | A card that opens the record or the document in the reading view. |
+  | Portal | `file` node with a `.canvas` file of the same project | "Open canvas". Enter or double-click opens that canvas. |
+  | Image | `file` node with a PNG, JPEG, GIF, WebP, or SVG file | The image, from a `blob:` address, with its `alt` text. The limit is 1 MiB for a file and 100 images for a canvas. |
+  | Other file | `file` node with another file, such as CSV | A file card with a link to the file on GitHub. |
+  | Link card | `link` node | The stored `title`, the host, and "Open link". The app fetches nothing from the address. |
+  | Group | `group` node | A frame with its label, behind the other elements. |
+  | Connector | edge | A curve with an arrow and its label. |
+  | Other type | any other node type | "Not supported". |
+
+- **Colours.** A preset (`"1"` to `"6"`) takes a colour of the active theme.
+  A hex value (`#RRGGBB`) shows as written. The colour shows as a stripe on
+  the element in each theme.
+- **A file that is not valid.** The app shows one message above the canvas,
+  with a link to the file on GitHub, and the rail marks the canvas. For a
+  file that is not JSON, is too large, or breaks a limit, no element of the
+  file shows: a record shows its generated canvas, and a board is empty. For
+  a file with some elements that are not valid, the other elements show, and
+  the message gives the count and the first fault. Select "Show 3 faults"
+  (with the count of your file) to see the list.
+- **Section not found.** A section card whose heading is not in the record
+  now says "Section not found". The card still opens the record. A portal to
+  a canvas that the project does not have says "Canvas not found".
+- **Selection and links.** Click selects an element. Enter selects the
+  element that has focus; Enter again opens it when it can open. An element
+  has a fixed place: a drag that starts on it moves the canvas. The address
+  names the canvas and the selected element, such as
+  `#p=<project>&c=launch-plan&n=note-risk` or
+  `/owner/repo?canvas=launch-plan&node=note-risk`. A link inside a note or a
+  card stays a link.
+- **List view.** The list shows each element in reading order: the elements
+  outside groups from top to bottom, then each group with its elements. An
+  element names its connectors as text lines, such as "proof → Pilot board".
+  The list is the form of a canvas for a phone and for assistive technology.
+
+Not in this step: editing in the browser, video and design embeds, CSV
+tables, group background images, a canvas file for Home (`home.canvas` is
+not shown), and the overview of references between canvases.
 
 ### Home canvas
 
@@ -209,6 +272,15 @@ This is a source-only local preview, not a hosted or multi-user service.
 The wheel and skill do not include the web assets. There is no public sharing,
 OAuth app, file editing, webhook, local-folder import, or background refresh.
 
+Canvas files are untrusted input. The app checks each file with the rules
+in `web/canvas-format.js` before it draws an element. Text from a file is
+always text: a note goes through the Markdown renderer, and each other value
+is escaped. A link address must start with `http://` or `https://`. A colour
+is a preset or `#RRGGBB`. A path cannot leave the project. A file larger
+than 512 KiB is not requested. An SVG image shows only as an image from a
+`blob:` address, so its script does not run, also when a person opens that
+address as a page. The app reads only the files that a loaded canvas names.
+
 Discovery reads default branches, including archived repositories. A project
 needs at least two core records and either VISION or PROGRESS (legacy STATUS
 is supported). Missing records are reported. Truncated repository trees are
@@ -228,7 +300,7 @@ The peek history holds up to 32 levels; Back and project changes release it.
 
 The server binds only to 127.0.0.1. It reads credentials locally through `gh`;
 they never reach the browser. Requests are read-only. Repository metadata and record contents are not saved to disk
-by the app. The browser stores only opaque project IDs, the positions of Home cards, the theme, palette, and mode choices, and the layout choice for each record type. It stores nothing about record canvases.
+by the app. The browser stores only opaque project IDs, the positions of Home cards, the theme, palette, and mode choices, and the layout choice for each record type. It stores nothing about record canvases, boards, or canvas files.
 In hosted mode, the browser also keeps a discovery index without record text; see
 [fast reloads](../worker/README.md#how-it-works).
 External images do not load automatically. Opening an external link leaves
@@ -238,9 +310,10 @@ the local credential identity and reject account changes. The remote account
 check is reused for up to 30 seconds; revocation of an unchanged credential
 can take that long to invalidate cached content.
 
-Records load in parallel. Up to 16 projects are cached in server memory at
-the scanned revision. Refresh and Clear workspace discard this cache. Failed
-record loads are retried instead of cached. Nothing is written to disk.
+Records and canvas files load in parallel. Up to 16 projects are cached in
+server memory at the scanned revision. Refresh and Clear workspace discard
+this cache. Failed record and canvas loads are retried instead of cached.
+Nothing is written to disk.
 
 ## Verification
 
@@ -252,10 +325,21 @@ node tests/test_gui_markdown.cjs
 node tests/test_gui_themes.cjs
 node tests/test_canvas_state.cjs
 node tests/test_canvas_sections.cjs
+node tests/test_canvas_format.cjs
+node tests/test_canvas_view.cjs
 python3 scripts/test_gui_e2e.py --output /tmp/horsemen-gui-check
 ```
 
+`tests/test_canvas_format.cjs` checks the reader of canvas files. It also
+runs the shared cases in `tests/fixtures/canvas/`, which the Python reader
+runs too, so both readers accept and refuse the same files with the same
+errors. When that folder is not in the checkout, the test reads the cases
+from the Git branch `origin/canvas/agent-tools`; with neither, it says that
+it skipped them. `tests/test_canvas_view.cjs` checks how a file and a record
+become one drawing.
+
 The browser check needs `agent-browser`. It uses fictional GitHub fixtures,
-checks reading/source views and browser safety, and saves screenshots and
-command output outside the repository. Full package checks remain in
+checks reading/source views, canvas files (`scripts/canvas_fixture.py`), and
+browser safety, and saves screenshots and command output outside the
+repository. Full package checks remain in
 [CONTRIBUTING](../CONTRIBUTING.md).

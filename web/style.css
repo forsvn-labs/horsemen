@@ -438,7 +438,7 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 .canvas-notice details{flex-basis:100%;color:var(--ink-2)}
 .canvas-notice summary{cursor:pointer;width:fit-content}
 .canvas-notice ul{margin:6px 0 2px;padding-left:20px;font-family:var(--mono);font-size:var(--fs-s);overflow-wrap:anywhere}
-.canvas-fault{width:13px;height:13px;margin-left:auto;color:var(--vermilion)}
+.canvas-link .canvas-fault{width:13px;height:13px;margin-left:auto;color:var(--ink-2)}
 .canvases-nav .boards-label{margin:16px 10px 6px}
 
 /* List view */

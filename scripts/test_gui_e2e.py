@@ -453,7 +453,7 @@ try:
     edges=value('JSON.stringify([...document.querySelectorAll(".wires .edge")].map(g=>[g.dataset.edge,g.querySelector("text").textContent,g.querySelectorAll("polygon").length,g.dataset.tone||null,/^M [-\\d.]+ [-\\d.]+ C /.test(g.querySelector("path").getAttribute("d"))]))')
     assert edges==[['e-proof','proof',1,None,True],['e-risk','blocks',1,'1',True],['e-hostile','<img src=x onerror=window.pwned=1>',2,None,True]], 'Each connector has its label and its arrows'
     assert value('JSON.stringify([document.querySelectorAll(".wires img,.wires script,.wires foreignObject,.wires circle").length,window.pwned??null,window.__csp])')==[0,None,[]], 'No script ran and nothing broke the content security policy'
-    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished")')
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished") && document.querySelector("#toast").hidden')
     browser('screenshot',str(args.output/'canvas-file-structure.png'))
     # Selection, keyboard, and links. An element of a file has a fixed place. Enter selects; a note does not open.
     browser('click','[data-node="note-risk"]')
