@@ -52,6 +52,8 @@ def main():
         # Hosted viewer: reader parity with Python, and the Worker's auth and proxy rules.
         if not shutil.which("node"): raise RuntimeError("hosted-tests need Node.js 20 or later")
         run("hosted-tests", ["node", "--test", "tests/test_hosted_reader.cjs", "worker/test/worker.test.js"])
+        # Canvas editing: the editor sign-in, the write route, the setup script, and the merge by element ID.
+        run("canvas-edit-tests", ["node", "--test", "worker/test/editor.test.js", "worker/test/setup.test.js", "tests/test_canvas_edit.cjs"])
         # Canvas files in the browser: the reader (with the shared cases of the Python reader) and the drawing rules.
         run("canvas-file-tests", ["node", "--test", "tests/test_canvas_format.cjs", "tests/test_canvas_view.cjs"])
         # Viewer rules: generated canvases, canvas interaction, previews, views, Markdown, themes, and media.
