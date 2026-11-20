@@ -5,12 +5,14 @@
    - Move, add a note, edit a note, connect, and delete change the draft (canvas-edit.js). The canvas shows the draft.
    - Save sends the canonical text to the Worker's one write route. One save is one commit by the person.
    - A conflict (the file changed on GitHub) reads the new file and merges by element ID, then saves again.
+   - Slice 4b: drop or paste an image, a GIF, a CSV or TSV table, or an address. A file gets a name from its bytes
+     (canvas-media.js) and shows from a blob: address until the save; the save sends it with the canvas, in one commit.
    - Slice 4c: when the default branch is protected, the Worker saves to horsemen/canvas. Edit asks the Worker where a save
      goes and starts the draft from the file on that branch; the bar says so, and after a save it links the pull request.
    It reads the app's shared state (app.js is a classic script) and talks to GitHub only through HorsemenHosted.editor. */
 (function () {
-  const hostedEditor = window.HorsemenHosted && window.HorsemenHosted.editor, E = window.HorsemenCanvasEdit;
-  if (!hostedEditor || !E) return;
+  const hostedEditor = window.HorsemenHosted && window.HorsemenHosted.editor, E = window.HorsemenCanvasEdit, M = window.HorsemenCanvasMedia;
+  if (!hostedEditor || !E || !M) return;
   const q = s => document.querySelector(s);
   const el = (tag, attrs = {}, text = null) => { const n = document.createElement(tag); for (const [k, v] of Object.entries(attrs)) if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? '' : v); if (text !== null) n.textContent = text; return n; };
   const clone = value => JSON.parse(JSON.stringify(value));
@@ -25,6 +27,11 @@
   const bar = el('div', { class: 'edit-bar', id: 'edit-bar', role: 'toolbar', 'aria-label': 'Edit canvas', hidden: true });
   const button = (id, label, title, cls = 'btn') => { const b = el('button', { type: 'button', class: cls, id, title }, label); bar.append(b); return b; };
   const addButton = button('edit-add', 'Add note', 'Add a note (N)');
+  const fileButton = button('edit-file', 'Add file', 'Add an image, a GIF, or a CSV or TSV table of 1 MiB or less. You can also drop or paste it.');
+  const linkButton = button('edit-link', 'Add link', 'Add a link or a player from an address (L). You can also paste it.');
+  const fileInput = el('input', { type: 'file', id: 'edit-file-input', multiple: true, hidden: true, tabindex: '-1', 'aria-hidden': 'true',
+    accept: 'image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.png,.jpg,.jpeg,.gif,.webp,.svg,.csv,.tsv,text/csv,text/tab-separated-values' });
+  bar.append(fileInput);
   const connectButton = button('edit-connect', 'Connect', 'Connect the two selected elements (C)');
   const deleteButton = button('edit-delete', 'Delete', 'Delete the selected elements (Delete)');
   const status = el('span', { class: 'edit-status', id: 'edit-status', role: 'status' }); bar.append(status);
@@ -41,7 +48,7 @@
     q('.stage')?.prepend(bar);
     /* The shortcut sheet lists the keys of edit mode. */
     const keys = q('#shortcuts .keys');
-    if (keys && !q('#edit-keys')) for (const [k, d] of [['N', 'Add a note, in edit mode'], ['C', 'Connect or disconnect two selected elements, in edit mode'], ['Delete', 'Delete the selected elements, in edit mode'], ['Ctrl S', 'Save the draft as one commit, in edit mode']]) {
+    if (keys && !q('#edit-keys')) for (const [k, d] of [['N', 'Add a note, in edit mode'], ['L', 'Add a link from an address, in edit mode'], ['Ctrl V', 'Paste an image, a table, or an address, in edit mode'], ['C', 'Connect or disconnect two selected elements, in edit mode'], ['Delete', 'Delete the selected elements, in edit mode'], ['Ctrl S', 'Save the draft as one commit, in edit mode']]) {
       const row = el('div', k === 'N' ? { id: 'edit-keys' } : {}); row.append(el('dt'), el('dd', {}, d)); row.firstChild.append(el('kbd', {}, k)); keys.append(row);
     }
   }
@@ -56,7 +63,13 @@
   const canvasPath = key => (project()?.root ? project().root + '/' : '') + '.horsemen/canvas/' + key + '.canvas';
   const draftKey = () => E.draftKey(editing.repo, editing.root, editing.key);
   function saveDraft() {
-    try { if (dirty()) sessionStorage.setItem(draftKey(), JSON.stringify({ base: editing.baseSha, baseDoc: editing.baseDoc, doc: editing.doc })); else sessionStorage.removeItem(draftKey()); } catch { /* Storage is optional: the draft stays in memory. */ }
+    const draft = { base: editing.baseSha, baseDoc: editing.baseDoc, doc: editing.doc };
+    try {
+      if (!dirty()) { sessionStorage.removeItem(draftKey()); return; }
+      const files = pending().map(m => ({ name: m.name, data: M.toBase64(m.bytes) }));
+      try { sessionStorage.setItem(draftKey(), JSON.stringify(files.length ? { ...draft, media: files } : draft)); }
+      catch { sessionStorage.setItem(draftKey(), JSON.stringify(draft)); }  // Too large for this tab's storage: the files stay in memory only.
+    } catch { /* Storage is optional: the draft stays in memory. */ }
   }
   function readDraft(p, key) {
     try {
@@ -77,6 +90,40 @@
     return null;
   }
 
+  /* ---------------------------------------------------------------- media of a draft (slice 4b)
+     Files that a person added in this tab, by repository and full path: { name, path, rel, kind, type, bytes, url, text, saved }.
+     A file is pending until a save sends it; it shows from memory until the next load of the project reads it from GitHub. */
+  const local = new Map();
+  const fullPath = rel => (project()?.root ? project().root + '/' : '') + rel;
+  const localKey = (repo, path) => repo + '\n' + path;
+  function remember(result, bytes) {
+    const p = project(), rel = M.path(result.name), key = localKey(p.repo, fullPath(rel));
+    const known = local.get(key);
+    if (known) { known.saved = false; return known; }
+    const entry = { name: result.name, path: fullPath(rel), rel, kind: result.kind, type: result.type, bytes, saved: false,
+      url: result.kind === 'image' ? URL.createObjectURL(new Blob([bytes], { type: result.type })) : null,
+      text: result.kind === 'table' ? new TextDecoder().decode(bytes) : null };
+    local.set(key, entry);
+    return entry;
+  }
+  /* The local files that a canvas document names, in this project. */
+  function named(doc) {
+    const p = project(); if (!p || !doc) return [];
+    return [...M.references(doc)].map(name => local.get(localKey(p.repo, fullPath(M.path(name))))).filter(Boolean);
+  }
+  const pending = () => editing ? named(editing.doc).filter(m => !m.saved) : [];
+  /* Links in the form of the reader's links (hosted-reader.js canvasLinks), so the drawing loads them like files on GitHub. */
+  const linksOf = doc => named(doc).map(m => ({ id: 'draft:' + m.path, kind: 'attachment', local: localKey(project().repo, m.path), path: m.path, title: m.name, source: 'draft',
+    href: 'https://github.com/' + project().repo + '/blob/' + project().revision + '/' + m.path.split('/').map(encodeURIComponent).join('/') }));
+  async function restoreMedia(files) {
+    if (!Array.isArray(files)) return;
+    for (const item of files.slice(0, M.MAX_FILES)) {
+      const bytes = item && M.fromBase64(item.data), result = bytes && await M.check(item.name, bytes);
+      if (result && result.ok) remember(result, bytes);
+    }
+  }
+  const sizeText = n => n < 1024 ? n + ' B' : n < 1024 * 1024 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB';
+
   /* ---------------------------------------------------------------- the view */
   function render() {
     const p = project(), on = active();
@@ -91,7 +138,7 @@
     where.hidden = !side; where.textContent = side ? 'Saves to ' + E.PR_BRANCH : '';
     prLink.hidden = !(side && link && (editing.saved || link.number));
     if (link) { prLink.href = link.url; prLink.textContent = link.label; prLink.title = link.number ? 'Open pull request #' + link.number + ' on GitHub' : 'Open a pull request from ' + E.PR_BRANCH + ' on GitHub'; }
-    saveButton.disabled = busy || !changed; discardButton.disabled = busy || !changed; addButton.disabled = busy;
+    saveButton.disabled = busy || !changed; discardButton.disabled = busy || !changed; addButton.disabled = fileButton.disabled = linkButton.disabled = busy;
     selectionChanged();
   }
   function selectionChanged() {
@@ -130,18 +177,109 @@
     if (failed) showToast('This card cannot move: its heading is repeated or has “#”. Rename the heading in the record first.');
     if (!apply(doc)) { buildCanvas(); setSelection(selected); }
   }
-  function addNote() {
+  /* The top left corner of a new element: the middle of the view, or the first free place below it, so it does not
+     cover a card. `doc` adds the elements that are not drawn yet. With `at` (a drop), the element is centred there. */
+  function freeSpot(width, height, at = null, doc = null) {
+    if (at) return { x: Math.round(at.x - width / 2), y: Math.round(at.y - height / 2) };
+    const start = worldPoint({ x: canvas.clientWidth / 2 - width / 2, y: canvas.clientHeight / 2 - height / 2 }), gap = 24;
+    const drawn = new Set(sectionNodes.keys()), extra = (doc?.nodes || []).filter(n => !drawn.has(n.id));
+    const boxes = [...[...sectionNodes.values()].filter(n => n.kind !== 'group'), ...extra.filter(n => n.type !== 'group')];
+    const free = (x, y) => boxes.every(n => x + width + gap <= n.x || n.x + n.width + gap <= x || y + height + gap <= n.y || n.y + n.height + gap <= y);
+    const x = Math.round(start.x), y = Math.round(start.y);
+    for (let step = 0; step < 60; step++) if (free(x, y + step * E.NOTE.height / 2)) return { x, y: Math.round(y + step * E.NOTE.height / 2) };
+    return { x, y };
+  }
+  function addNote(text = null) {
     if (!active() || busy) return;
     if (world.classList.contains('list')) setView(false);
-    /* The middle of the view, or the first free place below it: a new note does not cover a card. */
-    const start = worldPoint({ x: canvas.clientWidth / 2 - E.NOTE.width / 2, y: canvas.clientHeight / 2 - E.NOTE.height / 2 }), gap = 24;
-    const boxes = [...sectionNodes.values()].filter(n => n.kind !== 'group');
-    const free = (x, y) => boxes.every(n => x + E.NOTE.width + gap <= n.x || n.x + n.width + gap <= x || y + E.NOTE.height + gap <= n.y || n.y + n.height + gap <= y);
-    const x = Math.round(start.x), y = Math.round(start.y);
-    let at = { x, y };
-    for (let step = 0; step < 60; step++) if (free(x, y + step * E.NOTE.height / 2)) { at = { x, y: y + step * E.NOTE.height / 2 }; break; }
-    const { doc, id } = E.addNote(editing.doc, { x: at.x, y: at.y });
-    apply(doc, [id]); if (!inView(cardOf(id))) revealNode(id); editNote(id);
+    const at = freeSpot(E.NOTE.width, E.NOTE.height);
+    const { doc, id } = E.addNote(editing.doc, { x: at.x, y: at.y, ...(typeof text === 'string' ? { text } : {}) });
+    apply(doc, [id]); if (!inView(cardOf(id))) revealNode(id);
+    if (typeof text !== 'string') editNote(id);
+  }
+
+  /* ---------------------------------------------------------------- add files and links (slice 4b) */
+  const confirmedPublic = new Set();
+  /* Before the first file of a tab goes to a public repository, the person confirms that anyone can see it. */
+  async function publicOK() {
+    const p = project();
+    if (p.private || confirmedPublic.has(p.repo)) return true;
+    const go = await ask('Add a file to a public repository?', form => {
+      para(form, 'This repository is public. Anyone can see the files that you add, and Git history keeps them after you delete them.', 'edit-warning');
+      para(form, 'Add only files that you may share. The file goes to GitHub when you save.');
+    }, [['', 'Cancel'], ['add', 'Add the file', 'primary']]);
+    if (go !== 'add') return false;
+    confirmedPublic.add(p.repo);
+    return true;
+  }
+  /* The size of an image card from the image itself: 480 pixels wide at most, 640 high at most. Null when it does not decode. */
+  async function imageBox(entry) {
+    const img = new Image(); img.src = entry.url;
+    try { await img.decode(); } catch { return null; }
+    let w = img.naturalWidth || 400, h = img.naturalHeight || 300;
+    const width = Math.min(480, Math.max(160, w)), height = Math.round(width * h / w);
+    if (height > 640) return { width: Math.max(16, Math.round(640 * w / h)), height: 640 };
+    return { width, height: Math.max(16, height) };
+  }
+  const altOf = file => String(file || '').replace(/\.[A-Za-z0-9]{1,8}$/, '').replace(/[-_]+/g, ' ').trim().slice(0, 200) || 'Image';
+  /* Files from a drop, a paste, or the file picker. `at` is a point of the canvas (a drop), or null for a free place. */
+  async function addFiles(list, at = null, source = 'file') {
+    const files = [...list];
+    if (!active() || busy || !files.length) return;
+    if (world.classList.contains('list')) setView(false);
+    if (!(await publicOK())) return;
+    let doc = editing.doc;
+    const added = [], messages = [], waiting = new Set(pending().map(m => m.name));
+    for (const file of files) {
+      const big = file.size > M.MAX_BYTES, bytes = big ? new Uint8Array(M.MAX_BYTES + 1) : new Uint8Array(await file.arrayBuffer());
+      const result = await M.build(file.name || (source === 'paste' ? 'pasted' : ''), bytes, 'auto', file.type);
+      const label = file.name || 'The pasted file';
+      if (!result.ok) { messages.push(label + ': ' + result.error); continue; }
+      if (!waiting.has(result.name) && waiting.size >= M.MAX_FILES) { messages.push('A save holds ' + M.MAX_FILES + ' files at most. Save, then add more.'); break; }
+      const entry = remember(result, bytes);
+      const box = result.kind === 'image' ? await imageBox(entry) : { width: 480, height: 320 };
+      if (!box) { messages.push(label + ': the file could not be shown as an image.'); continue; }
+      const spot = freeSpot(box.width, box.height, at && { x: at.x + added.length * 24, y: at.y + added.length * 24 }, doc);
+      const out = E.addFile(doc, { ...spot, ...box, file: entry.rel, alt: result.kind === 'image' ? altOf(source === 'paste' && !file.name ? 'Pasted image' : file.name) : null });
+      if (!out) continue;
+      doc = out.doc; added.push(out.id); waiting.add(result.name);
+    }
+    if (added.length) { apply(doc, added); const last = added.at(-1); if (!inView(cardOf(last))) revealNode(last); }
+    if (messages.length) showToast(messages.join(' '));
+  }
+  /* A pasted or dropped text: an address is a link card (a player for a known provider), a table is a CSV or TSV
+     file, other text is a note. */
+  async function addText(text, at = null) {
+    if (!active() || busy || typeof text !== 'string' || !text.trim()) return;
+    const url = M.address(text);
+    if (url) return addLink(url, null, at);
+    const kind = M.tableKind(text);
+    if (kind) return addFiles([new File([text], 'pasted-table.' + kind, { type: kind === 'csv' ? 'text/csv' : 'text/tab-separated-values' })], at, 'paste');
+    addNote(text);
+  }
+  function addLink(url, title = null, at = null) {
+    if (!active() || busy) return;
+    if (world.classList.contains('list')) setView(false);
+    const player = !!window.HorsemenEmbeds?.embed(url), box = player ? E.PLAYER : E.LINK;
+    const spot = freeSpot(box.width, box.height, at), out = E.addLink(editing.doc, { ...spot, url, title, player });
+    if (!out) { showToast('Enter an http or https address of 2,048 characters or less.'); return; }
+    apply(out.doc, [out.id]); if (!inView(cardOf(out.id))) revealNode(out.id);
+  }
+  async function askLink() {
+    if (!active() || busy) return;
+    let address, title;
+    const go = await ask('Add a link', form => {
+      const a = el('label', { class: 'edit-field' }); a.append(el('span', {}, 'Address'));
+      address = el('input', { type: 'url', required: true, maxlength: '2048', placeholder: 'https://', autocomplete: 'off', spellcheck: 'false' }); a.append(address);
+      const t = el('label', { class: 'edit-field' }); t.append(el('span', {}, 'Title (optional)'));
+      title = el('input', { type: 'text', maxlength: '200', autocomplete: 'off' }); t.append(title);
+      form.append(a, t);
+      para(form, 'A YouTube, Vimeo, Loom, Figma, or Google address shows a player that loads only after a click. Other addresses show the title and the host.');
+    }, [['', 'Cancel'], ['add', 'Add', 'primary']]);
+    if (go !== 'add') return;
+    const url = M.address(address.value);
+    if (!url) { showToast('Enter an http or https address of 2,048 characters or less.'); return; }
+    addLink(url, title.value);
   }
   function connect() {
     const ids = [...selected].filter(id => sectionNodes.has(id));
@@ -182,7 +320,7 @@
       const go = await ask('Edit canvases of ' + p.repo, form => {
         para(form, 'Editing uses a second GitHub App, Horsemen Editor. It is separate from the viewer and you add it only if you want to edit.');
         const list = el('ul', { class: 'edit-facts' });
-        for (const t of ['GitHub asks for Contents: Read and write on the repositories where you install it. GitHub has no permission for one folder.', 'Horsemen uses it only to save canvas files in .horsemen/canvas/. It never changes your records.', 'Each save is one commit by you on the default branch, with [skip ci]. When that branch is protected, the save goes to the branch horsemen/canvas, and you open a pull request.', 'The viewer, the public view, and the local app stay read-only.']) list.append(el('li', {}, t));
+        for (const t of ['GitHub asks for Contents: Read and write on the repositories where you install it. GitHub has no permission for one folder.', 'Horsemen uses it only to save canvas files in .horsemen/canvas/ and the images and tables that you add in .horsemen/media/. It never changes your records.', 'Each save is one commit by you on the default branch, with [skip ci]. When that branch is protected, the save goes to the branch horsemen/canvas, and you open a pull request.', 'The viewer, the public view, and the local app stay read-only.']) list.append(el('li', {}, t));
         form.append(list);
       }, [['', 'Cancel'], ['go', 'Continue to GitHub', 'primary']]);
       if (go === 'go') hostedEditor.signIn();
@@ -266,7 +404,8 @@
     const go = await ask(side ? 'Save to ' + E.PR_BRANCH : 'Save to GitHub', form => {
       if (side) para(form, main + ' is protected, so this save goes to the branch ' + E.PR_BRANCH + '. Then open a pull request on GitHub to merge it into ' + main + '.', 'edit-where-note');
       const facts = el('dl', { class: 'edit-facts' });
-      for (const [k, v] of [['File', canvasPath(editing.key)], ['Commit', message], ['Branch', (side ? E.PR_BRANCH : main) + ', as you']]) { const row = el('div'); row.append(el('dt', {}, k), el('dd', {}, v)); facts.append(row); }
+      const files = pending().map(m => m.path + ' (' + sizeText(m.bytes.length) + ')').join('\n');
+      for (const [k, v] of [['File', canvasPath(editing.key)], ...(files ? [['New files', files]] : []), ['Commit', message], ['Branch', (side ? E.PR_BRANCH : main) + ', as you']]) { const row = el('div'); row.append(el('dt', {}, k), el('dd', {}, v)); facts.append(row); }
       form.append(facts);
       if (!project().private) para(form, 'This repository is public. Anyone can see this canvas and its files.', 'edit-warning');
       const diff = el('pre', { class: 'edit-diff', 'aria-label': 'Changed lines' });
@@ -281,27 +420,31 @@
   async function commit(attempt) {
     busy = true; render();
     let res;
-    try { res = await hostedEditor.save({ repo: editing.repo, root: editing.root, canvas: editing.key, base: editing.baseSha, text: F.canonical(editing.doc) }); }
+    const sending = pending(), media = sending.map(m => ({ name: m.name, data: M.toBase64(m.bytes) }));
+    try { res = await hostedEditor.save({ repo: editing.repo, root: editing.root, canvas: editing.key, base: editing.baseSha, text: F.canonical(editing.doc), ...(media.length ? { media } : {}) }); }
     catch (e) { busy = false; render(); showToast(e.message); return; }
     busy = false;
     const data = res.data || {};
     if (res.status === 200 && data.branch === E.PR_BRANCH) {
       /* Saved on horsemen/canvas: the default branch, and so the viewer, do not change until the pull request merges. */
       const sha = String(data.canvas_sha || '');
+      for (const m of sending) m.saved = true;
       editing.baseDoc = clone(editing.doc); editing.baseSha = SHA.test(sha) ? sha : editing.baseSha; saveDraft();
       editing.target = { side: true, defaultBranch: String(data.default_branch || editing.target.defaultBranch || ''), compareURL: data.pull_request?.compare_url || editing.target.compareURL };
       editing.saved = true; editing.link = editing.link || E.pullRequestLink(editing.repo, editing.target.compareURL, null);
       render(); refreshLink();
-      showToast(data.unchanged ? 'Nothing to save: ' + E.PR_BRANCH + ' has the same file.' : 'Saved to ' + E.PR_BRANCH + ' as commit ' + String(data.commit).slice(0, 7) + '. Open the pull request to merge it.');
+      showToast(data.unchanged ? 'Nothing to save: ' + E.PR_BRANCH + ' has the same file.' : 'Saved to ' + E.PR_BRANCH + ' as commit ' + String(data.commit).slice(0, 7) + (sending.length ? ' with ' + sending.length + (sending.length === 1 ? ' file' : ' files') : '') + '. Open the pull request to merge it.');
       return;
     }
     if (res.status === 200) {
       const text = F.canonical(editing.doc), sha = String(data.canvas_sha || '');
+      for (const m of sending) m.saved = true;
       editing.baseDoc = clone(editing.doc); editing.baseSha = SHA.test(sha) ? sha : editing.baseSha; saveDraft();
       const file = canvasFiles.get(editing.key) || { name: editing.key, path: canvasPath(editing.key), url: '', error: null, links: [] };
-      canvasFiles.set(editing.key, { ...file, error: null, parsed: F.parse(text), blob: editing.baseSha });
+      /* The new files show from memory until the next load of the project registers them from GitHub. */
+      canvasFiles.set(editing.key, { ...file, error: null, parsed: F.parse(text), blob: editing.baseSha, links: [...linksOf(editing.doc), ...(file.links || []).filter(l => !String(l.id).startsWith('draft:'))] });
       renderRail(); render();
-      showToast(data.unchanged ? 'Nothing to save: GitHub has the same file.' : 'Saved as commit ' + String(data.commit).slice(0, 7) + '. The viewer shows it after the next check.');
+      showToast(data.unchanged ? 'Nothing to save: GitHub has the same file.' : 'Saved as commit ' + String(data.commit).slice(0, 7) + (sending.length ? ' with ' + sending.length + (sending.length === 1 ? ' file' : ' files') : '') + '. The viewer shows it after the next check.');
       return;
     }
     if (res.status === 409 && data.code === 'conflict' && data.branch === E.PR_BRANCH) editing.target = { ...editing.target, side: true };
@@ -370,6 +513,7 @@
     changedOnGitHub = false;
     if (world.classList.contains('list')) setView(false);
     const draft = readDraft(p, key);
+    if (draft) await restoreMedia(draft.media);
     if (draft && draft.base === baseSha) editing.doc = draft.doc;
     else if (draft) {
       /* The draft started from an older file: merge it with the file that is loaded now. */
@@ -414,7 +558,47 @@
   }
 
   editButton.addEventListener('click', () => active() ? done() : start());
-  addButton.addEventListener('click', addNote); connectButton.addEventListener('click', connect); deleteButton.addEventListener('click', remove);
+  addButton.addEventListener('click', () => addNote());
+  fileButton.addEventListener('click', () => { if (active() && !busy) fileInput.click(); });
+  fileInput.addEventListener('change', () => { const files = [...fileInput.files]; fileInput.value = ''; addFiles(files); });
+  linkButton.addEventListener('click', askLink);
+  /* Drop on the canvas. A drag that starts in the page (a link in a card) is not a drop of new content. Outside edit
+     mode, a dropped file does not replace the page. */
+  let innerDrag = false;
+  document.addEventListener('dragstart', () => { innerDrag = true; });
+  document.addEventListener('dragend', () => { innerDrag = false; });
+  const carries = dt => !!dt && [...dt.types].some(t => t === 'Files' || t === 'text/uri-list' || t === 'text/plain');
+  const stage = () => q('.stage');
+  function dropTarget(on) { stage()?.toggleAttribute('data-drop', on); }
+  window.addEventListener('dragover', e => {
+    if (innerDrag || !carries(e.dataTransfer)) return;
+    e.preventDefault();
+    const here = active() && canvas.contains(e.target) && !busy && !q('dialog[open]');
+    e.dataTransfer.dropEffect = here ? 'copy' : 'none'; dropTarget(here);
+  });
+  window.addEventListener('dragleave', e => { if (!e.relatedTarget || !document.contains(e.relatedTarget)) dropTarget(false); });
+  window.addEventListener('drop', e => {
+    dropTarget(false);
+    if (innerDrag || !carries(e.dataTransfer)) { innerDrag = false; return; }
+    e.preventDefault();
+    if (!active() || !canvas.contains(e.target) || busy || q('dialog[open]')) {
+      if (info.available && project() && canvasKey !== 'home' && e.dataTransfer.files.length) showToast('Select Edit, then drop the file on the canvas.');
+      return;
+    }
+    const r = canvas.getBoundingClientRect(), at = worldPoint({ x: e.clientX - r.left, y: e.clientY - r.top });
+    if (e.dataTransfer.files.length) addFiles(e.dataTransfer.files, at);
+    else addText(e.dataTransfer.getData('text/uri-list').split(/\r?\n/).find(l => l && !l.startsWith('#')) || e.dataTransfer.getData('text/plain'), at);
+  });
+  /* Paste: an image or a file, an address, a table, or text for a note. Not in a field or a dialog. */
+  document.addEventListener('paste', e => {
+    if (!active() || busy || e.target.closest?.('dialog,input,textarea,select,[contenteditable=true]') || q('dialog[open]')) return;
+    const data = e.clipboardData;
+    if (!data) return;
+    const files = [...data.files];
+    e.preventDefault();
+    if (files.length) addFiles(files, null, 'paste');
+    else addText(data.getData('text/plain'));
+  }); connectButton.addEventListener('click', connect); deleteButton.addEventListener('click', remove);
   mergeButton.addEventListener('click', mergeNow); discardButton.addEventListener('click', discard); saveButton.addEventListener('click', save); doneButton.addEventListener('click', done);
   /* Double-click or Enter on a note edits its text. */
   document.addEventListener('dblclick', e => {
@@ -432,6 +616,7 @@
     let handled = true;
     if ((e.key === 'Delete' || e.key === 'Backspace') && !mod) remove();
     else if (e.key.toLowerCase() === 'n' && !mod && !e.altKey && !e.shiftKey) addNote();
+    else if (e.key.toLowerCase() === 'l' && !mod && !e.altKey && !e.shiftKey) askLink();
     else if (e.key.toLowerCase() === 'c' && !mod && !e.altKey && !e.shiftKey) connect();
     else if (e.key === 'Enter' && one && sectionNodes.get(one)?.kind === 'note' && e.target.closest('[data-artifact]')?.dataset.artifact === one) editNote(one);
     else handled = false;
@@ -446,13 +631,17 @@
     file(key) {
       if (!editing || editing.key !== key || editing.project !== project()?.id) return undefined;
       const file = canvasFiles.get(key) || null, parsed = F.validate(editing.doc);
-      return { name: key, path: file?.path || canvasPath(key), url: file?.url || '', error: null, parsed: { ...parsed, text: null, bom: false }, links: file?.links || [] };
+      return { name: key, path: file?.path || canvasPath(key), url: file?.url || '', error: null, parsed: { ...parsed, text: null, bom: false }, links: [...linksOf(editing.doc), ...(file?.links || []).filter(l => !String(l.id).startsWith('draft:'))] };
     },
+    /* A file that this tab added: the blob: address of an image, or the text of a table. Null for another link. */
+    media(link) { const m = link && link.local && local.get(link.local); return m && m.url ? Promise.resolve(m.url) : null; },
+    table(link) { const m = link && link.local && local.get(link.local); return m && m.text !== null ? Promise.resolve({ text: m.text }) : null; },
     moved, sync, selection: selectionChanged,
     actions() {
       if (!info.available || !project() || canvasKey === 'home') return [];
       if (!active()) return [{ icon: 'canvas', label: 'Edit this canvas', hint: 'Commit', run: start }];
-      return [{ icon: 'plus', label: 'Add a note', hint: 'N', run: addNote }, { icon: 'link', label: 'Connect the two selected elements', hint: 'C', run: connect },
+      return [{ icon: 'plus', label: 'Add a note', hint: 'N', run: () => addNote() }, { icon: 'plus', label: 'Add a file', hint: 'Image or table', run: () => fileButton.click() },
+        { icon: 'link', label: 'Add a link', hint: 'L', run: askLink }, { icon: 'link', label: 'Connect the two selected elements', hint: 'C', run: connect },
         { icon: 'check', label: 'Save the draft', hint: 'Ctrl S', run: save }, { icon: 'close', label: 'Leave edit mode', hint: 'Done', run: done },
         ...(!prLink.hidden ? [{ icon: 'link', label: prLink.textContent, hint: E.PR_BRANCH, run: () => window.open(prLink.href, '_blank', 'noopener') }] : []),
         ...(info.signed_in ? [{ icon: 'back', label: 'Stop editing on this site', hint: 'Sign out of the editor', run: () => { stop(); hostedEditor.stop(); } }] : [])];

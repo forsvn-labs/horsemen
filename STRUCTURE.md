@@ -13,7 +13,8 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   ├── canvas-format.js   Browser reader of canvas files (`.horsemen/canvas/*.canvas`): the same rules, limits, and errors as the Python reader
 │   ├── canvas-view.js     Rules that make one drawing from a canvas file and the generated canvas: elements, connectors, list order, and messages
 │   ├── canvas-edit.js     Edit rules shared by the browser and the Worker: draft operations, the commit message, and the merge by element ID
-│   ├── canvas-editor.js   Hosted edit mode (signed-in only): move, add a note, connect, delete, save, and merge; canvas-editor.css styles it
+│   ├── canvas-editor.js   Hosted edit mode (signed-in only): move, add a note, drop or paste a file or an address, connect, delete, save, and merge; canvas-editor.css styles it
+│   ├── canvas-media.js    Media rules shared by the browser and the Worker: type from the bytes, the file name from the SHA-256, size and count limits
 │   ├── canvas-embeds.js   Click-to-load players: a provider address to a frame address, and the frame-src list of both servers
 │   ├── canvas-table.js    CSV and TSV tables: rows, limits, and escaped markup
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode
@@ -53,7 +54,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Run local GUI: `python3 scripts/serve_gui.py`; see [setup and limits](web/README.md).
 - Hosted viewer tests: `node --test tests/test_hosted_reader.cjs worker/test/worker.test.js`.
 - Hosted browser check: `python3 scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check`.
-- Canvas editing checks: `node --test worker/test/editor.test.js worker/test/setup.test.js tests/test_canvas_edit.cjs`; browser check: `python3 scripts/test_hosted_edit_e2e.py --output /tmp/horsemen-edit-check`.
+- Canvas editing checks: `node --test worker/test/editor.test.js worker/test/setup.test.js worker/test/protected.test.js worker/test/media.test.js tests/test_canvas_edit.cjs tests/test_canvas_media.cjs`; browser check: `python3 scripts/test_hosted_edit_e2e.py --output /tmp/horsemen-edit-check`.
 - Hosted speed benchmark: `python3 scripts/bench_hosted.py --repos 80 --latency 150 --output /tmp/horsemen-bench`.
 - Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.

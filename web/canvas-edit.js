@@ -9,6 +9,7 @@
   const node = typeof module !== 'undefined' && module.exports;
   const F = node ? require('./canvas-format.js') : root.HorsemenCanvasFormat;
   const NOTE = { width: 320, height: 140 }, SECTION = { width: 320, height: 196 }, RANGE = 1000000;
+  const FILE = { width: 400, height: 300 }, LINK = { width: 320, height: 120 }, PLAYER = { width: 480, height: 270 }, SIZE = [16, 8192];
   const GEOMETRY = new Set(['x', 'y', 'width', 'height']);
   const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -52,6 +53,26 @@
   function addNote(doc, { x, y, text = 'New note', id = null }) {
     const out = base(doc), made = id || newId(idsOf(out));
     out.nodes.push({ id: made, type: 'text', x: clamp(x), y: clamp(y), width: NOTE.width, height: NOTE.height, text: cut(String(text)) });
+    return { doc: out, id: made };
+  }
+  const size = (n, fallback) => Number.isFinite(n) ? Math.max(SIZE[0], Math.min(SIZE[1], Math.round(n))) : fallback;
+  const cutTo = (text, max) => [...String(text)].slice(0, max).join('');
+  /* A dropped or pasted file (slice 4b): a file node with a path relative to the project root. Null for a bad path. */
+  function addFile(doc, { x, y, file, width, height, alt = null, id = null }) {
+    if (!F.safePath(file)) return null;
+    const out = base(doc), made = id || newId(idsOf(out));
+    const n = { id: made, type: 'file', x: clamp(x), y: clamp(y), width: size(width, FILE.width), height: size(height, FILE.height), file };
+    if (typeof alt === 'string' && alt) n.alt = cutTo(alt, F.LIMITS.alt);
+    out.nodes.push(n);
+    return { doc: out, id: made };
+  }
+  /* A pasted address: a link node. A known player (canvas-embeds.js) gets the size of a player. Null for a bad address. */
+  function addLink(doc, { x, y, url, title = null, player = false, id = null }) {
+    if (!F.safeURL(url)) return null;
+    const out = base(doc), made = id || newId(idsOf(out)), box = player ? PLAYER : LINK;
+    const n = { id: made, type: 'link', x: clamp(x), y: clamp(y), width: box.width, height: box.height, url };
+    if (typeof title === 'string' && title.trim()) n.title = cutTo(title.trim(), F.LIMITS.title);
+    out.nodes.push(n);
     return { doc: out, id: made };
   }
   function setText(doc, id, text) {
@@ -209,6 +230,6 @@
   /* The key of a draft in sessionStorage: the repository, the project root, and the canvas name. */
   const draftKey = (repo, projectRoot, name) => 'horsemen.draft.v1:' + repo + ':' + (projectRoot || '') + ':' + name;
 
-  const api = { PR_BRANCH, pullRequestLink, NOTE, SECTION, newId, emptyDoc, stable, same, moveNode, addNote, setText, connect, connected, disconnect, remove, saveSection, changes, summary, message, changedLines, merge, draftKey };
+  const api = { PR_BRANCH, pullRequestLink, NOTE, SECTION, FILE, LINK, PLAYER, newId, emptyDoc, stable, same, moveNode, addNote, addFile, addLink, setText, connect, connected, disconnect, remove, saveSection, changes, summary, message, changedLines, merge, draftKey };
   if (node) module.exports = api; else root.HorsemenCanvasEdit = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

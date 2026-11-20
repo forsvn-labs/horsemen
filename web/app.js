@@ -176,6 +176,8 @@ $('#peek-back').onclick=()=>{peekRequest++;peekTrail.pop();peekMode='overview';r
 let imageCache=new Map();
 function releaseImages(){for(const url of imageCache.values())url.then(u=>URL.revokeObjectURL(u),()=>{});imageCache=new Map()}
 function imageURL(link){
+  /* A file that edit mode added and did not save yet shows from memory (canvas-editor.js). */
+  const draft=window.HorsemenEditor?.media(link);if(draft)return draft;
   const p=projects[current],key=p.id+':'+link.id,path='/api/image?id='+encodeURIComponent(p.id)+'&link='+encodeURIComponent(link.id);
   if(!imageCache.has(key)){
     const load=hosted?api(path).then(data=>new Blob([data.bytes],{type:data.type})):fetch(path,{headers:{'X-Horsemen-Session':session},cache:'no-store'}).then(async r=>{if(r.ok)return r.blob();let message='';try{message=(await r.json()).error}catch{}throw Error(message||'It could not be loaded.')});
@@ -187,6 +189,7 @@ function imageURL(link){
    The text is kept for the open project, as images are. */
 let tableCache=new Map();
 function tableText(link){
+  const draft=window.HorsemenEditor?.table(link);if(draft)return draft;
   const p=projects[current],key=p.id+':'+link.id;
   if(!tableCache.has(key)){const load=api('/api/table?id='+encodeURIComponent(p.id)+'&link='+encodeURIComponent(link.id));load.catch(()=>tableCache.get(key)===load&&tableCache.delete(key));tableCache.set(key,load)}
   return tableCache.get(key);

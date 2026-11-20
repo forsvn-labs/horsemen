@@ -28,13 +28,16 @@ body[data-editing] .canvas .canvas-node:not(.saved){border-style:dashed}
 dl.edit-facts{padding:0}
 dl.edit-facts div{display:grid;grid-template-columns:72px 1fr;gap:8px}
 dl.edit-facts dt{color:var(--ink-3)}
-dl.edit-facts dd{margin:0;overflow-wrap:anywhere;font-family:var(--mono);font-size:var(--fs-s);color:var(--ink)}
+dl.edit-facts dd{margin:0;overflow-wrap:anywhere;white-space:pre-line;font-family:var(--mono);font-size:var(--fs-s);color:var(--ink)}
 .edit-diff{margin:0;max-height:220px;overflow:auto;padding:8px 10px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);background:var(--surface-2);font:var(--fs-s)/1.5 var(--mono);white-space:pre-wrap;overflow-wrap:anywhere}
 .edit-diff span{display:block}
 .edit-diff .add{color:var(--verdigris)}
 .edit-diff .del{color:var(--vermilion)}
 .edit-field{display:grid;gap:6px;color:var(--ink-2)}
 .edit-field textarea{width:100%;min-height:160px;resize:vertical;padding:10px;border:var(--bw) var(--bs) var(--line-strong);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--fs-ui)/1.5 var(--mono)}
+.edit-field input{width:100%;min-height:36px;padding:6px 10px;border:var(--bw) var(--bs) var(--line-strong);border-radius:var(--radius-s);background:var(--surface);color:var(--ink);font:var(--fs-ui)/1.4 var(--ui)}
+.stage[data-drop]::after{content:"Drop to add to the canvas";position:absolute;inset:8px;z-index:5;display:grid;place-items:center;pointer-events:none;
+  border:2px dashed var(--signal);border-radius:var(--radius);background:color-mix(in srgb,var(--surface) 70%,transparent);color:var(--ink);font:600 var(--fs-ui) var(--ui)}
 .edit-conflicts{display:grid;gap:10px;max-height:46dvh;overflow:auto}
 .edit-conflicts fieldset{margin:0;padding:10px 12px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);display:grid;gap:6px}
 .edit-conflicts legend{padding:0 4px;color:var(--ink);font-weight:600;overflow-wrap:anywhere}

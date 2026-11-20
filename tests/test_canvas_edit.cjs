@@ -9,6 +9,8 @@
    - the commit message has text from the file, or a count that is wrong
    - merge: each row of the conflict table; a choice for one element changes another; an unknown key is lost;
      a merged file that the reader refuses
+   - slice 4b: a dropped file or a pasted address makes a node that the reader refuses (a path outside the project,
+     a script address, a size out of range, an alt text or a title too long), or a node in place of a refused input
    - the pull request link (slice 4c): a link that is not the GitHub page of this repository and horsemen/canvas, a pull
      request number that is not a positive integer, an address of the pull request taken from GitHub text */
 const test = require('node:test');
@@ -60,6 +62,30 @@ test('note text changes only on a note, and is cut at 20,000 characters', () => 
   assert.equal(E.setText(base, 'g', 'x'), base);
   assert.equal(E.setText(base, 'n1', 'y'.repeat(30000)).nodes[0].text.length, 20000);
   assert.equal(E.setText(base, 'n1', 7), base);
+});
+
+test('a dropped file is a file node with a path inside the project, a size in range, and an alt text', () => {
+  const base = doc([note('n1')]);
+  const { doc: out, id } = E.addFile(base, { x: 10.4, y: -20, file: '.horsemen/media/route-0123abcd.png', width: 640.2, height: 5, alt: 'Map of the harbour loop' });
+  assert.match(id, /^[A-Za-z0-9]{12}$/);
+  assert.deepEqual(out.nodes.at(-1), { id, type: 'file', x: 10, y: -20, width: 640, height: 16, file: '.horsemen/media/route-0123abcd.png', alt: 'Map of the harbour loop' });
+  valid(out);
+  const big = E.addFile(base, { x: 0, y: 0, file: '.horsemen/media/stops-0123abcd.csv', width: 99999, height: 'x' }).doc.nodes.at(-1);
+  assert.deepEqual([big.width, big.height, 'alt' in big], [8192, E.FILE.height, false], 'a table has no alt text; a bad size takes the default');
+  assert.equal(E.addFile(base, { x: 0, y: 0, file: 'a.png', alt: 'x'.repeat(900) }).doc.nodes.at(-1).alt.length, 500);
+  for (const file of ['../secret.png', '/etc/x.png', 'a\\b.png', '', 7]) assert.equal(E.addFile(base, { x: 0, y: 0, file }), null, JSON.stringify(file));
+  assert.equal(JSON.stringify(base), JSON.stringify(doc([note('n1')])), 'the input does not change');
+});
+
+test('a pasted address is a link node; a known player gets the player size; a script address is refused', () => {
+  const base = doc();
+  const link = E.addLink(base, { x: 0, y: 0, url: 'https://example.org/walks', title: 'Walks ' + 'x'.repeat(300) });
+  const made = link.doc.nodes[0];
+  assert.deepEqual([made.type, made.url, made.width, made.height, made.title.length], ['link', 'https://example.org/walks', E.LINK.width, E.LINK.height, 200]);
+  valid(link.doc);
+  const video = E.addLink(base, { x: 0, y: 0, url: 'https://www.youtube.com/watch?v=EXAMPLE0000', player: true }).doc.nodes[0];
+  assert.deepEqual([video.width, video.height, 'title' in video], [E.PLAYER.width, E.PLAYER.height, false]);
+  for (const url of ['javascript:alert(1)', 'data:text/html,x', 'https://', 'https://a.example/' + 'x'.repeat(2100), 'https://a.example/x y', 7]) assert.equal(E.addLink(base, { x: 0, y: 0, url }), null, String(url).slice(0, 40));
 });
 
 test('connect adds one edge between two nodes; not to itself, not twice, not to a missing node', () => {

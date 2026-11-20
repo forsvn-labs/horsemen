@@ -208,7 +208,7 @@ read-only and do not load the edit code.
 1. Open a record canvas or a board and select **Edit** in the header. The
    first time, a dialog explains the permission: Horsemen Editor asks GitHub
    for Contents: Read and write on the repositories where you install it, and
-   uses it only to save files in `.horsemen/canvas/`. Select **Continue to
+   uses it only to save files in `.horsemen/canvas/` and `.horsemen/media/`. Select **Continue to
    GitHub**. If the editor app is not installed on the repository, the dialog
    links to its install page.
 2. Edit. A bar shows the actions and the state of the draft.
@@ -219,11 +219,14 @@ read-only and do not load the edit code.
    | Add a note | **Add note**. The note goes in free space in the middle of the view. | N |
    | Edit a note | Double-click the note. The text is Markdown. | Enter on the selected note; Ctrl + Enter closes the editor. |
    | Connect | Select two elements (Shift-click), then **Connect**. The connector goes from the first to the second. With a connector between them, the button is **Disconnect**. | C |
+   | Add an image or a table | **Add file**, drop a file on the canvas, or paste an image. PNG, JPEG, GIF, and WebP images and CSV and TSV tables of 1 MiB or less. A drop puts the card where you drop it. | Ctrl + V (Command + V on macOS) |
+   | Add a link or a player | **Add link**, or paste or drop an address. A YouTube, Vimeo, Loom, Figma, or Google address gets a player that loads only after a click; another address gets a link card. | L, or Ctrl + V |
+   | Paste a table or text | Paste rows with the same number of commas or tabs on each line: they become a CSV or TSV file. Other text becomes a note. | Ctrl + V |
    | Delete | **Delete**. The connectors of an element go with it. A section card that the record makes stays. | Delete or Backspace |
    | Save | **Save**, then **Commit** in the preview. | Ctrl + S (Command + S on macOS) |
 
-3. The preview shows the file, the commit message, the branch, and the
-   changed elements. For a public repository it says that anyone can see the
+3. The preview shows the file, the new media files with their sizes, the
+   commit message, the branch, and the changed elements. For a public repository it says that anyone can see the
    canvas. One save is one commit by you on the default branch, with a
    message such as `canvas(progress): add 1, move 2 [skip ci]`.
 
@@ -243,8 +246,30 @@ read-only and do not load the edit code.
 The draft stays in this browser tab until you save or discard it; **Done**
 asks first. The page warns before it closes with an unsaved draft, and
 sign-out removes drafts. **Stop editing on this site** in Jump signs out of
-the editor app only. Not in this step: resize, images and files, links,
-groups, colours, undo, and a choice of the target branch.
+the editor app only.
+
+Files that you add (slice 4b):
+
+- A file gets the name `<name>-<8 hex characters of its SHA-256>.<type>`
+  in `.horsemen/media/` of the project, for example
+  `.horsemen/media/harbour-route-1a2b3c4d.png`. The type comes from the
+  bytes of the file, not from its name. The same file always gets the same
+  name.
+- Until you save, the file shows from memory in this tab. The save sends the
+  canvas and its new files together: one commit.
+- A save holds four new files at most. Save, then add more.
+- Before the first file goes to a public repository, a dialog asks you to
+  confirm: anyone can see the file, and Git history keeps it after you delete
+  it.
+- The app refuses SVG files, videos, files over 1 MiB, and other types. For a
+  video or a large file, put it on a host and paste its address.
+- Removing a card does not delete its file.
+
+- On a protected default branch, the files go to `horsemen/canvas` with the
+  canvas. The viewer shows them after the pull request merges.
+
+Not in this step: resize, groups, colours, undo, and a choice of the target
+branch.
 
 ### Home canvas
 

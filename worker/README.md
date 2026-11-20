@@ -93,15 +93,16 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
 
 ## Canvas editing
 
-A person can move elements, add and edit notes, connect and delete
-elements on a record canvas or a board, and save. Each save is one commit by
+A person can move elements, add and edit notes, add images, tables, links,
+and players, connect and delete elements on a record canvas or a board, and
+save. Each save is one commit by
 that person. Editing needs a second GitHub App, **Horsemen Editor**, with
 Contents: Read and write. The viewer app does not change, so a person who only
 reads sees no new permission request.
 
 ```text
-browser ──POST /write/canvas (CSRF token + cookie with editor token)──▶ Worker ──editor token──▶ GitHub contents API
-           { repo, root, canvas, base, text }                       checks, builds the path, one commit
+browser ──POST /write/canvas (CSRF token + cookie with editor token)──▶ Worker ──editor token──▶ GitHub
+           { repo, root, canvas, base, text, media? }               checks, builds the paths, one commit
 ```
 
 - **Opt-in.** In edit mode, Edit explains the permission. **Continue to
@@ -116,18 +117,40 @@ browser ──POST /write/canvas (CSRF token + cookie with editor token)──�
   editor app is installed there and whether the person can push.
 - **The write route.** `POST /write/canvas` is the only write. It needs the
   session cookie with an editor token, an `Origin` header of this site, the
-  CSRF token, `Content-Type: application/json`, and a body of 2 MiB or less.
+  CSRF token, `Content-Type: application/json`, and a body of 6 MiB or less.
   The body has exactly `repo`, `root`, `canvas`, `base` (the blob SHA of the
-  file that the draft started from, or `null`), and `text`. The Worker builds
+  file that the draft started from, or `null`), and `text`, and `media` when
+  the save adds files. The Worker builds
   the path `<root>/.horsemen/canvas/<canvas>.canvas` and the commit message
   `canvas(<canvas>): add 1, move 2 [skip ci]` from counts. It checks the text
   with the same reader as the browser (`web/canvas-format.js`) and writes the
   canonical text. The browser never sends a path, a branch, or a message.
+- **Media.** `media` is a list of one to four `{ "name", "data" }` items:
+  a name in the form `<stem>-<8 hex>.<png|jpg|gif|webp|csv|tsv>` and the
+  bytes in base64. The Worker refuses a name that is not in this form, base64
+  that is not strict, a file over 1 MiB, bytes that are not the type of the
+  extension (magic numbers for images; UTF-8 text without NUL and not a Git
+  LFS pointer for tables), a hash that is not the SHA-256 of the bytes, and a
+  file that the canvas does not name. SVG is refused. A new file node that
+  names a file in `.horsemen/media/` must have that file in the save or on the
+  canvas on GitHub. The Worker builds each path, and writes only
+  `<root>/.horsemen/canvas/` and `<root>/.horsemen/media/`. The rules are in
+  `web/canvas-media.js`, shared with the browser.
+- **The GitHub call.** A save without media uses the REST contents API (one
+  `PUT`). A save with media uses the GraphQL `createCommitOnBranch` mutation:
+  one commit for the canvas and its files, on the default branch or on
+  `horsemen/canvas`. The mutation names the head that the Worker read
+  (`expectedHeadOid`).
 - **Conflicts.** The Worker reads the file on the default branch. A blob SHA
   that is not `base` returns `409` with `code: "conflict"` and the current
   SHA; the browser reads that file, merges by element ID
   (`web/canvas-edit.js`), and saves again. When the branch head moves during
-  the commit, the Worker tries again, three times at most.
+  the commit, the Worker tries again, three times at most. With media, the
+  Worker reads the head of the target branch, then the canvas at that commit,
+  and names that head in the mutation. After a refused mutation it reads the
+  head again: a moved head is tried again with a new conflict check; an
+  unmoved head is a refusal (on the default branch, the save goes to
+  `horsemen/canvas`).
 - **Protected branches.** When GitHub does not allow a direct commit on the
   default branch (classic branch protection, a ruleset rule such as
   `pull_request` or `update`, or a refused commit), the Worker saves to the
@@ -238,8 +261,9 @@ sign-out. It saves screenshots and `edit-flow.webm` to `--output`.
 - Links to private repositories work only for people with GitHub access.
   Public links to private repositories would need stored share settings.
 - Private PR image attachments open on GitHub; the viewer does not load them.
-- Editing covers canvas files only: move, notes, connectors, and delete. It
-  does not resize, upload media, or change record text. Saves go to the
+- Editing covers canvas files and their media: move, notes, images, tables,
+  links, connectors, and delete. It does not resize or change record text. A
+  save adds four media files at most, 1 MiB each; SVG and video are refused. Saves go to the
   default branch; a protected branch refuses the commit (code `busy`).
 - A project shows 20 canvas files at most;
   each one is one blob read when the project opens. A canvas loads 100

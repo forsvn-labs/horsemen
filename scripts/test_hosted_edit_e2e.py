@@ -3,7 +3,9 @@
 Runs the real Worker with `wrangler dev` and both GitHub Apps (viewer and editor) on a fake GitHub.
 A person signs in with the viewer, opts in to the editor, moves a section card, adds a note, connects
 the two, and saves one commit. Then a commit from outside arrives while a draft is open (Merge now),
-and a save meets a conflict on the same note (the person takes the GitHub version). Then the default
+and a save meets a conflict on the same note (the person takes the GitHub version). Slice 4b: the person
+drops an image, pastes a video address and a CSV table, confirms the public-repository warning, and saves
+one GraphQL commit with the canvas and both files. Then the default
 branch becomes protected (slice 4c): Edit says that saves go to horsemen/canvas, the save makes that
 branch, and the bar links the compare page, then the open pull request. It also checks the keyboard,
 phone width, the themes, the public view, and that a viewer-only sign-in asks for no write permission. Saves screenshots, a recording, and logs to --output (outside the repository).
@@ -13,6 +15,8 @@ phone width, the themes, the public view, and that a viewer-only sign-in asks fo
 import argparse
 import base64
 import hashlib
+import struct
+import zlib
 import json
 import os
 import secrets
@@ -45,9 +49,16 @@ SIDE = 'horsemen/canvas'
 world = {'rev': 'a' * 40, 'files': dict(SOURCES), 'commits': [], 'authorize': [], 'tokens': [], 'put_tokens': set(), 'revoked': [],
          # Slice 4c: classic protection of main, the branch horsemen/canvas ({files, base, own, sha} or None),
          # the open pull requests of that branch, the ref writes, and the tokens that read the pull requests.
-         'protected': False, 'side': None, 'pulls': [], 'ref_writes': [], 'pull_tokens': set()}
+         'protected': False, 'side': None, 'pulls': [], 'ref_writes': [], 'pull_tokens': set(),
+         'graphql': []}
 lock = threading.Lock()
-def sha(text): return hashlib.sha1(text.encode()).hexdigest()
+def raw(value): return value if isinstance(value, bytes) else value.encode()
+def sha(value): return hashlib.sha1(raw(value)).hexdigest()
+def png(width, height, rgb):
+    """A small real PNG (the editor decodes it to size the card)."""
+    chunk = lambda kind, data: struct.pack('>I', len(data)) + kind + data + struct.pack('>I', zlib.crc32(kind + data))
+    rows = b''.join(b'\x00' + bytes(rgb) * width for _ in range(height))
+    return b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 2, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(rows)) + chunk(b'IEND', b'')
 def bump():
     world['rev'] = hashlib.sha1((world['rev'] + str(time.time())).encode()).hexdigest()
 
@@ -98,14 +109,14 @@ class FakeGitHub(BaseHTTPRequestHandler):
             if self.headers.get('If-None-Match') == etag: return self.send(304, None, {'ETag': etag})
             return self.send(200, {'sha': world['rev'], 'commit': {'tree': {'sha': world['rev']}}}, {'ETag': etag})
         if p.startswith('/repos/example/alpha/git/trees/'):
-            return self.send(200, {'truncated': False, 'tree': [{'path': k, 'type': 'blob', 'mode': '100644', 'sha': sha(v), 'size': len(v.encode())} for k, v in files.items()]})
+            return self.send(200, {'truncated': False, 'tree': [{'path': k, 'type': 'blob', 'mode': '100644', 'sha': sha(v), 'size': len(raw(v))} for k, v in files.items()]})
         if p.startswith('/repos/example/alpha/git/blobs/'):
             for v in [*files.values(), *(side['files'].values() if side else [])]:
-                if sha(v) == p.rsplit('/', 1)[1]: return self.send(200, {'encoding': 'base64', 'content': base64.b64encode(v.encode()).decode()})
+                if sha(v) == p.rsplit('/', 1)[1]: return self.send(200, {'encoding': 'base64', 'content': base64.b64encode(raw(v)).decode()})
         if p.startswith('/repos/example/alpha/contents/'):
             v = (side['files'] if side and q.get('ref') == [SIDE] else files).get(p.split('/contents/', 1)[1])
             if v is None: return self.send(404, {'message': 'Not Found'})
-            return self.send(200, {'type': 'file', 'sha': sha(v), 'size': len(v.encode()), 'encoding': 'base64', 'content': base64.b64encode(v.encode()).decode()})
+            return self.send(200, {'type': 'file', 'sha': sha(v), 'size': len(raw(v)), 'encoding': 'base64', 'content': base64.b64encode(raw(v)).decode()})
         return self.send(404, {'message': 'Not Found'})
 
     def do_PUT(self):
@@ -135,6 +146,26 @@ class FakeGitHub(BaseHTTPRequestHandler):
             world['commits'].append({'path': path, 'message': body['message'], 'branch': body['branch'], 'text': text})
             return self.send(200, {'content': {'sha': sha(text)}, 'commit': {'sha': world['rev']}})
 
+    def graphql(self, body):
+        """createCommitOnBranch: the one commit of a save with media on main (slice 4b)."""
+        world['graphql'].append(body['query'].split('(')[0])
+        world['put_tokens'].add(self.headers.get('Authorization', ''))
+        if self.headers.get('Authorization') != 'Bearer ghu_editor': return self.send(401, {'message': 'Bad credentials'})
+        v = body['variables']
+        if not body['query'].startswith('mutation'): return self.send(200, {'data': None, 'errors': [{'type': 'UNEXPECTED', 'message': 'only the mutation'}]})
+        with lock:
+            change = v['input']
+            if change['branch'] != {'repositoryNameWithOwner': 'example/alpha', 'branchName': 'main'}: return self.send(200, {'data': None, 'errors': [{'type': 'NOT_FOUND', 'message': 'no branch'}]})
+            if world['protected']: return self.send(200, {'data': {'createCommitOnBranch': None}, 'errors': [{'type': 'FORBIDDEN', 'message': 'Protected branch update failed'}]})
+            if change['expectedHeadOid'] != world['rev']: return self.send(200, {'data': {'createCommitOnBranch': None}, 'errors': [{'type': 'STALE_DATA', 'message': 'Expected branch to point to another commit'}]})
+            paths = [a['path'] for a in change['fileChanges']['additions']]
+            for a in change['fileChanges']['additions']:
+                data = base64.b64decode(a['contents'])
+                world['files'][a['path']] = data.decode() if a['path'].endswith('.canvas') else data
+            bump()
+            world['commits'].append({'path': paths[0], 'paths': paths, 'message': change['message']['headline'], 'branch': 'main', 'text': world['files'][v['path']], 'graphql': True})
+            return self.send(200, {'data': {'createCommitOnBranch': {'commit': {'oid': world['rev'], 'file': {'oid': sha(world['files'][v['path']])}}}}})
+
     def do_PATCH(self):
         body = json.loads(self.rfile.read(int(self.headers.get('Content-Length') or 0)) or b'{}')
         if self.headers.get('Authorization') != 'Bearer ghu_editor': return self.send(403, {'message': 'Resource not accessible by integration'})
@@ -146,16 +177,17 @@ class FakeGitHub(BaseHTTPRequestHandler):
             return self.send(200, {'object': {'sha': world['rev']}})
 
     def do_POST(self):
-        raw = self.rfile.read(int(self.headers.get('Content-Length') or 0)).decode()
+        data = self.rfile.read(int(self.headers.get('Content-Length') or 0)).decode()
+        if self.path == '/graphql': return self.graphql(json.loads(data))
         if self.path == '/repos/example/alpha/git/refs':
-            body = json.loads(raw or '{}')
+            body = json.loads(data or '{}')
             if self.headers.get('Authorization') != 'Bearer ghu_editor': return self.send(403, {'message': 'Resource not accessible by integration'})
             with lock:
                 world['ref_writes'].append(('POST', self.path, body))
                 if body.get('ref') != 'refs/heads/' + SIDE or world['side'] or body.get('sha') != world['rev']: return self.send(422, {'message': 'Reference already exists'})
                 world['side'] = {'files': dict(world['files']), 'base': world['rev'], 'own': 0, 'sha': world['rev']}
                 return self.send(201, {'ref': body['ref'], 'object': {'sha': world['rev']}})
-        form = parse_qs(raw)
+        form = parse_qs(data)
         if self.path == '/login/oauth/access_token':
             client = form.get('client_id', [''])[0]; world['tokens'].append(client)
             token = 'ghu_editor' if client == 'Iv1.editor' else 'ghu_viewer'
@@ -208,14 +240,15 @@ def until(code, seconds=30):
             if value('!!(' + code + ')'): return
         except (AssertionError, ValueError): pass
         time.sleep(0.4)
-    try: where = browser('eval', 'JSON.stringify([location.href, document.querySelector("#edit-status")?.textContent, [...document.querySelectorAll("dialog[open]")].map(d => d.id + ": " + d.innerText.slice(0, 200)), document.querySelector("#toast").textContent, document.body.innerText.slice(0, 200)])')
+    try: where = browser('eval', 'JSON.stringify([location.href, document.querySelector("#edit-status")?.textContent, [...document.querySelectorAll("dialog[open]")].map(d => d.id + ": " + d.innerText.slice(0, 200)), document.querySelector("#toast").textContent, document.body.innerText.slice(0, 200), [...document.querySelectorAll(".canvas-node")].map(n => n.dataset.kind + ":" + (n.querySelector("[data-state]")?.dataset.state || "") + ":" + n.innerText.slice(0, 60))])')
     except (AssertionError, ValueError): where = '(page not readable)'
     raise AssertionError('Timed out waiting for: ' + code + ' at ' + str(where))
 
 
 def shot(name): browser('screenshot', str(args.output / name))
 def center(selector):
-    return value(f"JSON.stringify((r => [Math.round(r.x + r.width / 2), Math.round(r.y + 24)])(document.querySelector('{selector}').getBoundingClientRect()))")
+    """A point near the top of the element that the element itself gets (the edit bar can cover the top edge)."""
+    return value(f"JSON.stringify((c => {{ const r = c.getBoundingClientRect(), x = Math.round(r.x + r.width / 2); for (let y = Math.round(r.y + 24); y < r.bottom - 4; y += 8) if (c.contains(document.elementFromPoint(x, y))) return [x, y]; return [x, Math.round(r.y + 24)]; }})(document.querySelector('{selector}')))")
 def drag(selector, dx, dy):
     """A real pointer drag: the app moves elements on pointer events, not on HTML drag and drop."""
     x, y = center(selector)
@@ -226,6 +259,15 @@ def answer(choice):  # Select the button of the open edit dialog with this value
     until(f"document.querySelector('#edit-dialog').open && !!document.querySelector('#edit-dialog button[value=\"{choice}\"]')", 10)
     browser('click', f'#edit-dialog button[value="{choice}"]')
     until("!document.querySelector('#edit-dialog').open", 10)
+def drop(names, blobs, kind='image/png'):
+    """Drop files on the middle of the canvas, as a drag from the desktop does."""
+    data = json.dumps([base64.b64encode(raw(b)).decode() for b in blobs])
+    browser('eval', f"""(() => {{ const dt = new DataTransfer(); {json.dumps(names)}.forEach((name, i) => dt.items.add(new File([Uint8Array.from(atob({data}[i]), c => c.charCodeAt(0))], name, {{ type: {json.dumps(kind)} }})));
+      const c = document.querySelector('.canvas'), r = c.getBoundingClientRect(), at = {{ bubbles: true, cancelable: true, dataTransfer: dt, clientX: r.x + r.width / 2, clientY: r.y + r.height / 2 }};
+      c.dispatchEvent(new DragEvent('dragover', at)); c.dispatchEvent(new DragEvent('drop', at)); return true; }})()""")
+def paste(text):
+    """Paste text on the canvas, as Ctrl+V does."""
+    browser('eval', f"(() => {{ const dt = new DataTransfer(); dt.setData('text/plain', {json.dumps(text)}); document.querySelector('.canvas').dispatchEvent(new ClipboardEvent('paste', {{ clipboardData: dt, bubbles: true, cancelable: true }})); return true; }})()")
 def note_text():
     return value("JSON.stringify([...document.querySelectorAll('.canvas-node[data-kind=note]')].map(n => n.innerText.trim()))")
 def saved(): return json.loads(world['files'][CANVAS])
@@ -355,6 +397,52 @@ try:
     browser('press', 'Control+s'); answer('commit')
     wait_commits(4)
     assert world['commits'][-1]['message'] == 'canvas(progress): remove 2 [skip ci]' and saved()['edges'] == [], [c['message'] for c in world['commits']]
+
+    # Slice 4b: drop an image, paste a video address, paste a CSV table, then save one commit with all files.
+    image, table = png(48, 32, (200, 90, 40)), 'stop,minutes\nHarbour gate,4\nOld mill,12\n'
+    browser('eval', 'projects[current].private = false')  # The warning reads the project; the fake repository stays private.
+    drop(['Harbour route.png'], [image])
+    until("document.querySelector('#edit-dialog').open && document.querySelector('#edit-dialog').innerText.includes('Add a file to a public repository?')", 10)
+    shot('12-public-warning.png')
+    answer('add')
+    until("document.querySelectorAll('.canvas-node[data-kind=image] img[src^=\"blob:\"]').length === 1", 10)
+    paste('https://www.youtube.com/watch?v=EXAMPLE0000')
+    until("document.querySelectorAll('.canvas-node[data-kind=embed] .embed-load').length === 1", 10)
+    paste(table)
+    until("(t => t && t.innerText.includes('Harbour gate'))(document.querySelector('.canvas-node[data-kind=table] .sheet-stage[data-state=shown]'))", 10)
+    until("document.querySelector('#edit-status').textContent === 'Draft: add 3'", 10)
+    assert not value("!!document.querySelector('iframe')"), 'no player loads before a click'
+    shot('13-media-draft.png')
+    rest = len(world['commits'])
+    browser('press', 'Control+s')
+    until("document.querySelector('#edit-dialog').open && document.querySelector('#edit-dialog').innerText.includes('New files')", 10)
+    preview = value("JSON.stringify(document.querySelector('#edit-dialog').innerText)")
+    assert 'canvas(progress): add 3 [skip ci]' in preview and '.horsemen/media/harbour-route-' in preview and '.horsemen/media/pasted-table-' in preview and 'This repository is public.' in preview, preview
+    shot('14-media-save-preview.png')
+    graphql_before = len(world['graphql'])
+    answer('commit')
+    wait_commits(rest + 1)
+    last = world['commits'][-1]
+    assert last.get('graphql') and last['message'] == 'canvas(progress): add 3 [skip ci]' and len(last['paths']) == 3, last
+    assert last['paths'][0] == CANVAS and all(p.startswith('.horsemen/media/') for p in last['paths'][1:]), last['paths']
+    media = {p: world['files'][p] for p in last['paths'][1:]}
+    assert sorted(media.values(), key=len) == sorted([image, table.encode()], key=len), 'the bytes as dropped and pasted'
+    assert world['graphql'][graphql_before:] == ['mutation'], 'one GraphQL commit'
+    kinds = sorted((n['type'], n.get('file', n.get('url', ''))) for n in saved()['nodes'] if n['type'] == 'link' or n.get('file', '').startswith('.horsemen/media/'))
+    assert kinds == sorted([('file', p) for p in media] + [('link', 'https://www.youtube.com/watch?v=EXAMPLE0000')]), kinds
+    # The next check loads the commit; the image and the table still show (images load when they come into view).
+    until("document.querySelector('#project-description').textContent.includes(" + json.dumps(world['rev'][:7]) + ")", 20)
+    browser('eval', "(id => (setSelection(new Set([id])), revealNode(id)))(document.querySelector('.canvas-node[data-kind=image]').dataset.node)")
+    until("document.querySelectorAll('.canvas-node[data-kind=image] img').length === 1 && document.querySelectorAll('.canvas-node[data-kind=table] .sheet-stage[data-state=shown]').length === 1", 20)
+    # Four files at most in one save; the fifth gets a message.
+    drop([f'shot {i}.png' for i in range(5)], [png(8 + i, 8, (40 * i, 120, 60)) for i in range(5)])
+    until("document.querySelectorAll('.canvas-node[data-kind=image]').length === 5 && document.querySelector('#toast').textContent.includes('4 files at most')", 10)
+    drop(['walkthrough.mp4'], [b'\x00\x00\x00\x18ftypmp42fictional'], 'video/mp4')
+    until("document.querySelector('#toast').textContent.includes('Videos are not stored')", 10)
+    browser('click', '#edit-discard'); answer('discard')
+    until("document.querySelector('#edit-status').textContent === 'No changes' && document.querySelectorAll('.canvas-node[data-kind=image]').length === 1", 10)
+    assert world['put_tokens'] == {'Bearer ghu_editor'}, 'only the editor token writes'
+    browser('eval', 'projects[current].private = true')
     browser('record', 'stop')
     assert value("JSON.stringify([window.__errors, window.__csp])") == [[], []], 'no script errors and nothing broke the CSP'
 
@@ -464,7 +552,9 @@ try:
     browser('open', origin + '/example/open?canvas=progress')
     until("document.querySelector('meta[name=horsemen-mode]')?.content === 'public' && typeof canvasKey !== 'undefined' && canvasKey === 'progress' && document.body.dataset.state === 'ready'", 20)
     assert value("!document.querySelector('#edit-canvas') && !window.HorsemenEditor && !document.querySelector('script[src=\"/canvas-editor.js\"]')"), 'the public view stays read-only'
-    assert value("JSON.stringify([...document.querySelectorAll('.canvas-node')].map(n => n.dataset.node).sort())") == ['note-outside', 's-shipped', 's-up-next'], 'the public view shows the saved canvas file'
+    assert value("JSON.stringify([...document.querySelectorAll('.canvas-node')].map(n => n.dataset.node).sort())") == sorted(['s-shipped'] + [n['id'] for n in saved()['nodes']]), 'the public view shows the saved canvas file'
+    browser('eval', "(id => (setSelection(new Set([id])), revealNode(id)))(document.querySelector('.canvas-node[data-kind=image]').dataset.node)")
+    until("document.querySelectorAll('.canvas-node[data-kind=image] img').length === 1 && document.querySelectorAll('.canvas-node[data-kind=table] .sheet-stage[data-state=shown]').length === 1", 20)
     shot('11-public-view.png')
     print('Hosted edit E2E passed:', args.output)
     print('Commits:', json.dumps([c['message'] for c in world['commits']]))
