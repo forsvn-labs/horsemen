@@ -1127,13 +1127,73 @@ def scenario_install_health(env):
     record("I4 incomplete hook pair is unhealthy", proc.returncode != 0 and "Stop" in proc.stdout, proc.stdout + proc.stderr)
 
 
+CANVAS = ('{\n"horsemen":{"version":1},\n"nodes":[\n'
+          '{"id":"img-chart","type":"file","x":400,"y":260,"width":400,"height":250,"alt":"Notes written each week","file":".horsemen/media/chart.svg"},\n'
+          '{"id":"note-plan","type":"text","x":0,"y":0,"width":320,"height":140,"text":"Ask two testers about export."},\n'
+          '{"id":"s-up-next","type":"file","x":400,"y":0,"width":320,"height":200,"file":"PROGRESS.md","subpath":"#Up next"}\n'
+          '],\n"edges":[\n{"id":"e-plan","fromNode":"note-plan","toNode":"s-up-next","label":"feeds"}\n]\n}\n')
+CHART = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20"/></svg>\n'
+
+
+def scenario_canvas_check(env):
+    """C18-C24: canvas files in .horsemen/canvas are checked with the records."""
+    root = healthy_project(env, env.base / "canvas")
+    name = ".horsemen/canvas/progress.canvas"
+    write(root, {name: CANVAS, ".horsemen/media/chart.svg": CHART})
+    code, report = env.check(root)
+    record("C18 a valid canvas in canonical form adds no finding", code == 0 and not report["warnings"],
+           json.dumps(report["errors"] + report["warnings"]))
+
+    def found(text, kind="errors", files=None):
+        write(root, {name: text, **(files or {})})
+        code, report = env.check(root)
+        return code, {(i["code"], i["file"]) for i in report[kind]}, json.dumps(report["errors"] + report["warnings"])
+
+    code, hits, detail = found(json.dumps(json.loads(CANVAS), indent=2), "warnings")
+    record("C19 a valid canvas in another layout is a warning, not an error", code == 0 and hits == {("canvas-not-canonical", name)}, detail)
+    code, hits, detail = found(CANVAS.replace('{"id":"note-plan"', '<<<<<<< HEAD\n{"id":"note-plan"'))
+    record("C20 a canvas with conflict markers is an error", code == 1 and hits == {("canvas-invalid", name)} and "conflict markers" in detail, detail)
+    code, hits, detail = found(CANVAS.replace('"x":0,', '"x":0.5,').replace("Ask two", "<script>alert(1)</script> Ask two"))
+    record("C20 a canvas that breaks a format rule is an error", hits == {("canvas-invalid", name)} and "whole number" in detail, detail)
+    code, hits, detail = found(CANVAS.replace("#Up next", "#Renamed"))
+    record("C21 a section card whose heading is gone is an error", code == 1 and hits == {("canvas-dangling-ref", name)} and "#Renamed" in detail, detail)
+    code, hits, detail = found(CANVAS.replace("chart.svg", "gone.svg"))
+    record("C21 a card whose file is gone is an error", hits == {("canvas-dangling-ref", name)}, detail)
+    code, hits, detail = found(CANVAS.replace('"toNode":"s-up-next"', '"toNode":"ghost"'))
+    record("C21 an edge to a missing node is an error", hits == {("canvas-dangling-ref", name)}, detail)
+    code, hits, detail = found(CANVAS.replace("chart.svg", "big.svg"), files={".horsemen/media/big.svg": CHART + " " * (1024 * 1024)})
+    record("C22 media over 1 MiB is an error", code == 1 and hits == {("canvas-media-too-large", name)}, detail)
+    (root / ".horsemen/media/big.svg").unlink()
+    code, hits, detail = found(CANVAS.replace("chart.svg", "fake.png"), files={".horsemen/media/fake.png": "<script>alert(1)</script>"})
+    record("C22 media that is not its type is an error", hits == {("canvas-invalid", name)} and "PNG" in detail, detail)
+    (root / ".horsemen/media/fake.png").unlink()
+    code, hits, detail = found(CANVAS, files={".horsemen/canvas/My Board.canvas": "{}"})
+    record("C23 a canvas file with a bad name is an error", hits == {("canvas-invalid", ".horsemen/canvas/My Board.canvas")}, detail)
+    (root / ".horsemen/canvas/My Board.canvas").unlink()
+    code, hits, detail = found(CANVAS, files={f".horsemen/canvas/board-{i:02d}.canvas": '{\n"horsemen":{"version":1},\n"nodes":[],\n"edges":[]\n}\n' for i in range(20)})
+    record("C23 more than 20 canvas files is an error", hits == {("canvas-invalid", ".horsemen/canvas")} and "21 canvas files" in detail, detail)
+    for i in range(20):
+        (root / f".horsemen/canvas/board-{i:02d}.canvas").unlink()
+    outside = env.base / "canvas-outside"
+    write(outside, {"leak.canvas": CANVAS.replace("#Up next", "#TOP-SECRET")})
+    (root / ".horsemen/canvas/leak.canvas").symlink_to(outside / "leak.canvas")
+    code, hits, detail = found(CANVAS)
+    record("C24 a canvas file that is a link out of the project is not read",
+           hits == {("canvas-invalid", ".horsemen/canvas/leak.canvas")} and "TOP-SECRET" not in detail, detail)
+    (root / ".horsemen/canvas/leak.canvas").unlink()
+    env.hook("SessionStart", root, session="canvas")
+    code, out, elapsed, _ = env.hook("Stop", root, session="canvas", stop_hook_active=False)
+    record("C18 hooks still run in a project with canvases", code == 0 and review_requested(out), json.dumps(out))
+
+
 SCENARIOS = [scenario_noise, scenario_initialization, scenario_adoption, scenario_shipping, scenario_doc_only_commits,
              scenario_refactor, scenario_knowledge_migration, scenario_vision_change, scenario_publish, scenario_non_software,
              scenario_scale_and_staleness, scenario_nested, scenario_branch_switch, scenario_changelog_and_links,
              scenario_no_baseline, scenario_install, scenario_examples, scenario_preexisting_untracked,
              scenario_rearm, scenario_slow_git, scenario_install_permissions, scenario_orientation_safety, scenario_check_hardening,
              scenario_record_formats, scenario_structure_trees, scenario_task_review, scenario_state_identity,
-             scenario_state_resume, scenario_cache_shape, scenario_install_health]
+             scenario_state_resume, scenario_cache_shape, scenario_install_health,
+             scenario_canvas_check]
 
 
 def main():

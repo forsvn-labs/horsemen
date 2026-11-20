@@ -14,6 +14,8 @@ REQUIRED = {
     "scripts/horsemen_core/cli.py", "scripts/horsemen_core/__main__.py",
     "scripts/horsemen_core/plans.py", "scripts/horsemen_core/patches.py",
     "scripts/horsemen_core/git_read.py", "scripts/horsemen_core/documents.py",
+    "scripts/horsemen_core/canvas.py", "scripts/horsemen_core/agent_tools.py",
+    "scripts/horsemen_core/mcp.py", "references/canvas.md",
 }
 
 

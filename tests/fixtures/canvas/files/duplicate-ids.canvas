@@ -1,0 +1,10 @@
+{"nodes":[
+{"id":"a","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x"},
+{"id":"b","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x"},
+{"id":"a","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x"},
+{"id":"a","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x"}
+],"edges":[
+{"id":"b","fromNode":"a","toNode":"b"},
+{"id":"e","fromNode":"a","toNode":"b"},
+{"id":"e","fromNode":"a","toNode":"b"}
+]}
