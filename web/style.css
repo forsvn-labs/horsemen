@@ -419,6 +419,26 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 .file-node.image:not(.card) img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
 #map:not(.list) .file-node.image:not(.card) .md-image[data-state=shown]{position:absolute;inset:6px;width:auto;height:auto}
 #map:not(.list) .file-node.image:not(.card) img{position:absolute;inset:0;width:100%;height:100%}
+/* A player: a quiet stage with one button. The frame comes only after the click, and fills the stage. */
+.embed-stage{position:relative;flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;margin:10px calc(16px*var(--d)) 0;padding:12px;text-align:center;border:var(--bw) dashed var(--line);border-radius:var(--radius-s);background:color-mix(in srgb,var(--ink) 3%,var(--surface))}
+.embed-load .icon{width:15px;height:15px}
+.embed-note{max-width:36ch;font-size:var(--fs-s);line-height:1.4;color:var(--ink-2)}
+.embed-stage[data-state=playing]{padding:0;border-style:solid;overflow:hidden;background:var(--surface-2)}
+.embed-frame{display:block;width:100%;height:100%;border:0}
+.embed-foot,.sheet-foot{display:flex;align-items:center;gap:12px;min-width:0;padding:8px calc(16px*var(--d)) 12px}
+:is(.embed-foot,.sheet-foot) .card-line{flex:1;min-width:0}
+:is(.embed-foot,.sheet-foot) .card-open{flex:none;margin:0 0 0 auto}
+/* A table: the header row stays at the top; numbers align right; a wide or long table scrolls inside its card. */
+.sheet-stage{flex:1;min-height:0;display:flex;flex-direction:column;margin:10px calc(16px*var(--d)) 0}
+.sheet-stage>.card-note{margin:0}
+.sheet-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius-s);background:var(--surface);cursor:auto}
+.sheet-scroll:focus-visible{outline:var(--focus-w) dashed var(--focus);outline-offset:2px}
+.sheet-table{width:max-content;min-width:100%;border-collapse:collapse;font:400 var(--fs-s)/1.4 var(--ui);font-variant-numeric:tabular-nums;color:var(--ink)}
+.sheet-table :is(th,td){max-width:28ch;padding:5px 10px;text-align:left;vertical-align:top;white-space:pre-line;overflow-wrap:anywhere;border-bottom:1px solid var(--line)}
+.sheet-table th{position:sticky;top:0;z-index:1;font-weight:600;background:var(--surface-2)}
+.sheet-table .num{text-align:right}
+.sheet-table tbody tr:last-child td{border-bottom:0}
+.sheet-size{margin:6px 0 0;font-size:var(--fs-s);color:var(--ink-2)}
 /* Connectors: a curve with an arrow and a label. The list view gives the same facts as text lines. */
 .wires .edge path{stroke:var(--tone,var(--ink-3));stroke-width:1.5;stroke-dasharray:none}
 .wires .edge polygon{fill:var(--tone,var(--ink-3))}
@@ -455,6 +475,10 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 #map.list .group-label{padding:0 2px;font-size:.8125rem;white-space:normal}
 #map.list .file-node.image:not(.card) img{max-height:360px}
 #map.list .file-node .card-line{display:block;-webkit-line-clamp:unset}
+#map.list .embed-stage{flex:none;aspect-ratio:var(--ratio,16/9);max-height:420px}
+#map.list .embed-stage[data-state=idle]{aspect-ratio:auto;min-height:120px}
+#map.list .sheet-stage{flex:none}
+#map.list .sheet-scroll{max-height:360px}
 
 /* Zoom: one small control in the corner. */
 .zoom{position:absolute;right:16px;bottom:16px;z-index:5;display:flex;align-items:center;gap:2px;padding:3px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-card)}

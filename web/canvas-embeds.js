@@ -94,7 +94,7 @@
     }
     if (!found || !frameAllowed(found.frame)) return null;
     return { provider: found.id, name: found.name, kind: found.kind, frame: found.frame, referrer: found.referrer,
-      action: found.kind === 'video' ? 'Play video' : 'Load preview', ratio: found.kind === 'video' ? '16 / 9' : '4 / 3' };
+      action: found.kind === 'video' ? 'Load video' : 'Load preview', ratio: found.kind === 'video' ? '16 / 9' : '4 / 3' };
   }
   /* True for a frame address inside the frame-src list: one of the origins, then a path. */
   const frameAllowed = frame => typeof frame === 'string' && FRAME_ORIGINS.some(origin => frame.startsWith(origin + '/'));

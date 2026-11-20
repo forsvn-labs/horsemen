@@ -16,7 +16,11 @@
    - portals: a portal to a canvas that is not there opens something
    - connectors: an end is not on the border of its node; the stated sides are ignored; an arrow has no head
    - list: the order changes between loads; a group loses its members
-   - names: a board name shows as a file name */
+   - names: a board name shows as a file name
+   - embeds (slice 2b): a known provider address is not a player; an unknown host becomes a player; the card
+     has a frame, a frame address, or a thumbnail before a click; the stored address goes into a frame
+   - tables (slice 2b): a CSV or TSV file that no loaded canvas registered is read; XLSX becomes a table; more
+     than 20 tables load; a cell becomes markup; the size line is wrong; a reader error repeats hostile text */
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -55,7 +59,7 @@ const links = [link('.horsemen/media/route-map.svg'), link('.horsemen/media/pilo
 const view = compose('progress', fileOf('progress', text, links));
 assert.deepEqual(view.nodes.map(n => n.id).sort(), ['g-proof', 'g-route', 'img-route', 'link-survey', 'note-risk', 'ref-start', 's-gates', 's-in-progress', 's-latest-day', 's-shipped', 's-up-next', 'sheet-signups', 'to-launch', 'vid-walkthrough'].sort());
 assert.deepEqual(Object.fromEntries(view.nodes.map(n => [n.id, n.kind])), { 'g-proof': 'group', 'g-route': 'group', 'img-route': 'image', 'link-survey': 'link', 'note-risk': 'note', 'ref-start': 'section', 's-in-progress': 'section', 's-shipped': 'section',
-  'sheet-signups': 'file', 'to-launch': 'portal', 'vid-walkthrough': 'link', 's-latest-day': 'section', 's-up-next': 'section', 's-gates': 'section' });
+  'sheet-signups': 'table', 'to-launch': 'portal', 'vid-walkthrough': 'embed', 's-latest-day': 'section', 's-up-next': 'section', 's-gates': 'section' });
 const shipped = byId(view, 's-shipped');
 assert.deepEqual([shipped.x, shipped.y, shipped.width, shipped.height, shipped.color, shipped.saved, shipped.record, shipped.section, shipped.missing], [0, 0, 320, 220, '4', true, 'progress', 's-shipped', false], 'a saved section card keeps its place, size, and colour');
 assert.ok(shipped.lead.includes('Booking page') && shipped.meta === '2 items', 'a saved section card shows the live text of its section');
@@ -82,11 +86,20 @@ assert.ok(!/<img|<svg[^>]*onload|<script/i.test(V.cardHTML(image)), 'the image f
 const portal = byId(view, 'to-launch');
 assert.deepEqual([portal.target, portal.exists, portal.title], ['launch-plan', true, 'Launch plan']);
 assert.equal(byId(compose('progress', fileOf('progress', text, links), { canvases: ['progress'] }), 'to-launch').exists, false, 'a portal to a canvas that is not there says so');
+/* Embeds: a link card of a known provider is a player that loads after a click. An unknown host stays a link card. */
 const video = byId(view, 'vid-walkthrough');
-assert.deepEqual([video.title, video.host, video.url], ['Booking page walkthrough (3 min)', 'www.youtube.com', 'https://www.youtube.com/watch?v=EXAMPLE0000'], 'a video address is a link card in this slice');
-assert.match(V.cardHTML(video), /<a class="card-open" target="_blank" rel="noopener noreferrer" href="https:\/\/www\.youtube\.com\/watch\?v=EXAMPLE0000">/);
+assert.deepEqual([video.kind, video.title, video.host, video.url, video.embed.provider, video.embed.frame, video.embed.action],
+  ['embed', 'Booking page walkthrough (3 min)', 'www.youtube.com', 'https://www.youtube.com/watch?v=EXAMPLE0000', 'youtube', 'https://www.youtube-nocookie.com/embed/EXAMPLE0000', 'Load video']);
+const videoHTML = V.cardHTML(video);
+assert.match(videoHTML, /<div class="embed-stage" data-state="idle"><button type="button" class="btn embed-load"><svg class="icon" aria-hidden="true"><use href="\/assets\/icons\/icons\.svg#play"\/><\/svg><span>Load video<\/span><\/button><span class="embed-note">Nothing loads from YouTube before you select Load video\.<\/span><\/div>/);
+assert.ok(!/iframe|youtube-nocookie|<img|ytimg/i.test(videoHTML), 'before a click the card has no frame, no frame address, and no thumbnail');
+assert.match(videoHTML, /<a class="card-open" target="_blank" rel="noopener noreferrer" href="https:\/\/www\.youtube\.com\/watch\?v=EXAMPLE0000">Open on YouTube/);
+assert.equal(byId(view, 'link-survey').kind, 'link', 'an unknown host stays a link card');
+assert.ok(!V.cardHTML(byId(view, 'link-survey')).includes('embed'), 'a link card has no player');
+/* Tables: a CSV or TSV file that the reader registered loads as a table; XLSX stays a file card. */
 const sheet = byId(view, 'sheet-signups');
-assert.deepEqual([sheet.title, sheet.href], ['pilot-signups.csv', BASE + '.horsemen/media/pilot-signups.csv'], 'a table file is a file card until the table slice');
+assert.deepEqual([sheet.kind, sheet.format, sheet.title, sheet.path, sheet.href, sheet.load, sheet.link.path], ['table', 'csv', 'pilot-signups.csv', '.horsemen/media/pilot-signups.csv', BASE + '.horsemen/media/pilot-signups.csv', true, '.horsemen/media/pilot-signups.csv']);
+assert.match(V.cardHTML(sheet), /^<span class="cardhead"><svg class="icon" aria-hidden="true"><use href="\/assets\/icons\/icons\.svg#table"\/><\/svg><b>pilot-signups\.csv<\/b><\/span><div class="sheet-stage" data-state="loading"><p class="card-note">Loading the table…<\/p><\/div><span class="sheet-foot">/);
 assert.deepEqual([byId(view, 'g-proof').label, byId(view, 'note-risk').color], ['Proof for the booking page', '1']);
 /* Connectors. */
 assert.deepEqual(view.edges.map(e => [e.id, e.from, e.to, e.label, e.toEnd, e.fromEnd]).find(e => e[0] === 'e-demo'), ['e-demo', 's-shipped', 'vid-walkthrough', 'demo', 'arrow', 'none'], 'a connector points at its end node unless the file says otherwise');
@@ -95,6 +108,9 @@ assert.deepEqual(byId(view, 's-shipped').links, ['demo → Booking page walkthro
 
 /* A board: only the elements of the file. */
 const board = compose('launch-plan', fileOf('launch-plan', read('.horsemen/canvas/launch-plan.canvas')));
+assert.deepEqual(['loom-pitch', 'sheet-budget'].map(id => (n => [n.kind, n.embed.provider, n.embed.action, n.embed.frame])(byId(board, id))),
+  [['embed', 'loom', 'Load video', 'https://www.loom.com/embed/00000000000000000000000000000000'], ['embed', 'google-sheets', 'Load preview', 'https://docs.google.com/spreadsheets/d/EXAMPLE-FICTIONAL-SHEET/preview']], 'a Loom video and a Google sheet are players');
+assert.match(V.cardHTML(byId(board, 'sheet-budget')), /<span>Load preview<\/span><\/button><span class="embed-note">Nothing loads from Google Sheets before you select Load preview\.<\/span>/);
 assert.deepEqual([board.nodes.length, board.edges.length, board.sections, board.title, board.nodes.filter(n => !n.saved).length], [9, 4, 0, 'Launch plan', 0]);
 assert.deepEqual([byId(board, 'ref-next').record, byId(board, 'ref-next').section, byId(board, 'ref-next').from], ['progress', 's-up-next', 'Progress'], 'a board can show a section of a record');
 
@@ -173,21 +189,45 @@ const hostile = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ no
   { ...node({ id: 'p' }), type: 'file', file: '.horsemen/canvas/launch-plan.canvas' },
   { ...node({ id: 's' }), type: 'file', file: 'PROGRESS.md', subpath: '#' + HOSTILE },
   { ...node({ id: 'u' }), type: HOSTILE.slice(0, 32) },
-], edges: [{ id: 'e', fromNode: 'n', toNode: 'l', label: HOSTILE }] }), [link('img/"><script>.png'), link('docs/"onmouseover="x.pdf')]));
-assert.equal(hostile.nodes.length, 8, 'text with markup is valid content');
+  { ...node({ id: 'v' }), type: 'link', url: 'https://www.youtube.com/watch?v=aqz-KE-bpKQ&x="><script>', title: HOSTILE },
+  { ...node({ id: 't' }), type: 'file', file: 'data/"><script>.csv' },
+  { ...node({ id: 't2' }), type: 'file', file: 'data/"onmouseover="x.tsv' },
+], edges: [{ id: 'e', fromNode: 'n', toNode: 'l', label: HOSTILE }] }), [link('img/"><script>.png'), link('docs/"onmouseover="x.pdf'), link('data/"><script>.csv')]));
+assert.equal(hostile.nodes.length, 11, 'text with markup is valid content');
+assert.deepEqual(['v', 't', 't2'].map(id => byId(hostile, id).kind), ['embed', 'table', 'table']);
 for (const n of hostile.nodes) {
   const html = V.cardHTML(n) + V.linksHTML(n);
   /* Text from the file is escaped, so each "<" starts a tag that the app wrote. Each tag has known attributes in quotes. */
   for (const tag of html.match(/<[^>]*>/g) || []) {
-    assert.match(tag, /^<\/?(?:span|b|a|p|div|small|strong|em|code|svg|use|ul|ol|li|br|pre|del)(?: [a-z-]+="[^"<>]*")*\/?>$/, `${n.id}: only tags that the app writes (${tag.slice(0, 60)})`);
-    for (const [, name] of tag.matchAll(/ ([a-z-]+)="/g)) assert.ok(['class', 'href', 'target', 'rel', 'data-image', 'data-alt', 'aria-hidden'].includes(name), `${n.id}: attribute ${name}`);
+    assert.match(tag, /^<\/?(?:span|b|a|p|div|small|strong|em|code|svg|use|ul|ol|li|br|pre|del|button)(?: [a-z-]+="[^"<>]*")*\/?>$/, `${n.id}: only tags that the app writes (${tag.slice(0, 60)})`);
+    for (const [, name] of tag.matchAll(/ ([a-z-]+)="/g)) assert.ok(['class', 'href', 'target', 'rel', 'data-image', 'data-alt', 'aria-hidden', 'type', 'data-state'].includes(name), `${n.id}: attribute ${name}`);
   }
   assert.equal(html.replace(/<[^>]*>/g, '').includes('<'), false, `${n.id}: no other markup`);
-  for (const href of [...html.matchAll(/href="([^"]*)"/g)].map(m => m[1])) assert.match(href, /^(https:\/\/(github\.com\/example-org\/|example\.com\/)|\/assets\/icons\/)/, `${n.id}: links go to GitHub, the stated address, or the icon file`);
+  for (const href of [...html.matchAll(/href="([^"]*)"/g)].map(m => m[1])) assert.match(href, /^(https:\/\/(github\.com\/example-org\/|example\.com\/|www\.youtube\.com\/watch\?)|\/assets\/icons\/)/, `${n.id}: links go to GitHub, the stated address, or the icon file`);
   assert.ok(!V.cardLabel(n).includes('\n'));
 }
 assert.ok(V.cardHTML(byId(hostile, 'n')).includes('&lt;script&gt;window.pwned=1&lt;/script&gt;'), 'a note shows the text of a tag');
 assert.ok(!V.cardHTML(byId(hostile, 'n')).includes('href="javascript'), 'a Markdown link with a script address is text');
+assert.equal(byId(hostile, 'v').embed.frame, 'https://www.youtube-nocookie.com/embed/aqz-KE-bpKQ', 'only the checked ID of a hostile address reaches the frame address');
+assert.deepEqual([byId(hostile, 't').load, byId(hostile, 't2').load, byId(hostile, 't2').link], [true, false, null], 'only a registered table loads');
+
+/* A loaded table: escaped cells, a scroll area with a name, and a size line. A reader error is text. */
+const loadedTable = V.sheetHTML(sheet, 'week,guests\n1,12\n2,"<img src=x onerror=window.pwned=1>"\n');
+assert.match(loadedTable, /^<div class="sheet-scroll" tabindex="0" role="region" aria-label="Table: pilot-signups\.csv"><table class="sheet-table"><caption class="sr">pilot-signups\.csv<\/caption><thead><tr><th scope="col" class="num">week<\/th><th scope="col">guests<\/th><\/tr><\/thead>/);
+assert.match(loadedTable, /<\/table><\/div><p class="card-meta sheet-size">2 rows, 2 columns\.<\/p>$/);
+assert.ok(!/<img/i.test(loadedTable) && loadedTable.includes('&lt;img src=x onerror=window.pwned=1&gt;'), 'a cell is text');
+assert.equal(V.sheetHTML(byId(hostile, 't'), 'a\n1'), V.sheetHTML(byId(hostile, 't'), 'a\n1'));
+assert.ok(!V.sheetHTML(byId(hostile, 't'), 'a\n1').includes('<script>'), 'a hostile file name is text in the label');
+assert.equal(V.sheetErrorHTML('Stored in Git LFS; not shown. <b>x</b>'), '<p class="card-note">The table did not load. Stored in Git LFS; not shown. &lt;b&gt;x&lt;/b&gt;</p>');
+assert.equal(V.sheetHTML({ ...sheet, format: 'tsv' }, 'a\tb\n1,2\t3').includes('<td>1,2</td><td class="num">3</td>'), true, 'a TSV file splits on tabs');
+/* XLSX stays a file card; a table outside the media folder loads; 20 tables load at most. */
+const sheets = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [{ ...node({ id: 'x' }), type: 'file', file: 'data/budget.xlsx' }, { ...node({ id: 'd' }), type: 'file', file: 'data/stops.TSV' }] }), [link('data/budget.xlsx'), link('data/stops.TSV')]));
+assert.deepEqual([byId(sheets, 'x').kind, byId(sheets, 'd').kind, byId(sheets, 'd').format, byId(sheets, 'd').load], ['file', 'table', 'tsv', true]);
+const tables = Array.from({ length: 25 }, (_, i) => ({ ...node({ id: 't' + String(i).padStart(2, '0') }), type: 'file', file: `data/${i}.csv` }));
+const ledger = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: tables }), tables.map(n => link(n.file))));
+assert.deepEqual([ledger.nodes.filter(n => n.load).length, V.MAX_TABLES], [20, 20], 'a canvas loads 20 tables at most');
+assert.match(V.cardHTML(ledger.nodes.find(n => !n.load)), /Not loaded\. A canvas loads 20 tables at most\./);
+
 /* Colours: only a preset or a hex value, also when a caller skips the reader. */
 assert.deepEqual([V.tone('3'), V.tone('#A1b2C3'), V.tone('red;x'), V.tone(undefined), V.tone('#fff'), V.tone(4)], [{ preset: '3' }, { hex: '#A1b2C3' }, null, null, null, null]);
 
@@ -221,9 +261,10 @@ assert.deepEqual(V.listOrder([...view.nodes].reverse()).map(n => n.id), V.listOr
 assert.deepEqual(V.listOrder(board.nodes).map(n => n.id), ['ref-next', 'g-ideas', 'idea-lanterns', 'idea-partners', 'idea-press', 'loom-pitch', 'g-decided', 'decision-date', 'sheet-budget']);
 
 /* Labels for assistive technology. */
-assert.deepEqual(['s-shipped', 'note-risk', 'img-route', 'to-launch', 'vid-walkthrough', 'g-proof', 'sheet-signups'].map(id => V.cardLabel(byId(view, id))),
-  ['Open section: Shipped', 'Note: Risk: the old gate closes at 21:00 in winter.', 'Image: Map of the harbour loop with five stops', 'Open canvas: Launch plan', 'Link: Booking page walkthrough (3 min)', 'Group: Proof for the booking page', 'File: pilot-signups.csv']);
+assert.deepEqual(['s-shipped', 'note-risk', 'img-route', 'to-launch', 'vid-walkthrough', 'g-proof', 'sheet-signups', 'link-survey'].map(id => V.cardLabel(byId(view, id))),
+  ['Open section: Shipped', 'Note: Risk: the old gate closes at 21:00 in winter.', 'Image: Map of the harbour loop with five stops', 'Open canvas: Launch plan', 'YouTube video: Booking page walkthrough (3 min)', 'Group: Proof for the booking page', 'Table: pilot-signups.csv', 'Link: Guest survey results, October']);
+assert.deepEqual(['loom-pitch', 'sheet-budget'].map(id => V.cardLabel(byId(board, id))), ['Loom video: Partner pitch, first take', 'Google Sheets: Launch budget']);
 assert.equal(V.cardLabel(byId(hostile, 'u')), 'Element that is not supported');
-assert.deepEqual([V.openable(byId(view, 's-shipped')), V.openable(byId(view, 'to-launch')), V.openable(byId(view, 'note-risk')), V.openable(byId(view, 'vid-walkthrough')), V.openable(byId(view, 'g-proof'))], [true, true, false, false, false]);
+assert.deepEqual([V.openable(byId(view, 's-shipped')), V.openable(byId(view, 'to-launch')), V.openable(byId(view, 'note-risk')), V.openable(byId(view, 'vid-walkthrough')), V.openable(byId(view, 'g-proof')), V.openable(byId(view, 'sheet-signups'))], [true, true, false, false, false, false]);
 
 console.log('canvas view: ok');

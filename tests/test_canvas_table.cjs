@@ -66,8 +66,10 @@ assert.deepEqual([lines.totalRows, lines.rows.length], [131072, 200]); assert.ok
 
 /* Markup: header cells are column headers, numbers align right, and each value is escaped text. */
 const html = T.html(quoted, 'Signups');
-assert.match(html, /^<table class="sheet-table"><caption class="sr">Signups<\/caption><thead><tr><th scope="col">name<\/th><th scope="col">note<\/th><th scope="col">count<\/th><\/tr><\/thead><tbody>/);
+assert.match(html, /^<table class="sheet-table"><caption class="sr">Signups<\/caption><thead><tr><th scope="col">name<\/th><th scope="col">note<\/th><th scope="col" class="num">count<\/th><\/tr><\/thead><tbody>/, 'a column of numbers aligns right, with its header');
 assert.match(html, /<td>Harbour, east<\/td><td>He said &quot;go&quot;\nthen left<\/td><td class="num">12<\/td>/);
+assert.match(T.html(T.parse('a,b\n1,x\n,2\n3,4', 'csv')), /<th scope="col" class="num">a<\/th><th scope="col">b<\/th>/, 'one cell of text makes a column of text; an empty cell does not');
+assert.match(T.html(T.parse('a\n\n', 'csv')), /<th scope="col">a<\/th>/, 'a column without values is text');
 for (const [value, numeric] of [['12', true], ['-3.5', true], ['1,234', true], ['12%', true], ['$4.50', true], ['€4', true], ['1e3', true], ['', false], ['12 guests', false], ['0x1F', false], ['week 1', false], ['--', false]])
   assert.equal(T.numeric(value), numeric, value);
 

@@ -76,7 +76,7 @@ for (const [url, want, provider] of cases) {
 
 /* What a card says, and what the frame gets. A video plays; a design or a document loads a preview. */
 const yt = E.embed(`https://youtu.be/${YT}`), sheet = E.embed(`https://docs.google.com/spreadsheets/d/${DOC}/edit`), figma = E.embed(`https://www.figma.com/file/${FIGMA}`);
-assert.deepEqual([yt.name, yt.kind, yt.action, yt.referrer, yt.ratio], ['YouTube', 'video', 'Play video', 'strict-origin-when-cross-origin', '16 / 9'], 'YouTube needs the site origin as the referrer, or the player fails');
+assert.deepEqual([yt.name, yt.kind, yt.action, yt.referrer, yt.ratio], ['YouTube', 'video', 'Load video', 'strict-origin-when-cross-origin', '16 / 9'], 'YouTube needs the site origin as the referrer, or the player fails');
 assert.deepEqual([sheet.name, sheet.kind, sheet.action, sheet.referrer], ['Google Sheets', 'sheet', 'Load preview', 'no-referrer']);
 assert.deepEqual([figma.name, figma.kind, figma.action, figma.referrer], ['Figma', 'design', 'Load preview', 'no-referrer']);
 for (const [url, name] of [['https://vimeo.com/76979871', 'Vimeo'], [`https://www.loom.com/share/${LOOM}`, 'Loom'], [`https://docs.google.com/document/d/${DOC}/edit`, 'Google Docs'], [`https://docs.google.com/presentation/d/${DOC}/edit`, 'Google Slides']])

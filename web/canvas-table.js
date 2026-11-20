@@ -73,13 +73,14 @@
   const NUMBER = /^[-+]?[$€£¥]?\s?(?:\d{1,3}(?:,\d{3})+|\d+)?(?:\.\d+)?(?:e[-+]?\d+)?%?$/i;
   const numeric = value => typeof value === 'string' && /\d/.test(value) && NUMBER.test(value.trim()) && !/^[-+]?[$€£¥]?\s?\.?e/i.test(value.trim());
 
-  /* The table as markup. Each value is escaped text. */
+  /* The table as markup. Each value is escaped text. A column whose values that show are all numbers aligns right. */
   function html(table, label = '') {
     if (!table.header.length) return '<p class="card-note">The table is empty.</p>';
     const cell = (tag, value, attrs = '') => '<' + tag + attrs + '>' + esc(value) + '</' + tag + '>';
+    const num = table.header.map((_, c) => table.rows.some(r => r[c] !== '') && table.rows.every(r => r[c] === '' || numeric(r[c])) ? ' class="num"' : '');
     return '<table class="sheet-table">' + (label ? '<caption class="sr">' + esc(label) + '</caption>' : '') +
-      '<thead><tr>' + table.header.map(h => cell('th', h, ' scope="col"')).join('') + '</tr></thead>' +
-      '<tbody>' + table.rows.map(r => '<tr>' + r.map(v => cell('td', v, numeric(v) ? ' class="num"' : '')).join('') + '</tr>').join('') + '</tbody></table>';
+      '<thead><tr>' + table.header.map((h, c) => cell('th', h, ' scope="col"' + num[c])).join('') + '</tr></thead>' +
+      '<tbody>' + table.rows.map(r => '<tr>' + r.map((v, c) => cell('td', v, num[c])).join('') + '</tr>').join('') + '</tbody></table>';
   }
 
   const api = { LIMITS, format, parse, summary, numeric, html };

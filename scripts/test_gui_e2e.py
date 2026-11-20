@@ -9,7 +9,7 @@ import threading
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tests'))
 from test_gui import Fake
 from horsemen_core.gui import GitHubReader, ScanState, make_server
-from canvas_fixture import BOARDS, CANVASES, HEAVY_SIZE, MEDIA
+from canvas_fixture import BOARDS, CANVASES, HEAVY_SIZE, MEDIA, PLAYER_ORIGINS
 
 parser=argparse.ArgumentParser();parser.add_argument('--output',required=True,type=Path);args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1]
@@ -43,6 +43,9 @@ class ProgressiveFake(Fake):
             return {'encoding':'base64','content':base64.b64encode(CANVASES[name].encode()).decode()}
         for name,data in MEDIA.items():
             if f'/contents/{name}?' in path:return {'type':'file','sha':'3'*40,'size':len(data),'encoding':'base64','content':base64.b64encode(data).decode()}
+        if '/contents/.horsemen/media/' in path:
+            from horsemen_core.gui import ProviderError
+            raise ProviderError('Repository or record is no longer accessible.',404)
         for name,data in [('img/board.png',BOARD),('img/logo.svg',LOGO)]:
             if f'/contents/{name}?' in path:return {'type':'file','sha':'2'*40,'size':len(data),'encoding':'base64','content':base64.b64encode(data).decode()}
         if '/contents/img/' in path:
@@ -433,7 +436,7 @@ try:
     nodes=value('JSON.stringify(Object.fromEntries([...document.querySelectorAll(".canvas-node")].map(e=>[e.dataset.node,[e.dataset.kind,e.tagName,e.classList.contains("saved")]])))')
     assert nodes=={'s-map':['section','BUTTON',True],'s-read-before-changing':['section','BUTTON',False],'s-commands':['section','BUTTON',False],'note-risk':['note','DIV',True],'g-proof':['group','DIV',True],
                    'img-board':['image','DIV',True],'img-logo':['image','DIV',True],'link-survey':['link','DIV',True],'ref-shipped':['section','BUTTON',True],'doc-research':['document','BUTTON',True],
-                   'sheet-signups':['file','DIV',True],'to-launch':['portal','BUTTON',True],'odd':['unknown','DIV',True]}, 'Each element of the file shows with its kind; each section that the file does not place is a generated card'
+                   'sheet-signups':['table','DIV',True],'to-launch':['portal','BUTTON',True],'odd':['unknown','DIV',True]}, 'Each element of the file shows with its kind; each section that the file does not place is a generated card'
     assert value('JSON.stringify([document.querySelector("#project-name").textContent,document.querySelector("#project-description").textContent.startsWith("3 sections · 11 elements from structure.canvas · example/alpha"),document.querySelector("#canvas-notice").hidden])')==['Structure',True,True], 'The header counts the sections and the elements of the file; a valid file has no message'
     assert value('JSON.stringify((e=>[position("s-map"),e.offsetWidth,e.offsetHeight,e.dataset.tone,e.innerText.includes("operator workspace")])(document.querySelector("[data-node=s-map]")))')==[[0,0],320,220,'4',True], 'A saved section card keeps its place, size, and colour, and shows the text of the record'
     assert value('JSON.stringify((()=>{const cards=[...document.querySelectorAll(".canvas-node:not(.group)")].map(e=>({id:e.dataset.node,x:position(e.dataset.node)[0],y:position(e.dataset.node)[1],w:e.offsetWidth,h:e.offsetHeight}));const hits=[];for(const a of cards)for(const b of cards)if(a.id<b.id&&HorsemenCanvas.overlaps(a,b,0))hits.push(a.id+"/"+b.id);return hits})())')==[], 'Generated cards do not overlap saved elements'
@@ -532,6 +535,62 @@ try:
     assert value(shown)==['launch-plan',[],False] and 'not in Launch plan now' in browser('get','text','#toast'), 'A link to an element that is gone says so'
     browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','review canvas');browser('press','Enter')
     assert value('JSON.stringify([canvasKey,document.querySelector("#palette").open])')==['review',False], 'Jump opens a board'
+    # Players and tables (slice 2b). A local fake player answers each provider origin: no real provider is contacted.
+    def player_requests():
+        found=json.loads(browser('--json','network','requests'))['data']['requests']
+        return [[r['url'],(r.get('headers') or {}).get('Referer')] for r in found if any(r['url'].startswith(o+'/') for o in PLAYER_ORIGINS)]
+    for origin in PLAYER_ORIGINS:browser('network','route',origin+'/**','--body','{"player":"fake"}')
+    browser('network','requests','--clear');watch_csp();browser('click','[data-canvas="proof"]')
+    browser('wait','--fn','document.querySelectorAll("[data-node^=table-] .sheet-stage[data-state=shown]").length === 2 && document.querySelector("[data-node=table-missing] .sheet-stage[data-state=error]")')
+    kinds=value('JSON.stringify(Object.fromEntries([...document.querySelectorAll(".canvas-node")].map(e=>[e.dataset.node,e.dataset.kind])))')
+    assert kinds=={'g-proof':'group','vid-demo':'embed','sheet-budget':'embed','table-signups':'table','table-stops':'table','file-budget':'file','link-lookalike':'link','table-missing':'table'}, 'A video and a sheet address are players; CSV and TSV files are tables; XLSX is a file card; a look-alike host is a link card'
+    assert value('JSON.stringify([document.querySelectorAll("#map iframe").length,[...document.querySelectorAll(".embed-load")].map(b=>b.textContent),document.querySelector("[data-node=vid-demo] .embed-note").textContent])')==[0,['Load video','Load preview'],'Nothing loads from YouTube before you select Load video.'], 'Before a click there is no frame'
+    assert player_requests()==[], 'Before a click the browser sends no request to a provider'
+    signups=value('JSON.stringify((n=>[[...n.querySelectorAll("thead th")].map(e=>e.textContent),n.querySelectorAll("tbody tr").length,n.querySelector("tbody tr:nth-child(1) td:nth-child(3)").textContent,n.querySelector("tbody tr:nth-child(3) td:nth-child(3)").textContent,n.querySelectorAll("img,script,[onerror],a:not(.card-open)").length,n.querySelector(".sheet-size").textContent,[...n.querySelectorAll("th")].map(e=>getComputedStyle(e).textAlign),getComputedStyle(n.querySelector("tbody td")).textAlign,n.querySelector(".sheet-scroll").getAttribute("aria-label")])(document.querySelector("[data-node=table-signups]")))')
+    assert signups==[['week','guests','note'],40,'Harbour loop, east','<img src=x onerror="window.pwned=1">',0,'40 rows, 3 columns.',['right','right','left'],'right','Table: signups.csv'], 'A CSV file is a table: a header, all 40 rows, quoted commas, markup as text, and numbers on the right'
+    assert value('JSON.stringify((n=>[[...n.querySelectorAll("th")].map(e=>e.textContent),[...n.querySelectorAll("tbody td")].map(e=>e.textContent)])(document.querySelector("[data-node=table-stops]")))')==[['stop','minutes'],['Harbour, east','12','Old gate','4']], 'A TSV file splits on tabs'
+    assert value('JSON.stringify([document.querySelector("[data-node=table-missing] .sheet-stage").textContent,document.querySelector("[data-node=file-budget] a").href,document.querySelector("[data-node=link-lookalike] a").href])')==['The table did not load. The table is not in the repository at this commit.','https://github.com/example/alpha/blob/'+'a'*40+'/.horsemen/media/budget.xlsx','https://www.youtube.com.example.net/watch?v=Pilot-Demo1'], 'A missing table says so; XLSX links to GitHub; a look-alike host is a plain link'
+    assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].every(e=>{const r=e.getBoundingClientRect(),c=document.querySelector(".canvas").getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom}))') is True, 'The board fits the screen'
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished") && document.querySelector("#toast").hidden')
+    browser('screenshot',str(args.output/'canvas-embeds-before.png'))
+    # The wheel over a long table scrolls the table, not the canvas. A drag elsewhere on the card still moves the canvas.
+    camera_before=value('JSON.stringify(camera)')
+    box=value('JSON.stringify((r=>({x:r.x+r.width/2,y:r.y+r.height/2}))(document.querySelector("[data-node=table-signups] .sheet-scroll").getBoundingClientRect()))')
+    browser('mouse','move',str(round(box['x'])),str(round(box['y'])));browser('mouse','wheel','200')
+    browser('wait','--fn','document.querySelector("[data-node=table-signups] .sheet-scroll").scrollTop > 0')
+    assert value('JSON.stringify(camera)')==camera_before, 'The canvas does not move while a table scrolls'
+    assert value('JSON.stringify((t=>t.querySelector("th").getBoundingClientRect().top-t.getBoundingClientRect().top)(document.querySelector("[data-node=table-signups] .sheet-scroll")))')<=2, 'The header row stays at the top of the table'
+    # A click loads the player. The frame address comes from the rules; the frame is sandboxed; only YouTube gets the site origin as the referrer.
+    browser('click','[data-node="vid-demo"] .embed-load');browser('wait','[data-node="vid-demo"] iframe')
+    frame=value('JSON.stringify((f=>[f.getAttribute("src"),f.getAttribute("sandbox"),f.referrerPolicy,f.title,f.allowFullscreen,f.closest(".embed-stage").dataset.state,document.activeElement===f])(document.querySelector("[data-node=vid-demo] iframe")))')
+    assert frame==['https://www.youtube-nocookie.com/embed/Pilot-Demo1?start=65','allow-scripts allow-same-origin allow-presentation','strict-origin-when-cross-origin','YouTube: Pilot walkthrough (2 min)',True,'playing',True], 'A click on Load video makes the frame of the fake player'
+    browser('wait','--fn','performance.getEntriesByType("resource").some(e=>e.name.startsWith("https://www.youtube-nocookie.com/embed/"))')
+    origin_ref=f'http://127.0.0.1:{server.server_port}/'
+    assert player_requests()==[['https://www.youtube-nocookie.com/embed/Pilot-Demo1?start=65',origin_ref]], 'Only the chosen player is requested, with the site origin and no path as the referrer'
+    # The keyboard: Tab reaches the button of the sheet; Enter loads it. Google gets no referrer.
+    browser('focus','[data-node="sheet-budget"] .embed-load');browser('press','Enter');browser('wait','[data-node="sheet-budget"] iframe')
+    assert value('JSON.stringify((f=>[f.getAttribute("src"),f.referrerPolicy,f.title])(document.querySelector("[data-node=sheet-budget] iframe")))')==['https://docs.google.com/spreadsheets/d/PILOT-BUDGET-FICTIONAL-0001/preview','no-referrer','Google Sheets: Pilot budget'], 'Enter on Load preview makes the frame of the sheet'
+    browser('wait','--fn','performance.getEntriesByType("resource").some(e=>e.name.startsWith("https://docs.google.com/"))')
+    assert sorted(player_requests())==[['https://docs.google.com/spreadsheets/d/PILOT-BUDGET-FICTIONAL-0001/preview',None],['https://www.youtube-nocookie.com/embed/Pilot-Demo1?start=65',origin_ref]], 'The sheet frame sends no referrer'
+    assert value('JSON.stringify([window.__csp,window.pwned??null,[...selected],document.querySelector("#peek").open])')==[[],None,[],False], 'The frames load under the content security policy; a player button does not select or open the card'
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished") && document.querySelector("#toast").hidden')
+    browser('screenshot',str(args.output/'canvas-embeds-after.png'))
+    # The list view and a phone: players and tables keep their content and fit the width.
+    browser('click','#list-view')
+    assert value('JSON.stringify([document.querySelectorAll("#map iframe").length,document.querySelectorAll(".sheet-table").length,document.querySelector(".canvas").scrollWidth<=document.querySelector(".canvas").clientWidth])')==[2,2,True], 'The list shows the players and the tables'
+    browser('screenshot',str(args.output/'canvas-embeds-list.png'))
+    browser('set','viewport','390','844');browser('wait','--fn','document.querySelector(".canvas").clientWidth < 400')
+    assert value('JSON.stringify([document.documentElement.scrollWidth<=innerWidth,[...document.querySelectorAll("[data-kind=embed] iframe,[data-kind=table] .sheet-scroll")].every(e=>{const r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth}),getComputedStyle(document.querySelector("[data-node=vid-demo] .embed-stage")).aspectRatio])')==[True,True,'16 / 9'], 'On a phone the players and the tables fit the width; a video keeps 16:9'
+    browser('screenshot',str(args.output/'canvas-embeds-phone.png'))
+    browser('set','viewport','1440','1100');browser('click','#canvas-view')
+    # Each theme draws the player stage and the table. The header cell keeps a ground under the rows that scroll.
+    for style in ['engraved','modern','editorial','terminal','swiss','blueprint','soft','contrast']:
+        browser('eval',f'applyTheme({{style:"{style}"}})')
+        look=value('JSON.stringify((th=>[getComputedStyle(th).backgroundColor!=="rgba(0, 0, 0, 0)",getComputedStyle(th).color!==getComputedStyle(th).backgroundColor,getComputedStyle(document.querySelector("[data-node=table-stops] .sheet-scroll")).overflow])(document.querySelector("[data-node=table-signups] th")))')
+        assert look==[True,True,'auto'], style
+        if style in ('terminal','contrast'):browser('screenshot',str(args.output/f'canvas-embeds-{style}.png'))
+    browser('eval','localStorage.removeItem("horsemen-style");localStorage.removeItem("horsemen-theme");localStorage.removeItem("horsemen-mode");applyTheme()')
+    browser('network','unroute')
     # The SVG blob test: the image address opened as a page runs no script.
     browser('click','[data-canvas="structure"]');browser('wait','--fn','document.querySelectorAll(".file-node.image .md-image[data-state=shown] img").length === 2')
     browser('eval','location.href=document.querySelector("[data-node=img-logo] img").src');browser('wait','--fn','location.protocol === "blob:" && document.documentElement.localName === "svg"')
