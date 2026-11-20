@@ -2,6 +2,8 @@
 
 ## 2026-11-19
 
+- Agents can read and change canvases with few tokens. `horsemen show` prints an index, a section, or a canvas outline, and `horsemen canvas apply` checks and writes a canvas file. `horsemen mcp install` gives Claude Code and Codex the same two tools, `read` and `canvas_edit`, through a local server. Refresh your installation to get it. [Canvas guide](horsemen/references/canvas.md). [PR #32](https://github.com/hungv47/horsemen/pull/32).
+
 - The viewer shows canvas files (`.horsemen/canvas/*.canvas`): boards in the sidebar, and notes, images, link cards, groups, and connectors on the canvas of a record. A file that is not valid shows a message and the generated canvas. Read-only. See the [roadmap board of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). [PR #33](https://github.com/hungv47/horsemen/pull/33).
 
 - Each record now opens as a canvas. The sidebar has a project switcher and a list of canvases; each section of a record is a card, and a card opens the reading view at that section. Links such as `horsemen.forsvn.com/owner/repo?canvas=progress&node=s-shipped` open one canvas at one card. [Design](docs/product/canvas-workspace.md). [PR #30](https://github.com/hungv47/horsemen/pull/30).
