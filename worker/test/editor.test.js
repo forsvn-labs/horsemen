@@ -212,9 +212,9 @@ test('a write must be a same-origin POST with the CSRF token and a JSON body', a
 
 test('the body has a size limit, with and without Content-Length', async () => {
   const s = await editorSignIn(); mockFetch(async () => json({}));
-  const big = body({ text: 'x'.repeat(2 * 1024 * 1024) });
+  const big = body({ text: 'x'.repeat(6 * 1024 * 1024) });  // 6 MiB: a canvas and four media files of 1 MiB (slice 4b).
   assert.equal((await post(s, big)).status, 413, 'declared length');
-  assert.equal((await post(s, body(), { 'content-length': String(3 * 1024 * 1024) })).status, 413, 'a declared length over the limit is refused before the body is read');
+  assert.equal((await post(s, body(), { 'content-length': String(6 * 1024 * 1024 + 1) })).status, 413, 'a declared length over the limit is refused before the body is read');
   const headers = { ...s.headers, origin: ORIGIN, 'sec-fetch-site': 'same-origin', 'content-type': 'application/json' };
   assert.equal((await call('/write/canvas', { method: 'POST', body: big, headers })).status, 413, 'no declared length: the Worker stops reading at the limit');
   assert.equal((await post(s, body({ text: 'x'.repeat(600 * 1024) }))).status, 422, 'a canvas over 512 KiB in a body under the limit');

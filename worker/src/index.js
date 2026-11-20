@@ -4,9 +4,11 @@
    only in an encrypted HttpOnly cookie. There is no database, KV, or log of content.
    Optional editing (slice 4a): a second, opt-in GitHub App ("Horsemen Editor") with Contents: Read and write.
    Its user token goes into the same cookie, in its own field, and is used only by the one write route,
-   /write/canvas. Reads always use the viewer token; the public view has no session and never writes. */
+   /write/canvas. Reads always use the viewer token; the public view has no session and never writes.
+   Media (slice 4b): a save can add up to four images or tables in <root>/.horsemen/media/, in the same commit. */
 import F from '../../web/canvas-format.js';
 import E from '../../web/canvas-edit.js';
+import M from '../../web/canvas-media.js';
 
 const SESSION = '__Host-horsemen';
 const STATE = '__Host-horsemen-state';
@@ -304,7 +306,7 @@ async function appPage(env, request, session, mode = 'hosted') {
   html = html.replace('__SESSION__', mode === 'public' ? '' : await csrfFor(env, session))
     .replace('<meta charset="utf-8">', '<meta charset="utf-8">' + meta)
     .replace(/<title>[^<]*<\/title>/, '<title>Horsemen</title>')
-    .replace(anchor, '<script src="/hosted-reader.js" defer></script><script src="/hosted.js" defer></script>' + (mode === 'public' ? '' : '<script src="/canvas-edit.js" defer></script>') + anchor);
+    .replace(anchor, '<script src="/hosted-reader.js" defer></script><script src="/hosted.js" defer></script>' + (mode === 'public' ? '' : '<script src="/canvas-edit.js" defer></script><script src="/canvas-media.js" defer></script>') + anchor);
   /* Edit mode (signed in only): its script runs after app.js, its styles follow the app styles. */
   if (mode !== 'public') html = html.replace(anchor + '</script>', anchor + '</script><script src="/canvas-editor.js" defer></script>').replace('<link rel="stylesheet" href="/style.css">', '<link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/canvas-editor.css">');
   return respond(html, 200, { 'content-type': 'text/html; charset=utf-8' });
@@ -382,8 +384,8 @@ const ROOT_PART = /^[A-Za-z0-9_][A-Za-z0-9_.-]{0,99}$/;
 const BLOB = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const validRepo = repo => typeof repo === 'string' && WRITE_REPO.test(repo) && !['.', '..'].includes(repo.split('/')[1]);
 const validRoot = root => typeof root === 'string' && (root === '' || (root.length <= 200 && root.split('/').length <= 16 && root.split('/').every(part => ROOT_PART.test(part))));
-const WRITE_KEYS = ['repo', 'root', 'canvas', 'base', 'text'];
-const MAX_WRITE = 2 * 1024 * 1024;  // The request; the canvas itself has 512 KiB at most (canvas-format.js).
+const WRITE_KEYS = ['repo', 'root', 'canvas', 'base', 'text'], OPTIONAL_KEYS = ['media'];
+const MAX_WRITE = 6 * 1024 * 1024;  // The request: a canvas of 512 KiB at most (canvas-format.js) and four media files of 1 MiB in base64.
 /* The body as text, or null when it is larger than `max`. The Worker stops reading at the limit. */
 async function readCapped(request, max) {
   if (!request.body) return '';
@@ -411,6 +413,97 @@ const WRITE_ERRORS = {
 const writeError = (name, cookie) => { const [status, error, code] = WRITE_ERRORS[name]; return json({ error, code }, status, cookieOf(cookie)); };
 class GitHubFailure extends Error { constructor(name) { super(name); this.name = name; } }
 
+/* The media list of a save (slice 4b), checked before any GitHub call: 1 to 4 files of { name, data }, each name in the
+   form that canvas-media.js builds, the hash and the type from the bytes, 1 MiB at most, and each file on the canvas.
+   Result: { media: [{ name, bytes }] } or { error: Response }. */
+async function readMedia(input, doc) {
+  const bad = (status, error, code = null) => ({ error: json(code ? { error, code } : { error }, status) });
+  if (!Object.hasOwn(input, 'media')) return { media: [] };
+  const list = input.media;
+  if (!Array.isArray(list) || list.length < 1 || list.length > M.MAX_FILES) return bad(400, `Send 1 to ${M.MAX_FILES} media files in a save.`);
+  const media = [], names = new Set();
+  for (const item of list) {
+    if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).sort().join(',') !== 'data,name' || typeof item.data !== 'string') return bad(400, 'Each media file must have a name and base64 data, and nothing else.');
+    if (!M.validName(item.name)) return bad(400, 'A media file name is not valid.');
+    if (names.has(item.name)) return bad(400, 'A media file name is in the list twice.');
+    names.add(item.name);
+    if (item.data.length > Math.ceil(M.MAX_BYTES / 3) * 4) return bad(413, `The file ${item.name} is larger than 1 MiB.`);
+    const bytes = M.fromBase64(item.data);
+    if (!bytes) return bad(400, `The data of ${item.name} is not valid base64.`);
+    const result = await M.check(item.name, bytes);
+    if (!result.ok) return result.code === 'size' ? bad(413, `The file ${item.name} is larger than 1 MiB.`) : bad(422, `The file ${item.name} is not accepted: ${result.error}`, 'media');
+    media.push({ name: item.name, bytes });
+  }
+  const named = M.references(doc);
+  for (const m of media) if (!named.has(m.name)) return bad(422, `The file ${m.name} is not on the canvas.`, 'media');
+  return { media };
+}
+/* A media file that the new canvas names must be in this save or on the canvas on GitHub: the browser cannot add a
+   card for a file that it did not upload, and a restored draft can have lost its files. Null when the rule holds. */
+function unknownMedia(doc, beforeDoc, media) {
+  const known = new Set([...M.references(beforeDoc), ...media.map(m => m.name)]);
+  const missing = [...M.references(doc)].find(name => !known.has(name));
+  return missing ? json({ error: `The canvas names ${M.path(missing)}, which is not in this save and not on the canvas on GitHub. Remove the card, or add the file again.`, code: 'media' }, 422) : null;
+}
+
+/* One commit for the canvas and its media files: the GraphQL createCommitOnBranch call. The head query reads the
+   permission, the default branch, its head commit, and the blob of the canvas at that commit in one answer; the
+   mutation names that head (expectedHeadOid), so GitHub refuses it when the branch moved. Then the Worker reads the
+   head again: a new canvas blob is a conflict; the same blob means that another file changed, so it tries again,
+   three times at most. Docs: docs/product/canvas-workspace.md#slice-4b-as-built. */
+const HEAD_QUERY = 'query($owner:String!,$name:String!,$path:String!){repository(owner:$owner,name:$name){viewerPermission defaultBranchRef{name target{...on Commit{oid file(path:$path){oid object{...on Blob{text isBinary isTruncated}}}}}}}}';
+const COMMIT_MUTATION = 'mutation($input:CreateCommitOnBranchInput!,$path:String!){createCommitOnBranch(input:$input){commit{oid file(path:$path){oid}}}}';
+const PUSH = new Set(['ADMIN', 'MAINTAIN', 'WRITE']);
+async function commitWithMedia(env, token, { repo, path, root, canonical, base, media, prepare }) {
+  const graphql = async (query, variables) => {
+    const res = await fetch(apiBase(env) + '/graphql', { method: 'POST', body: JSON.stringify({ query, variables }), headers: { ...githubHeaders(token), 'content-type': 'application/json' } });
+    if (res.status === 401) throw new GitHubFailure('signin');
+    if (res.status === 403 || res.status === 404) throw new GitHubFailure('install');
+    if (!res.ok) throw new GitHubFailure('github');
+    const out = await res.json().catch(() => null);
+    if (!out || typeof out !== 'object') throw new GitHubFailure('github');
+    return out;
+  };
+  const errorType = out => Array.isArray(out.errors) ? String(out.errors[0]?.type || '') : '';
+  const [owner, name] = repo.split('/');
+  const head = async () => {
+    const out = await graphql(HEAD_QUERY, { owner, name, path });
+    const r = out.data?.repository;
+    if (!r) throw new GitHubFailure(['NOT_FOUND', 'FORBIDDEN'].includes(errorType(out)) || out.data?.repository === null ? 'install' : 'github');
+    if (!PUSH.has(r.viewerPermission)) throw new GitHubFailure('push');
+    const ref = r.defaultBranchRef, oid = String(ref?.target?.oid || ''), branch = ref?.name;
+    if (typeof branch !== 'string' || !branch || branch.length > 255 || !BLOB.test(oid)) throw new GitHubFailure('github');
+    const file = ref.target.file;
+    if (!file) return { branch, oid, sha: null, text: null };
+    if (!BLOB.test(String(file.oid))) throw new GitHubFailure('github');
+    const blob = file.object || {};
+    return { branch, oid, sha: file.oid, text: !blob.isBinary && !blob.isTruncated && typeof blob.text === 'string' ? blob.text : null };
+  };
+  const now = await head();
+  const ready = prepare(now);
+  if (ready.response) return ready.response;
+  /* The Worker builds each path; only the canvas folder and the media folder of this root are written. */
+  const prefix = root ? root + '/' : '';
+  const additions = [{ path, contents: M.toBase64(new TextEncoder().encode(canonical)) }, ...media.map(m => ({ path: prefix + M.path(m.name), contents: M.toBase64(m.bytes) }))];
+  if (!additions.every(a => a.path.startsWith(prefix + F.FOLDER) || a.path.startsWith(prefix + F.MEDIA_FOLDER))) throw new GitHubFailure('github');
+  let current = now;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const input = { branch: { repositoryNameWithOwner: repo, branchName: current.branch }, expectedHeadOid: current.oid, message: { headline: ready.message }, fileChanges: { additions } };
+    const out = await graphql(COMMIT_MUTATION, { input, path });
+    const commit = out.data?.createCommitOnBranch?.commit;
+    if (commit && !out.errors) {
+      const oid = String(commit.oid || ''), blob = String(commit.file?.oid || '');
+      if (!BLOB.test(oid) || !BLOB.test(blob)) throw new GitHubFailure('github');
+      return { commit: oid, canvas_sha: blob, url: `${web(env)}/${repo}/commit/${oid}`, message: ready.message, media: additions.slice(1).map(a => a.path) };
+    }
+    const again = await head();
+    if (again.sha !== base) return { conflict: again.sha };
+    if (again.oid === current.oid || again.branch !== current.branch) throw new GitHubFailure(errorType(out) === 'FORBIDDEN' ? 'install' : 'github');
+    current = again;
+  }
+  throw new GitHubFailure('busy');
+}
+
 /* POST /write/canvas: one commit that writes <root>/.horsemen/canvas/<canvas>.canvas on the default branch.
    Contract and checks: docs/product/canvas-workspace.md#slice-4a-as-built. GitHub calls (REST contents API):
    GET /repos/{repo} (default branch, push permission), GET the file at the branch (blob SHA, for the conflict check),
@@ -430,7 +523,7 @@ async function writeCanvas(env, request, session) {
   try { input = JSON.parse(raw); } catch { return json({ error: 'The request is not valid JSON.' }, 400); }
   if (!input || typeof input !== 'object' || Array.isArray(input)) return json({ error: 'The request must be a JSON object.' }, 400);
   const keys = Object.keys(input);
-  if (keys.length !== WRITE_KEYS.length || !WRITE_KEYS.every(key => keys.includes(key))) return json({ error: 'The request must have repo, root, canvas, base, and text, and nothing else.' }, 400);
+  if (!WRITE_KEYS.every(key => keys.includes(key)) || !keys.every(key => WRITE_KEYS.includes(key) || OPTIONAL_KEYS.includes(key))) return json({ error: 'The request must have repo, root, canvas, base, and text, and media when it adds files; nothing else.' }, 400);
   const { repo, root, canvas: name, base, text } = input;
   if (!validRepo(repo)) return json({ error: 'The repository name is not valid.' }, 400);
   if (!validRoot(root)) return json({ error: 'The project root is not valid.' }, 400);
@@ -442,13 +535,33 @@ async function writeCanvas(env, request, session) {
   if (report.errors.length) return json({ error: 'The canvas is not valid: ' + report.errors[0].message + '.', code: 'invalid' }, 422);
   if (report.readOnly) return json({ error: `The canvas is not valid: the file uses format version ${parsed.version}; this site saves version 1 only.`, code: 'invalid' }, 422);
   const canonical = report.text;
+  const { media, error: mediaError } = await readMedia(input, parsed.doc);
+  if (mediaError) return mediaError;
 
   const { token, cookie } = await editorToken(env, session);
   if (!token) return writeError('signin', cookie);
   const path = (root ? root + '/' : '') + '.horsemen/canvas/' + name + '.canvas';
   const contents = `/repos/${repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`;
   const gh = (target, init = {}) => fetch(apiBase(env) + target, { ...init, headers: { ...githubHeaders(token), ...(init.body ? { 'content-type': 'application/json' } : {}) } });
+  const conflict = sha => json({ error: 'The canvas changed on GitHub. Merge, then save again.', code: 'conflict', current: sha }, 409, cookieOf(cookie));
+  const withCookie = res => { if (cookie) res.headers.append('set-cookie', cookie); return res; };
+  /* The checks against the file on GitHub, the same for both calls: the conflict, an unchanged file, the media
+     references, and the message. { response } ends the save; { message } goes on to the commit. */
+  const prepare = now => {
+    if (now.sha !== base) return { response: conflict(now.sha) };
+    if (now.text === canonical && !media.length) return { response: json({ unchanged: true, canvas_sha: now.sha }, 200, cookieOf(cookie)) };
+    const before = now.text === null ? null : F.parse(now.text), beforeDoc = before && !before.fatal ? before.doc : null;
+    const unknown = unknownMedia(parsed.doc, beforeDoc, media);
+    if (unknown) return { response: withCookie(unknown) };
+    return { message: E.message(name, E.changes(beforeDoc, parsed.doc)) };
+  };
   try {
+    if (media.length) {
+      const out = await commitWithMedia(env, token, { repo, path, root, canonical, base, media, prepare });
+      if (out instanceof Response) return out;
+      if (out.conflict !== undefined) return conflict(out.conflict);
+      return json(out, 200, cookieOf(cookie));
+    }
     const meta = await gh(`/repos/${repo}`);
     if (meta.status === 404 || meta.status === 403) throw new GitHubFailure('install');
     if (meta.status === 401) throw new GitHubFailure('signin');
@@ -467,12 +580,9 @@ async function writeCanvas(env, request, session) {
       let content = null; try { content = file.encoding === 'base64' ? fromBase64(file.content) : null; } catch { /* Not UTF-8: the file is replaced, and the message counts it as new. */ }
       return { sha: file.sha, text: content };
     };
-    const conflict = sha => json({ error: 'The canvas changed on GitHub. Merge, then save again.', code: 'conflict', current: sha }, 409, cookieOf(cookie));
-    const now = await current();
-    if (now.sha !== base) return conflict(now.sha);
-    if (now.text === canonical) return json({ unchanged: true, canvas_sha: now.sha }, 200, cookieOf(cookie));
-    const before = now.text === null ? null : F.parse(now.text);
-    const message = E.message(name, E.changes(before && !before.fatal ? before.doc : null, parsed.doc));
+    const ready = prepare(await current());
+    if (ready.response) return ready.response;
+    const message = ready.message;
     const content = base64(new TextEncoder().encode(canonical));
     for (let attempt = 0; attempt < 3; attempt++) {
       const res = await gh(contents, { method: 'PUT', body: JSON.stringify({ message, content, branch, ...(base ? { sha: base } : {}) }) });
