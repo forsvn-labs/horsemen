@@ -33,6 +33,8 @@ Next action: Merge the hooks (pull request #34), then slices 2b (embeds and tabl
 
 ## In progress
 
+- **Quiet Stop hook** (started 2026-11-20): The Stop hook blocked at every stop, so hosts that show only the last turn hid each task report behind a note about the record review. Now it blocks only for new record drift, and then asks the agent to end with its full task report again. In review in [PR #38](https://github.com/hungv47/horsemen/pull/38); installed copies change after a refresh from main.
+
 - **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 (record canvases) shipped. Slice 2a (canvas files) shipped. The owner chose to build all slices now. Later slices add canvas files, editing by people and agents, and tools for agents.
 
 ### Technical details
