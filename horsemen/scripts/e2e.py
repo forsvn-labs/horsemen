@@ -336,7 +336,13 @@ def context(out):
 
 def review_requested(out):
     reason = (out or {}).get("reason", "")
-    return (out or {}).get("decision") == "block" and all(name in reason for name in ("VISION", "BRAIN", "PROGRESS", "STRUCTURE"))
+    return ((out or {}).get("decision") == "block" and all(name in reason for name in ("VISION", "BRAIN", "PROGRESS", "STRUCTURE"))
+            and "full task report" in reason)
+
+
+def quiet(out):
+    """No drift to report: the Stop hook must not block, so the agent's task report stays its last message."""
+    return out is None
 
 
 def write(root, files):
@@ -436,7 +442,7 @@ def scenario_shipping(env):
     snapshot = context(out)
     record("orient injects the PROGRESS snapshot, not the log", "Export to PDF" in snapshot and "Started the note editor" not in snapshot, snapshot[:300])
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
-    record("T1 no local changes still request a four-record review", review_requested(out), json.dumps(out))
+    record("T1 no local changes do not block the final reply", quiet(out), json.dumps(out))
     write(root, {"src/app/export.js": "pdf\n"})
     env.git(root, "add", "-A")
     env.git(root, "commit", "-q", "-m", "export")
@@ -446,8 +452,9 @@ def scenario_shipping(env):
     reason = (out or {}).get("reason", "")
     record("S4 work commit without PROGRESS update blocks once", (out or {}).get("decision") == "block" and "PROGRESS" in reason, reason)
     record("S16 reason is short", 0 < len(reason) < 1200, str(len(reason)))
+    record("S22 a block asks for the review and a repeated full task report", review_requested(out), reason)
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
-    record("S10 same drift detail does not repeat; task review remains", review_requested(out) and "work commit" not in out.get("reason", ""))
+    record("S10 same drift does not block again", quiet(out))
     ship_row = shipped_section(("PDF export", "2026-11-01", "Consultants send summaries as PDF."))
     shipped = progress(ship_row + ROW_EXPORT, "| PDF export | v0.2.0 deployed, https://example.invalid |\n")
     shipped = shipped.replace("Updated: 2026-10-30", "Updated: 2026-11-01")
@@ -457,8 +464,8 @@ def scenario_shipping(env):
     record("S7 new Shipped row without CHANGELOG reminds", "CHANGELOG" in reason and "PROGRESS.md:" not in reason, reason)
     write(root, {"CHANGELOG.md": CHANGELOG.replace("# Changelog\n", "# Changelog\n\n## 0.2.0 - 2026-11-01\n\n- PDF export.\n")})
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
-    record("shipping: updated records still get the task review, without a stale changelog alert",
-           review_requested(out) and "Changelog:" not in out.get("reason", ""), json.dumps(out))
+    record("shipping: updated records do not block again",
+           quiet(out), json.dumps(out))
     bad = shipped.replace("v0.2.0 deployed, https://example.invalid", " ")
     write(root, {"PROGRESS.md": bad})
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
@@ -507,8 +514,8 @@ def scenario_doc_only_commits(env):
     write(root, {"README.md": README + "\nMore.\n"})
     env.git(root, "commit", "-qam", "docs")
     code, out, _, _ = env.hook("Stop", root, session="doc", stop_hook_active=False)
-    record("S5 record-only commits request review without a work-commit alert",
-           review_requested(out) and "work commit" not in out.get("reason", ""), json.dumps(out))
+    record("S5 record-only commits do not block",
+           quiet(out), json.dumps(out))
 
 
 def scenario_refactor(env):
@@ -556,7 +563,7 @@ def scenario_vision_change(env):
     reason = (out or {}).get("reason", "")
     record("S9 VISION change asks for downstream review", "VISION" in reason and "README" in reason, reason)
     code, out, _, _ = env.hook("Stop", root, session="vis", stop_hook_active=False)
-    record("S9 same vision drift detail fires once", review_requested(out) and "Vision:" not in out.get("reason", ""))
+    record("S9 same vision drift does not block again", quiet(out))
     write(root, {"VISION.md": VISION.replace("Owner: Hung · Confirmed: 2026-10-20", "Owner: Hung").replace("## What we will never become\n\n- Team workspaces.\n", "")})
     code, report = env.check(root)
     warns = codes(report, "warnings")
@@ -584,7 +591,7 @@ def scenario_publish(env):
     reason = (out or {}).get("reason", "")
     record("S20 an unpublished record edit asks to commit and push", "Publish:" in reason and "PROGRESS.md" in reason and "origin/main" in reason, reason)
     code, out, _, _ = env.hook("Stop", root, session="pub", stop_hook_active=False)
-    record("S20 the same unpublished edit fires once", review_requested(out) and "Publish:" not in out.get("reason", ""))
+    record("S20 the same unpublished edit does not block again", quiet(out))
     env.git(root, "commit", "-qam", "progress")
     env.git(root, "push", "-q", "origin", "main")
     write(root, {"BRAIN.md": BRAIN + "\n- New source.\n"})
@@ -596,12 +603,12 @@ def scenario_publish(env):
     write(root, {"README.md": README + "\nMore.\n"})
     write(root, {"README.md": README})
     code, out, _, _ = env.hook("Stop", root, session="pub2", stop_hook_active=False)
-    record("S20 published records do not fire", review_requested(out) and "Publish:" not in out.get("reason", ""), out.get("reason", ""))
+    record("S20 published records do not fire", quiet(out), json.dumps(out))
     local = healthy_project(env, env.base / "publish-local")
     env.hook("SessionStart", local, session="loc")
     write(local, {"PROGRESS.md": PROGRESS + "\n<!-- fictional edit -->\n"})
     code, out, _, _ = env.hook("Stop", local, session="loc", stop_hook_active=False)
-    record("S20 a repository without a remote default branch does not fire", review_requested(out) and "Publish:" not in out.get("reason", ""))
+    record("S20 a repository without a remote default branch does not fire", quiet(out))
 
 
 def scenario_non_software(env):
@@ -620,7 +627,7 @@ def scenario_non_software(env):
     record("non-software project passes check without warnings", code == 0 and not report["warnings"],
            json.dumps(report["errors"] + report["warnings"]))
     code, out, _, _ = env.hook("Stop", root, session="np", stop_hook_active=False)
-    record("T1 no-git task still gets a four-record review", review_requested(out), json.dumps(out))
+    record("T1 no-git task does not block", quiet(out), json.dumps(out))
 
 
 def scenario_scale_and_staleness(env):
@@ -670,8 +677,8 @@ def scenario_branch_switch(env):
     env.git(root, "add", "-A")
     env.git(root, "commit", "-qm", "main work", "--date", "2026-10-02T00:00:00")
     code, out, _, _ = env.hook("Stop", root, session="br", stop_hook_active=False)
-    record("S12 baseline not an ancestor: commit rules skipped, review remains",
-           review_requested(out) and "work commit" not in out.get("reason", ""), json.dumps(out))
+    record("S12 baseline not an ancestor: commit rules skipped, no block",
+           quiet(out), json.dumps(out))
 
 
 def scenario_changelog_and_links(env):
@@ -700,7 +707,7 @@ def scenario_no_baseline(env):
     env.git(root, "add", "-A")
     env.git(root, "commit", "-qm", "z")
     code, out, _, _ = env.hook("Stop", root, session="never-started", stop_hook_active=False)
-    record("T2 no baseline still gets a four-record review", code == 0 and review_requested(out), json.dumps(out))
+    record("T2 no baseline does not block", code == 0 and quiet(out), json.dumps(out))
 
 
 def scenario_install(env):
@@ -761,7 +768,7 @@ def scenario_preexisting_untracked(env):
     env.hook("SessionStart", root, session="unt")
     code, out, _, _ = env.hook("Stop", root, session="unt", stop_hook_active=False)
     record("S18 pre-existing untracked folder is not structure drift",
-           review_requested(out) and "Structure:" not in out.get("reason", ""), json.dumps(out))
+           quiet(out), json.dumps(out))
 
 
 def scenario_rearm(env):
@@ -1018,17 +1025,17 @@ def scenario_task_review(env):
     before = {p.name: p.read_bytes() for p in root.glob("*.md")}
     first = env.hook("Stop", root, session="task-review")[1]
     second = env.hook("Stop", root, session="task-review")[1]
-    record("T3 successive discussion or external-work tasks both get a review",
-           review_requested(first) and review_requested(second), json.dumps([first, second]))
+    record("T3 successive discussion or external-work tasks do not block",
+           quiet(first) and quiet(second), json.dumps([first, second]))
     record("T1 review hooks never edit records", before == {p.name: p.read_bytes() for p in root.glob("*.md")})
     write(root, {"src/app/main.js": "uncommitted work\n"})
     out = env.hook("Stop", root, session="task-review")[1]
-    record("T4 uncommitted work gets review without a false release claim", review_requested(out), json.dumps(out))
+    record("T4 uncommitted work does not block or claim a release", quiet(out), json.dumps(out))
     caches = [p for p in env.state.glob("*.json") if json.loads(p.read_text()).get("root") == str(root)]
     for p in caches:
         p.write_text("{broken")
     out = env.hook("Stop", root, session="task-review")[1]
-    record("T2 corrupt cache does not disable review", review_requested(out), json.dumps(out))
+    record("T2 corrupt cache exits cleanly without a block", quiet(out), json.dumps(out))
     out = env.hook("SessionStart", root, session="task-review", source="compact")[1]
     record("T2 corrupt cache can be rebuilt on compaction", "Export to PDF" in context(out), json.dumps(out))
     saved = env.env["HORSEMEN_STATE_DIR"]
@@ -1037,7 +1044,7 @@ def scenario_task_review(env):
     env.env["HORSEMEN_STATE_DIR"] = str(blocked)
     try:
         out = env.hook("Stop", root, session="task-review")[1]
-        record("T2 unavailable cache does not disable review", review_requested(out), json.dumps(out))
+        record("T2 unavailable cache exits cleanly without a block", quiet(out), json.dumps(out))
         out = env.hook("SessionStart", root, session="task-review")[1]
         record("T2 unavailable cache does not disable orientation", "Export to PDF" in context(out), json.dumps(out))
     finally:
@@ -1103,7 +1110,7 @@ def scenario_cache_shape(env):
         state[field] = value
         cache.write_text(json.dumps(state))
         code, out, _, _ = env.hook("Stop", root, session="shape")
-        record("K7 review survives " + label, code == 0 and review_requested(out), json.dumps(out))
+        record("K7 hook survives " + label, code == 0 and quiet(out), json.dumps(out))
 
 
 def scenario_install_health(env):
@@ -1183,7 +1190,7 @@ def scenario_canvas_check(env):
     (root / ".horsemen/canvas/leak.canvas").unlink()
     env.hook("SessionStart", root, session="canvas")
     code, out, elapsed, _ = env.hook("Stop", root, session="canvas", stop_hook_active=False)
-    record("C18 hooks still run in a project with canvases", code == 0 and review_requested(out), json.dumps(out))
+    record("C18 hooks still run in a project with canvases", code == 0 and quiet(out), json.dumps(out))
 
 
 SCENARIOS = [scenario_noise, scenario_initialization, scenario_adoption, scenario_shipping, scenario_doc_only_commits,

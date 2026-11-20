@@ -46,10 +46,22 @@ class Tests(unittest.TestCase):
 class ReportingTests(unittest.TestCase):
     def test_hook_keeps_task_report_primary(self):
         from horsemen import completion_reminder
-        reason=completion_reminder([])['reason']
+        reason=completion_reminder(['Progress: drift.'])['reason']
         self.assertIn('silently',reason)
         self.assertIn('unless asked',reason)
         self.assertIn('permission questions',reason)
+
+    def test_no_drift_never_blocks_final_reply(self):
+        # A Stop block forces one more turn; hosts then show that turn, not the task report.
+        from horsemen import completion_reminder
+        self.assertIsNone(completion_reminder([]))
+
+    def test_block_asks_to_repeat_full_task_report(self):
+        from horsemen import completion_reminder
+        reason=completion_reminder(['Progress: drift.'])['reason']
+        self.assertIn('full task report',reason)
+        self.assertIn('Progress: drift.',reason)
+        self.assertLess(len(reason),1200)
 
     def test_silent_by_default(self): self.assertFalse(should_report())
     def test_requested_update(self): self.assertTrue(should_report(requested=True))

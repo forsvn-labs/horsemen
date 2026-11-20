@@ -166,7 +166,7 @@ user-facing checklist just to prove the review happened.
 | Vision unclear, contradictory, or unconfirmed | [Vision interview](references/interviews.md#vision-discovery) before you finalize VISION | User answers |
 | Brain or task tracker undefined, unreachable, or holding less than BRAIN claims | [Provider interview](references/interviews.md#providers) | User answers |
 | An update is ambiguous (see [When to interview](#when-to-interview)) | [Quick interview](references/interviews.md#quick-interview), then write | User answers |
-| Any project task is ending | Review all four records using the checklist above; edit only changed facts | Stop hook; AGENTS.md when hooks are unavailable |
+| Any project task is ending | Review all four records using the checklist above; edit only changed facts | Session-start text; Stop hook when it finds drift; AGENTS.md when hooks are unavailable |
 | Meaningful decision made | Save it where BRAIN's save rules say | Instruction |
 | Work started, finished, blocked, or reprioritized | Move the PROGRESS bullet to its status section; update the `Updated:` date, and the dated entry when there is an outcome | Task review; stop hook adds commit evidence when available |
 | Work shipped (with evidence) | PROGRESS bullet to `Shipped` with evidence in the toggle; a dated entry for stakeholders; a CHANGELOG entry; README if newcomers should know | Stop hook checks the PROGRESS and CHANGELOG pair |
