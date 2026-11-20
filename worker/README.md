@@ -169,6 +169,16 @@ its callback is `/auth/edit/callback`. To turn editing off, delete the three
 editor secrets with `bunx wrangler secret delete <name>`; the instance is a
 viewer again.
 
+Before the first deploy with editing, check the GitHub calls on a disposable
+repository that you own. The name must contain `check` or `disposable`. The
+script uses your `gh` sign-in, writes and deletes one canvas file with four
+commits marked `[skip ci]`, and prints statuses and SHAs only:
+
+```sh
+node scripts/live-edit-check.mjs --repo you/horsemen-edit-check          # reads only, then asks
+node scripts/live-edit-check.mjs --repo you/horsemen-edit-check --yes
+```
+
 To rotate the session key, which signs everyone out:
 `openssl rand -base64 32 | bunx wrangler secret put SESSION_KEY`.
 
