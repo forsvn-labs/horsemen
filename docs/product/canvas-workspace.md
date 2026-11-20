@@ -5,7 +5,9 @@ Status: the owner approved this design and all eleven proposed answers on
 See [slice 1 as built](#slice-1-as-built). The browser half of slice 2a
 (canvas files shown in the browser, read-only) is built and waits for review;
 it is not deployed. See [slice 2a as built](#slice-2a-as-built). The Python
-half of slice 2a and the agent tools have their own pull request.
+half of slice 2a and the agent tools have their own pull request. Slice 2b
+(click-to-load players and CSV and TSV tables) is built and waits for review;
+it is not deployed. See [slice 2b as built](#slice-2b-as-built).
 The owner gave the direction and three decisions on 2026-11-19; this page
 turns them into a design and a build plan.
 
@@ -168,7 +170,7 @@ request of the agent tools.
 | IDs | An element keeps the ID of the file. A generated card keeps its `s-` ID; when the file uses that ID for another element, the generated card gets `-2`, `-3`. |
 | Section card | `file` and `subpath` name the section. The text comes from the record at the loaded commit. `#Parent#Child` names a deeper heading: the card shows its text and opens the section that holds it. A card of another record has a "from Vision" tag and opens that record. When the heading is gone, the card says "Section not found" and still opens the record. |
 | Other elements | A note is Markdown from the safe renderer. A portal opens a canvas of the same project root, or says "Canvas not found". A Markdown file that is not a record is a document card that opens in the reading view. An image shows from a `blob:` address with its `alt` text. A link card shows the stored title and the host; the app fetches nothing. A group is a frame behind the other elements. Another file is a file card with a link to GitHub. An unknown type shows as "Not supported". |
-| Embeds and tables | Not in this slice. A video or design address is a link card. A CSV, TSV, or XLSX file is a file card. They come with slice 2b. |
+| Embeds and tables | Not in this slice. A video or design address is a link card. A CSV, TSV, or XLSX file is a file card. Slice 2b adds them; see [slice 2b as built](#slice-2b-as-built). |
 | Connectors | A curve from border to border. A stated side wins; if not, the app takes the sides that face each other. The end has an arrow unless the file says `none`. The label sits at the middle of the curve. The list view states each connector as a text line of its start element. |
 | Colours | A preset takes a colour of the active theme: 1 vermilion, 2 between vermilion and gilt, 3 gilt, 4 verdigris, 5 between verdigris and indigo, 6 indigo. A hex value is set as a value, never as CSS text. Each theme draws its own card border, so the colour also shows as a stripe. |
 | A file that is not valid | A file that fails before its elements are checked (size, UTF-8, JSON, conflict markers, nesting, numbers, Unicode, shape, version, counts) shows no element: the record shows its generated canvas, and a board is empty. One message above the canvas names the file and the fault, with a link to the file. For a file with some bad elements, the other elements show; the message gives the count of elements that do not show and the first fault, and a list of 8 faults at most. An edge to an element that does not show does not show. The first element with an ID keeps it. A file with a higher version shows with a note. The rail marks a canvas whose file shows no element. |
@@ -187,6 +189,29 @@ Section card IDs follow one rule on both sides: the live rule of slice 1 in
 backtick fences). The owner chose it on 2026-11-19 so that old `?node=` links
 keep working. The shared cases state this rule, and the Python agent tools
 and the browser both pass them.
+
+### Slice 2b as built
+
+Slice 2b has the click-to-load players, the `frame-src` list, and CSV and TSV
+tables. It needs no change to the file format: the kind of an element still
+comes from the JSON Canvas type and the file extension or the URL host.
+
+| Item | Rule in the code |
+| --- | --- |
+| Modules | `web/canvas-embeds.js` turns the address of a link card into a frame address, or gives null. `web/canvas-table.js` splits CSV and TSV text into rows and writes escaped markup. `web/canvas-view.js` uses both; `web/app.js` makes the frame and loads the tables. Pure rules, with tests in `tests/test_canvas_embeds.cjs`, `tests/test_canvas_table.cjs`, and `tests/test_canvas_view.cjs`. |
+| Providers | YouTube (`youtube.com`, `www.`, `m.`, `youtu.be`, `youtube-nocookie.com`), Vimeo, Loom, Figma, and Google Docs, Sheets, and Slides on `docs.google.com`. The host must match exactly, with no port and no user information. Any other address stays a link card. |
+| Frame address | The app builds it from an ID that a strict pattern checks: 11 characters for YouTube, digits and an optional hex hash for Vimeo, 32 hex characters for Loom, a file key and an optional `node-id` for Figma, and a file ID for Google. A stored address never goes into a frame. YouTube uses `www.youtube-nocookie.com/embed/<ID>`, with `start` from `t` or `start`. Vimeo adds `dnt=1`. Figma gets `www.figma.com/embed?embed_host=horsemen&url=` with an address that the app makes again from the key. Google uses `/preview` (`/embed` for slides); a published file keeps its published form. |
+| Before the click | The card shows the title, "Load video" or "Load preview", a note that nothing loads before the click, the host, and "Open on <provider>". No frame, no thumbnail, no request to a provider. |
+| After the click | One `iframe` with `sandbox="allow-scripts allow-same-origin allow-presentation"`, `allow="fullscreen; picture-in-picture; encrypted-media"`, and a title. YouTube gets `referrerpolicy="strict-origin-when-cross-origin"`; the other frames get `no-referrer`. The app checks the frame address against `frame-src` again before it makes the frame. The button gets the label "Load video", not "Play": the player starts on its own button, because autoplay is not the same for each provider. |
+| `frame-src` | `https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com`, on each response of the Worker and on the page of the local server. One test compares the two policies with the list in `web/canvas-embeds.js`. A `curl` check on 2026-11-20 showed that these frame addresses send no `X-Frame-Options` and no `frame-ancestors`; the Figma `embed.figma.com` form sends `X-Frame-Options: SAMEORIGIN` on its redirect, so the app uses `www.figma.com/embed`. |
+| Tables | A CSV or TSV file that a canvas names, in `.horsemen/media/` or at another path. The reader gives its text (1 MiB at most) through `/api/table` in the local app and the contents route in the hosted viewer. A text that is not UTF-8, has a NUL character, or is a Git LFS pointer gives a message. The first row is the header; then 200 rows and 30 columns at most; a cell shows 300 characters at most. A column of numbers aligns right. A canvas loads 20 tables at most. XLSX stays a file card. |
+| Interaction | The button of a player is a real button: Tab, Enter, and Space work. A click on it does not select or open the card. Over a table, the wheel and the arrow keys scroll the table; Ctrl or Cmd with the wheel still zooms. A drag on a table does not move the canvas. |
+| List view and phones | A player keeps its ratio (16:9 for a video, 4:3 for a file). A table scrolls in its card, 360 pixels high at most. |
+| Browser checks | `scripts/test_gui_e2e.py` and `scripts/test_hosted_e2e.py` open the Proof board of `scripts/canvas_fixture.py`. A route in the isolated browser answers each provider origin with a fake player, so no real provider is contacted. The checks show that no request goes to a provider before a click, that the frame of the chosen player loads under the content security policy, and which referrer it sends. |
+
+Not in slice 2b: an XLSX preview, a live check for each provider (it needs a
+deployed canvas; see the pull request), a player that stays loaded when a
+live update draws the canvas again, and thumbnails.
 
 ### Connections between artifacts
 
@@ -623,8 +648,10 @@ frame-src https://www.youtube-nocookie.com https://www.loom.com
           https://player.vimeo.com https://www.figma.com https://docs.google.com
 ```
 
-The exact hosts are confirmed with a live check for each provider in that
-slice. `frame-ancestors 'none'` stays: no other site can frame Horsemen.
+Slice 2b uses exactly these five origins. A `curl` check of each frame address
+found no header that refuses a frame. The live check of a video, a sheet, and
+a CSV file on a deployed canvas comes after the deploy.
+`frame-ancestors 'none'` stays: no other site can frame Horsemen.
 
 ## Risks
 
