@@ -1,0 +1,12 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"a","type":"text","x":0,"y":0,"width":16,"height":16,"color":"#A1b2C3","text":""},
+{"id":"b","type":"text","x":-1000000,"y":1000000,"width":8192,"height":8192,"color":"6","text":"At the limits."}
+],
+"edges":[
+{"id":"e1","fromNode":"a","toNode":"b","color":"1","fromEnd":"none","fromSide":"top","toEnd":"arrow","toSide":"bottom"},
+{"id":"e2","fromNode":"b","toNode":"a","color":"#000000","fromEnd":"arrow","fromSide":"left","label":"","toEnd":"none","toSide":"right"},
+{"id":"e3","fromNode":"a","toNode":"a"}
+]
+}

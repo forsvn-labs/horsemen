@@ -35,9 +35,9 @@ class Commands(unittest.TestCase):
         section=s.split('### inspect-and-update')[1].split('### check')[0]
         for phrase in ('record maintenance', 'existing permissions', 'No code changes', 'proposed priorities'):
             self.assertIn(phrase,section)
-        self.assertIn('plain inspect and check', horsemen.completion_reminder([])['reason'])
+        self.assertIn('plain inspect and check', horsemen.completion_reminder(['Progress: drift.'])['reason'])
     def test_hook_respects_read_only_commands(self):
-        self.assertIn('read-only commands',horsemen.completion_reminder([])['reason'])
+        self.assertIn('read-only commands',horsemen.completion_reminder(['Progress: drift.'])['reason'])
     def test_preservation_and_uncertainty(self):
         s=self.commands()
         for phrase in ('unchanged dates','both files exist','VISION','Unknown commands','uncertain write','no new permission'):

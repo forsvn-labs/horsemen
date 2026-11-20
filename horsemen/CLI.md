@@ -15,6 +15,9 @@ CLI share their checker and version. Nothing contacts a provider by default.
 | `horsemen check PATH` | Validate all local records, including cross-record rules |
 | `horsemen inspect PATH` | Check records and show local Git state and progress |
 | `horsemen plan --help` | Setup, migration, edit proposals and review patches |
+| `horsemen show [TARGET]` | Print the workspace index, record headings, one section, a canvas outline, or one canvas element as short text |
+| `horsemen canvas apply NAME` | Check, format, and write one canvas file from a list of edit ops |
+| `horsemen mcp` | Run the local MCP server; `mcp install` and `mcp status` register and check it |
 
 Add `--json` for machine-readable output. Named-record commands accept
 `--path PATH`; otherwise they resolve the current project, including from a
@@ -98,6 +101,49 @@ There is no CLI provider authentication or live remote save. The existing
 Brain/records libraries retain their revision and host-authorization rules;
 this local command does not weaken or bypass those adapters.
 
+## Read and edit canvases
+
+```sh
+horsemen show                                  # index: records, canvases, next action
+horsemen show progress                         # headings of PROGRESS.md
+horsemen show "progress#Shipped"               # one section
+horsemen show progress.canvas                  # outline of .horsemen/canvas/progress.canvas
+horsemen show "progress.canvas#note-risk"      # one element
+horsemen canvas apply progress --ops ops.json --dry-run
+horsemen canvas apply progress --ops ops.json --base-rev 4191a616
+horsemen canvas apply progress                 # rewrite the file in canonical form
+```
+
+`show` is the `read` tool and `canvas apply` is the `canvas_edit` tool of the
+MCP server; the [canvas guide](references/canvas.md) has the targets, the op
+format, and the limits. `--path PATH` selects a project; without it, the
+commands find the project from the current folder.
+
+`show` prints plain text within a character limit: 800 for the index, 1,200
+for headings, 2,000 for the other targets, and `--max-chars` up to 8,000. A
+longer reply ends with `more: offset=N` for `--offset`. Exit code 0 means a
+reply on standard output. Exit code 2 means a target that does not exist or
+an option out of range, with the reason on standard error.
+
+`canvas apply` reads a JSON list of ops from `--ops FILE`, or from standard
+input with `--ops -`. All ops apply, or none: one bad op leaves the file
+unchanged. Exit code 0 means that the file was written (or checked, with
+`--dry-run`). Exit code 1 means a refused edit: a broken rule, a changed
+file, or a `--base-rev` that does not match. Exit code 2 means input that
+cannot be used. The command writes one canvas file and no other file. It does
+not commit.
+
+`horsemen mcp` serves the two tools on standard input and output until the
+input ends. `horsemen mcp install` registers the server with Claude Code and
+Codex through their own commands (`claude mcp add`, `codex mcp add`);
+`--dry-run` prints the commands and runs nothing. `horsemen mcp status` asks
+each host if the server is registered. These two commands change or read
+agent settings, not project files.
+
+`horsemen check` also reads `.horsemen/canvas/` and reports `canvas-invalid`,
+`canvas-dangling-ref`, `canvas-media-too-large`, and the warning
+`canvas-not-canonical`.
+
 ## Plans and compatibility
 
 ```sh
@@ -145,7 +191,9 @@ From a checkout, replace `horsemen` with
 `python3 -B horsemen/scripts/test_cli.py` for subprocess tests, or set
 `HORSEMEN_CLI` to an isolated installed executable. Run
 `python3 -B horsemen/scripts/test_documents.py` for simulated storage, race
-and read-back failures. The full repository verifier covers source, installed
+and read-back failures. Run `python3 -B horsemen/scripts/test_canvas_cli.py`
+for the canvas commands; it uses fake host commands and never calls a real
+agent host. The full repository verifier covers source, installed
 wheel, skill archive and legacy hooks; see the root CONTRIBUTING.md.
 
 No live provider writes are used in QA. No release, merge, global installation,

@@ -1,0 +1,16 @@
+{"nodes":[
+{"id":"r1","type":"file","x":0,"y":0,"width":320,"height":140,"file":".horsemen/media"},
+{"id":"r2","type":"file","x":0,"y":0,"width":320,"height":140,"file":".horsemen/canvas/none.canvas"},
+{"id":"r3","type":"file","x":0,"y":0,"width":320,"height":140,"file":"PROGRESS.md","subpath":"#In progress#Missing child"},
+{"id":"r4","type":"group","x":0,"y":0,"width":320,"height":140,"background":".horsemen/media/none.png"},
+{"id":"r5","type":"file","x":0,"y":0,"width":320,"height":140,"file":".horsemen/media/notes.txt"},
+{"id":"r6","type":"file","x":0,"y":0,"width":320,"height":140,"file":".horsemen/media/big.png"},
+{"id":"r7","type":"file","x":0,"y":0,"width":320,"height":140,"file":".horsemen/media/limit.png"},
+{"id":"r8","type":"file","x":0,"y":0,"width":320,"height":140,"file":"docs/big-table.CSV"},
+{"id":"r9","type":"group","x":0,"y":0,"width":320,"height":140,"background":".horsemen/media/big.png"},
+{"id":"r10","type":"file","x":0,"y":0,"width":320,"height":140,"file":"%2e%2e/x.md"},
+{"id":"r11","type":"file","x":0,"y":0,"width":320,"height":140,"file":"docs/big-notes.md"},
+{"id":"r12","type":"file","x":0,"y":0,"width":320,"height":140,"file":"README.md","subpath":"#get STARTED"},
+{"id":"r13","type":"file","x":0,"y":0,"width":320,"height":140,"file":".horsemen/media/pilot-signups.csv","subpath":"#Sheet name is not checked"},
+{"id":"r14","type":"link","x":0,"y":0,"width":320,"height":140,"url":"https://example.com","file":"not-checked-on-a-link.md"}
+]}

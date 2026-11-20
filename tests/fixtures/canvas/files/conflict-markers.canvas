@@ -1,0 +1,11 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+<<<<<<< HEAD
+{"id":"note-a","type":"text","x":0,"y":0,"width":320,"height":140,"text":"Mine."}
+=======
+{"id":"note-b","type":"text","x":0,"y":0,"width":320,"height":140,"text":"Theirs."}
+>>>>>>> other
+],
+"edges":[]
+}

@@ -336,7 +336,13 @@ def context(out):
 
 def review_requested(out):
     reason = (out or {}).get("reason", "")
-    return (out or {}).get("decision") == "block" and all(name in reason for name in ("VISION", "BRAIN", "PROGRESS", "STRUCTURE"))
+    return ((out or {}).get("decision") == "block" and all(name in reason for name in ("VISION", "BRAIN", "PROGRESS", "STRUCTURE"))
+            and "full task report" in reason)
+
+
+def quiet(out):
+    """No drift to report: the Stop hook must not block, so the agent's task report stays its last message."""
+    return out is None
 
 
 def write(root, files):
@@ -436,7 +442,7 @@ def scenario_shipping(env):
     snapshot = context(out)
     record("orient injects the PROGRESS snapshot, not the log", "Export to PDF" in snapshot and "Started the note editor" not in snapshot, snapshot[:300])
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
-    record("T1 no local changes still request a four-record review", review_requested(out), json.dumps(out))
+    record("T1 no local changes do not block the final reply", quiet(out), json.dumps(out))
     write(root, {"src/app/export.js": "pdf\n"})
     env.git(root, "add", "-A")
     env.git(root, "commit", "-q", "-m", "export")
@@ -446,8 +452,9 @@ def scenario_shipping(env):
     reason = (out or {}).get("reason", "")
     record("S4 work commit without PROGRESS update blocks once", (out or {}).get("decision") == "block" and "PROGRESS" in reason, reason)
     record("S16 reason is short", 0 < len(reason) < 1200, str(len(reason)))
+    record("S26 a block asks for the review and a repeated full task report", review_requested(out), reason)
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
-    record("S10 same drift detail does not repeat; task review remains", review_requested(out) and "work commit" not in out.get("reason", ""))
+    record("S10 same drift does not block again", quiet(out))
     ship_row = shipped_section(("PDF export", "2026-11-01", "Consultants send summaries as PDF."))
     shipped = progress(ship_row + ROW_EXPORT, "| PDF export | v0.2.0 deployed, https://example.invalid |\n")
     shipped = shipped.replace("Updated: 2026-10-30", "Updated: 2026-11-01")
@@ -457,8 +464,8 @@ def scenario_shipping(env):
     record("S7 new Shipped row without CHANGELOG reminds", "CHANGELOG" in reason and "PROGRESS.md:" not in reason, reason)
     write(root, {"CHANGELOG.md": CHANGELOG.replace("# Changelog\n", "# Changelog\n\n## 0.2.0 - 2026-11-01\n\n- PDF export.\n")})
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
-    record("shipping: updated records still get the task review, without a stale changelog alert",
-           review_requested(out) and "Changelog:" not in out.get("reason", ""), json.dumps(out))
+    record("shipping: updated records do not block again",
+           quiet(out), json.dumps(out))
     bad = shipped.replace("v0.2.0 deployed, https://example.invalid", " ")
     write(root, {"PROGRESS.md": bad})
     code, out, _, _ = env.hook("Stop", root, session=sid, stop_hook_active=False)
@@ -507,8 +514,8 @@ def scenario_doc_only_commits(env):
     write(root, {"README.md": README + "\nMore.\n"})
     env.git(root, "commit", "-qam", "docs")
     code, out, _, _ = env.hook("Stop", root, session="doc", stop_hook_active=False)
-    record("S5 record-only commits request review without a work-commit alert",
-           review_requested(out) and "work commit" not in out.get("reason", ""), json.dumps(out))
+    record("S5 record-only commits do not block",
+           quiet(out), json.dumps(out))
 
 
 def scenario_refactor(env):
@@ -556,7 +563,7 @@ def scenario_vision_change(env):
     reason = (out or {}).get("reason", "")
     record("S9 VISION change asks for downstream review", "VISION" in reason and "README" in reason, reason)
     code, out, _, _ = env.hook("Stop", root, session="vis", stop_hook_active=False)
-    record("S9 same vision drift detail fires once", review_requested(out) and "Vision:" not in out.get("reason", ""))
+    record("S9 same vision drift does not block again", quiet(out))
     write(root, {"VISION.md": VISION.replace("Owner: Hung · Confirmed: 2026-10-20", "Owner: Hung").replace("## What we will never become\n\n- Team workspaces.\n", "")})
     code, report = env.check(root)
     warns = codes(report, "warnings")
@@ -584,7 +591,7 @@ def scenario_publish(env):
     reason = (out or {}).get("reason", "")
     record("S20 an unpublished record edit asks to commit and push", "Publish:" in reason and "PROGRESS.md" in reason and "origin/main" in reason, reason)
     code, out, _, _ = env.hook("Stop", root, session="pub", stop_hook_active=False)
-    record("S20 the same unpublished edit fires once", review_requested(out) and "Publish:" not in out.get("reason", ""))
+    record("S20 the same unpublished edit does not block again", quiet(out))
     env.git(root, "commit", "-qam", "progress")
     env.git(root, "push", "-q", "origin", "main")
     write(root, {"BRAIN.md": BRAIN + "\n- New source.\n"})
@@ -596,12 +603,12 @@ def scenario_publish(env):
     write(root, {"README.md": README + "\nMore.\n"})
     write(root, {"README.md": README})
     code, out, _, _ = env.hook("Stop", root, session="pub2", stop_hook_active=False)
-    record("S20 published records do not fire", review_requested(out) and "Publish:" not in out.get("reason", ""), out.get("reason", ""))
+    record("S20 published records do not fire", quiet(out), json.dumps(out))
     local = healthy_project(env, env.base / "publish-local")
     env.hook("SessionStart", local, session="loc")
     write(local, {"PROGRESS.md": PROGRESS + "\n<!-- fictional edit -->\n"})
     code, out, _, _ = env.hook("Stop", local, session="loc", stop_hook_active=False)
-    record("S20 a repository without a remote default branch does not fire", review_requested(out) and "Publish:" not in out.get("reason", ""))
+    record("S20 a repository without a remote default branch does not fire", quiet(out))
 
 
 def scenario_non_software(env):
@@ -620,7 +627,7 @@ def scenario_non_software(env):
     record("non-software project passes check without warnings", code == 0 and not report["warnings"],
            json.dumps(report["errors"] + report["warnings"]))
     code, out, _, _ = env.hook("Stop", root, session="np", stop_hook_active=False)
-    record("T1 no-git task still gets a four-record review", review_requested(out), json.dumps(out))
+    record("T1 no-git task does not block", quiet(out), json.dumps(out))
 
 
 def scenario_scale_and_staleness(env):
@@ -670,8 +677,8 @@ def scenario_branch_switch(env):
     env.git(root, "add", "-A")
     env.git(root, "commit", "-qm", "main work", "--date", "2026-10-02T00:00:00")
     code, out, _, _ = env.hook("Stop", root, session="br", stop_hook_active=False)
-    record("S12 baseline not an ancestor: commit rules skipped, review remains",
-           review_requested(out) and "work commit" not in out.get("reason", ""), json.dumps(out))
+    record("S12 baseline not an ancestor: commit rules skipped, no block",
+           quiet(out), json.dumps(out))
 
 
 def scenario_changelog_and_links(env):
@@ -700,7 +707,7 @@ def scenario_no_baseline(env):
     env.git(root, "add", "-A")
     env.git(root, "commit", "-qm", "z")
     code, out, _, _ = env.hook("Stop", root, session="never-started", stop_hook_active=False)
-    record("T2 no baseline still gets a four-record review", code == 0 and review_requested(out), json.dumps(out))
+    record("T2 no baseline does not block", code == 0 and quiet(out), json.dumps(out))
 
 
 def scenario_install(env):
@@ -761,7 +768,7 @@ def scenario_preexisting_untracked(env):
     env.hook("SessionStart", root, session="unt")
     code, out, _, _ = env.hook("Stop", root, session="unt", stop_hook_active=False)
     record("S18 pre-existing untracked folder is not structure drift",
-           review_requested(out) and "Structure:" not in out.get("reason", ""), json.dumps(out))
+           quiet(out), json.dumps(out))
 
 
 def scenario_rearm(env):
@@ -1018,17 +1025,17 @@ def scenario_task_review(env):
     before = {p.name: p.read_bytes() for p in root.glob("*.md")}
     first = env.hook("Stop", root, session="task-review")[1]
     second = env.hook("Stop", root, session="task-review")[1]
-    record("T3 successive discussion or external-work tasks both get a review",
-           review_requested(first) and review_requested(second), json.dumps([first, second]))
+    record("T3 successive discussion or external-work tasks do not block",
+           quiet(first) and quiet(second), json.dumps([first, second]))
     record("T1 review hooks never edit records", before == {p.name: p.read_bytes() for p in root.glob("*.md")})
     write(root, {"src/app/main.js": "uncommitted work\n"})
     out = env.hook("Stop", root, session="task-review")[1]
-    record("T4 uncommitted work gets review without a false release claim", review_requested(out), json.dumps(out))
+    record("T4 uncommitted work does not block or claim a release", quiet(out), json.dumps(out))
     caches = [p for p in env.state.glob("*.json") if json.loads(p.read_text()).get("root") == str(root)]
     for p in caches:
         p.write_text("{broken")
     out = env.hook("Stop", root, session="task-review")[1]
-    record("T2 corrupt cache does not disable review", review_requested(out), json.dumps(out))
+    record("T2 corrupt cache exits cleanly without a block", quiet(out), json.dumps(out))
     out = env.hook("SessionStart", root, session="task-review", source="compact")[1]
     record("T2 corrupt cache can be rebuilt on compaction", "Export to PDF" in context(out), json.dumps(out))
     saved = env.env["HORSEMEN_STATE_DIR"]
@@ -1037,7 +1044,7 @@ def scenario_task_review(env):
     env.env["HORSEMEN_STATE_DIR"] = str(blocked)
     try:
         out = env.hook("Stop", root, session="task-review")[1]
-        record("T2 unavailable cache does not disable review", review_requested(out), json.dumps(out))
+        record("T2 unavailable cache exits cleanly without a block", quiet(out), json.dumps(out))
         out = env.hook("SessionStart", root, session="task-review")[1]
         record("T2 unavailable cache does not disable orientation", "Export to PDF" in context(out), json.dumps(out))
     finally:
@@ -1103,7 +1110,7 @@ def scenario_cache_shape(env):
         state[field] = value
         cache.write_text(json.dumps(state))
         code, out, _, _ = env.hook("Stop", root, session="shape")
-        record("K7 review survives " + label, code == 0 and review_requested(out), json.dumps(out))
+        record("K7 hook survives " + label, code == 0 and quiet(out), json.dumps(out))
 
 
 def scenario_install_health(env):
@@ -1127,13 +1134,294 @@ def scenario_install_health(env):
     record("I4 incomplete hook pair is unhealthy", proc.returncode != 0 and "Stop" in proc.stdout, proc.stdout + proc.stderr)
 
 
+CANVAS = ('{\n"horsemen":{"version":1},\n"nodes":[\n'
+          '{"id":"img-chart","type":"file","x":400,"y":260,"width":400,"height":250,"alt":"Notes written each week","file":".horsemen/media/chart.svg"},\n'
+          '{"id":"note-plan","type":"text","x":0,"y":0,"width":320,"height":140,"text":"Ask two testers about export."},\n'
+          '{"id":"s-up-next","type":"file","x":400,"y":0,"width":320,"height":200,"file":"PROGRESS.md","subpath":"#Up next"}\n'
+          '],\n"edges":[\n{"id":"e-plan","fromNode":"note-plan","toNode":"s-up-next","label":"feeds"}\n]\n}\n')
+CHART = '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="20"><rect width="40" height="20"/></svg>\n'
+
+
+def scenario_canvas_check(env):
+    """C18-C24: canvas files in .horsemen/canvas are checked with the records."""
+    root = healthy_project(env, env.base / "canvas")
+    name = ".horsemen/canvas/progress.canvas"
+    write(root, {name: CANVAS, ".horsemen/media/chart.svg": CHART})
+    code, report = env.check(root)
+    record("C18 a valid canvas in canonical form adds no finding", code == 0 and not report["warnings"],
+           json.dumps(report["errors"] + report["warnings"]))
+
+    def found(text, kind="errors", files=None):
+        write(root, {name: text, **(files or {})})
+        code, report = env.check(root)
+        return code, {(i["code"], i["file"]) for i in report[kind]}, json.dumps(report["errors"] + report["warnings"])
+
+    code, hits, detail = found(json.dumps(json.loads(CANVAS), indent=2), "warnings")
+    record("C19 a valid canvas in another layout is a warning, not an error", code == 0 and hits == {("canvas-not-canonical", name)}, detail)
+    code, hits, detail = found(CANVAS.replace('{"id":"note-plan"', '<<<<<<< HEAD\n{"id":"note-plan"'))
+    record("C20 a canvas with conflict markers is an error", code == 1 and hits == {("canvas-invalid", name)} and "conflict markers" in detail, detail)
+    code, hits, detail = found(CANVAS.replace('"x":0,', '"x":0.5,').replace("Ask two", "<script>alert(1)</script> Ask two"))
+    record("C20 a canvas that breaks a format rule is an error", hits == {("canvas-invalid", name)} and "whole number" in detail, detail)
+    code, hits, detail = found(CANVAS.replace("#Up next", "#Renamed"))
+    record("C21 a section card whose heading is gone is an error", code == 1 and hits == {("canvas-dangling-ref", name)} and "#Renamed" in detail, detail)
+    code, hits, detail = found(CANVAS.replace("chart.svg", "gone.svg"))
+    record("C21 a card whose file is gone is an error", hits == {("canvas-dangling-ref", name)}, detail)
+    code, hits, detail = found(CANVAS.replace('"toNode":"s-up-next"', '"toNode":"ghost"'))
+    record("C21 an edge to a missing node is an error", hits == {("canvas-dangling-ref", name)}, detail)
+    code, hits, detail = found(CANVAS.replace("chart.svg", "big.svg"), files={".horsemen/media/big.svg": CHART + " " * (1024 * 1024)})
+    record("C22 media over 1 MiB is an error", code == 1 and hits == {("canvas-media-too-large", name)}, detail)
+    (root / ".horsemen/media/big.svg").unlink()
+    code, hits, detail = found(CANVAS.replace("chart.svg", "fake.png"), files={".horsemen/media/fake.png": "<script>alert(1)</script>"})
+    record("C22 media that is not its type is an error", hits == {("canvas-invalid", name)} and "PNG" in detail, detail)
+    (root / ".horsemen/media/fake.png").unlink()
+    code, hits, detail = found(CANVAS, files={".horsemen/canvas/My Board.canvas": "{}"})
+    record("C23 a canvas file with a bad name is an error", hits == {("canvas-invalid", ".horsemen/canvas/My Board.canvas")}, detail)
+    (root / ".horsemen/canvas/My Board.canvas").unlink()
+    code, hits, detail = found(CANVAS, files={f".horsemen/canvas/board-{i:02d}.canvas": '{\n"horsemen":{"version":1},\n"nodes":[],\n"edges":[]\n}\n' for i in range(20)})
+    record("C23 more than 20 canvas files is an error", hits == {("canvas-invalid", ".horsemen/canvas")} and "21 canvas files" in detail, detail)
+    for i in range(20):
+        (root / f".horsemen/canvas/board-{i:02d}.canvas").unlink()
+    outside = env.base / "canvas-outside"
+    write(outside, {"leak.canvas": CANVAS.replace("#Up next", "#TOP-SECRET")})
+    (root / ".horsemen/canvas/leak.canvas").symlink_to(outside / "leak.canvas")
+    code, hits, detail = found(CANVAS)
+    record("C24 a canvas file that is a link out of the project is not read",
+           hits == {("canvas-invalid", ".horsemen/canvas/leak.canvas")} and "TOP-SECRET" not in detail, detail)
+    (root / ".horsemen/canvas/leak.canvas").unlink()
+    env.hook("SessionStart", root, session="canvas")
+    code, out, elapsed, _ = env.hook("Stop", root, session="canvas", stop_hook_active=False)
+    record("C18 hooks still run in a project with canvases", code == 0 and quiet(out), json.dumps(out))
+
+
+# The hook output of the release before canvases, for the same fixtures. Legacy mode must give these bytes.
+LEGACY_START = 'Horsemen records for {root}: VISION.md, BRAIN.md, PROGRESS.md, STRUCTURE.md.\nBefore acting, respect the gates and constraints below. Read VISION.md, BRAIN.md, or the rest of STRUCTURE.md when the task needs direction, knowledge, or locations. Before finishing each task, use horsemen to review all four records silently, including work outside Git. Keep unchanged records and dates unchanged. Do not replace the actual task report with skill maintenance; report it only if asked, or for necessary permission questions and actionable blockers.\n\nPROGRESS.md snapshot:\n# Progress\n\nUpdated: 2026-10-30 · Stage: building · Health: On track\n\nThe editor works for early testers. Export is next.\n\nNext action: Hung finishes the editor.\n\n## In progress\n\n- **Note editor** (started 2026-10-28): Consultants can write notes in the app.\n\n## Up next\n\n- **Export to PDF**: Consultants send a summary as a PDF.\n\n## Roadmap\n\n- Idea: calendar import.\n\n<details>\n<summary>Technical details</summary>\n\n| Item | Evidence |\n| --- | --- |\n| Note editor | branch editor |\n\n</details>\n\nRecord health:\n- VISION.md lists 1 open question.\nFull report: python3 {checker} check'
+LEGACY_STOP = "Horsemen found record drift. Fix it in VISION, BRAIN, PROGRESS, or STRUCTURE (and README, CHANGELOG, or TECHSTACK if affected). Honor read-only commands: plain inspect and check report proposed changes without writing. Keep VISION unless the user agreed to a change. Also open relevant brain originals; update or archive only when authorized. Leave unchanged files and dates alone. Do this silently, with no Horsemen section unless asked; still surface permission questions and actionable blockers. The user sees only your last message, so end with your full task report again, not a note about this review.\n- Structure: folders added src/new since session start, but STRUCTURE.md did not change. Update its map and any moved knowledge locations in BRAIN.md.\n- Vision: VISION.md changed. Check README.md, PROGRESS.md (Next, Later), and BRAIN.md for conflicts, and log the agreed direction change. Ask only if the owner's intent is unclear."
+EMPTY_CANVAS = '{\n"horsemen":{"version":1},\n"nodes":[],\n"edges":[]\n}\n'
+POINTER_LIMIT = 700
+
+
+def pointer(env, root, session="pointer"):
+    """The text that session start injects in pointer mode."""
+    payload = {"session_id": session, "cwd": str(root), "hook_event_name": "SessionStart"}
+    proc, _ = env.run(["hook", "session-start", "--pointer"], json.dumps(payload), cwd=root)
+    out = proc.stdout.strip()
+    return context(json.loads(out)) if out else ""
+
+
+def stop_reason(env, root, session):
+    return (env.hook("Stop", root, session=session, stop_hook_active=False)[1] or {}).get("reason", "")
+
+
+def scenario_legacy_mode(env):
+    """L1: without --pointer, the hooks give the same bytes as before, also in a project with canvases."""
+    checker = str(SCRIPT.resolve().parent / "horsemen_core" / "legacy.py")
+    root = healthy_project(env, env.base / "legacy-mode")
+    write(root, {".horsemen/canvas/progress.canvas": CANVAS, ".horsemen/media/chart.svg": CHART})
+    text = context(env.hook("SessionStart", root, session="legacy-mode")[1])
+    want = LEGACY_START.replace("{root}", str(root)).replace("{checker}", checker)
+    record("L1 legacy session start is byte-for-byte the same, with canvases in the project", text == want, text)
+    plain = healthy_project(env, env.base / "legacy-stop")
+    env.hook("SessionStart", plain, session="legacy-stop")
+    write(plain, {"VISION.md": VISION + "\nOwner direction note.\n", "src/new/a.js": "x\n"})
+    reason = stop_reason(env, plain, "legacy-stop")
+    record("L1 legacy stop gives the expected text in a project without canvases", reason == LEGACY_STOP, reason)
+
+
+def scenario_pointer(env):
+    """PT1-PT9: pointer mode injects 700 characters or less and keeps the gates."""
+    root = healthy_project(env, env.base / "pointer")
+    gate = "The phone and bank-app QR rehearsal must pass before a release."
+    write(root, {"PROGRESS.md": progress(extra=f"\nGates: {gate}\n")})
+    text = pointer(env, root)
+    record("PT1 the pointer is 700 characters or less", 0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
+    record("PT1 the pointer names the root, the records, and the next action",
+           str(root) in text and all(name in text for name in ("VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md"))
+           and "Next action: Hung finishes the editor." in text, text)
+    record("PT1 the pointer names the read tool and the show command", "`read`" in text and "horsemen show" in text, text)
+    record("PT1 the pointer does not inject the snapshot", "Consultants can write notes" not in text and "| Item | Evidence |" not in text, text)
+    record("PT2 a short Gates line stays in full", "Gates: " + gate in text, text)
+    record("PT4 no canvas line without canvases", "anvas" not in text, text)
+    record("PT1 the pointer still asks for the review of the four records", "review" in text.lower(), text)
+    legacy = context(env.hook("SessionStart", root, session="pointer-legacy")[1])
+    record("PT1 the pointer is shorter than the legacy text", 0 < len(text) < len(legacy) / 2, f"{len(text)} and {len(legacy)}")
+
+    write(root, {".horsemen/canvas/progress.canvas": CANVAS, ".horsemen/media/chart.svg": CHART, ".horsemen/canvas/launch-plan.canvas": EMPTY_CANVAS})
+    text = pointer(env, root)
+    record("PT4 canvases are named", "Canvases: launch-plan, progress." in text and len(text) <= POINTER_LIMIT, text)
+
+    gates = "## Gates\n\n- No public walk before the insurer confirms cover.\n- Keep payment data out of the app.\n\n"
+    write(root, {"PROGRESS.md": progress(rows=ROW_EDITOR + ROW_EXPORT + gates)})
+    text = pointer(env, root)
+    record("PT2 gates below a Gates heading stay in full",
+           "No public walk before the insurer confirms cover." in text and "Keep payment data out of the app." in text and len(text) <= POINTER_LIMIT, text)
+
+    many = "## Gates\n\n" + "".join(f"- Gate {i}: " + "x" * 60 + f" END-{i}.\n" for i in range(8)) + "\n"
+    write(root, {"PROGRESS.md": progress(rows=ROW_EDITOR + ROW_EXPORT + many)})
+    text = pointer(env, root)
+    record("PT3 long gates become an instruction to read them; no gate is cut",
+           "progress#Gates before you act" in text and "END-" not in text and "xxxx" not in text and len(text) <= POINTER_LIMIT, text)
+    write(root, {"PROGRESS.md": progress(extra="\nGates:\n\n- " + "y" * 320 + " FINAL-GATE\n")})
+    text = pointer(env, root)
+    record("PT3 a long Gates line becomes an instruction to read it",
+           "Gates" in text and "before you act" in text and "FINAL-GATE" not in text and "yyyy" not in text and len(text) <= POINTER_LIMIT, text)
+    write(root, {"PROGRESS.md": PROGRESS})
+    text = pointer(env, root)
+    record("PT2 a snapshot without gates says so", "Gates: none" in text, text)
+
+    big = healthy_project(env, env.base / ("pointer-" + "d" * 90) / ("e" * 90))
+    files = {f".horsemen/canvas/{'board-' + str(i).zfill(2) + '-' + 'n' * 50}.canvas": EMPTY_CANVAS for i in range(20)}
+    files["PROGRESS.md"] = progress(rows=ROW_EDITOR + ROW_EXPORT + "## Gates\n\n- " + "g" * 280 + " GATE-END.\n\n").replace(
+        "Next action: Hung finishes the editor.", "Next action: " + "n" * 600 + " NEXT-END")
+    files["STRUCTURE.md"] = STRUCTURE.replace("## Brain", "## Read before changing\n\n- `docs/decisions.md` before any API change.\n\n## Brain") \
+        + "\n| `gone/one/` | x |\n| `gone/two/` | x |\n"
+    files["BRAIN.md"] = BRAIN.replace("Brain: Google Drive", "Storage: Google Drive")
+    files["VISION.md"] = VISION.replace("Confirmed: 2026-10-20", "Confirmed: unconfirmed")
+    write(big, files)
+    text = pointer(env, big)
+    record("PT5 the pointer stays in 700 characters with a long path, 20 canvases, a long next action, and many problems",
+           0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
+    record("PT5 a full pointer keeps the gates, the read line, and all four record names",
+           "GATE-END." in text and "`read`" in text and "horsemen show" in text
+           and all(name in text for name in ("VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md")), text)
+    record("PT8 the pointer keeps the STRUCTURE reading list as one line", "Read before changing" in text, text)
+    record("PT9 a full pointer has at most three health lines", text.count("\n- ") <= 3, text)
+    many = healthy_project(env, env.base / "pointer-many")
+    write(many, {name: files[name] for name in ("STRUCTURE.md", "BRAIN.md", "VISION.md")})
+    write(many, {".horsemen/canvas/progress.canvas": CANVAS.replace("#Up next", "#Renamed"), ".horsemen/media/chart.svg": CHART})
+    text = pointer(env, many)
+    record("PT9 five problems give three health lines, with the canvas problem first",
+           text.count("\n- ") == 3 and "\n- 1 canvas problem; run check." in text and len(text) <= POINTER_LIMIT, text)
+    record("PT5 a next action that does not fit is not cut without a mark", "NEXT-END" in text or "…" in text or "next action" not in text.lower(), text)
+
+    old = healthy_project(env, env.base / "pointer-status")
+    (old / "PROGRESS.md").unlink()
+    write(old, {"STATUS.md": LEGACY_STATUS})
+    text = pointer(env, old)
+    record("PT7 a legacy STATUS file must be read before project work", "STATUS.md" in text and "before project work" in text and len(text) <= POINTER_LIMIT, text)
+    proc, _ = env.run(["hook", "session-start", "--pointer"], "not json", cwd=env.base / "home")
+    record("PT6 pointer mode is silent outside a project", proc.returncode == 0 and not proc.stdout.strip(), proc.stdout + proc.stderr)
+
+
+def scenario_pointer_install(env):
+    """PT10: pointer mode is a choice at install time."""
+    root = env.base / "mode-cfg"
+    root.mkdir()
+    claude, codex = root / "settings.json", root / "hooks.json"
+    opts = ["--claude-settings", str(claude), "--codex-hooks", str(codex)]
+
+    def commands(path):
+        data = json.loads(path.read_text())
+        return {event: [h["command"] for entry in data["hooks"][event] for h in entry["hooks"]] for event in ("SessionStart", "Stop")}
+
+    env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT)])
+    plain = commands(claude)
+    proc, _ = env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT), "--pointer"])
+    both = [commands(claude), commands(codex)]
+    record("PT10 install --pointer changes the SessionStart command only",
+           proc.returncode == 0 and all(len(c["SessionStart"]) == 1 and "hook session-start --pointer" in c["SessionStart"][0]
+                                        and c["Stop"] == plain["Stop"] for c in both), json.dumps(both))
+    project = healthy_project(env, env.base / "mode-installed")
+    run = subprocess.run(["/bin/sh", "-c", both[0]["SessionStart"][0]], input=json.dumps({"session_id": "pi", "cwd": str(project)}),
+                         capture_output=True, text=True, cwd=project, env=env.env, timeout=10)
+    text = context(json.loads(run.stdout)) if run.stdout.strip() else ""
+    record("PT10 the installed pointer command injects the pointer", 0 < len(text) <= POINTER_LIMIT and "Consultants can write notes" not in text, run.stdout + run.stderr)
+    proc, _ = env.run(["hooks", "status", *opts])
+    record("PT10 status names pointer mode", proc.returncode == 0 and "pointer mode" in proc.stdout, proc.stdout)
+    env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT)])
+    record("PT10 install without --pointer gives the same commands as before", commands(claude) == plain, json.dumps(commands(claude)))
+    proc, _ = env.run(["hooks", "status", *opts])
+    record("PT10 status without pointer mode is unchanged", proc.returncode == 0 and "pointer" not in proc.stdout, proc.stdout)
+
+
+def scenario_canvas_stop(env):
+    """S22-S25: stop reports a canvas problem that the session made, once, and Publish covers .horsemen."""
+    remote = env.base / "canvas-remote.git"
+    env.git(env.base, "init", "-q", "--bare", "-b", "main", str(remote))
+    root = env.base / "canvas-stop"
+    healthy_project(env, root, git=False)
+    name = ".horsemen/canvas/progress.canvas"
+    write(root, {name: CANVAS, ".horsemen/media/chart.svg": CHART})
+    env.git(root, "init", "-q", "-b", "main")
+    env.git(root, "config", "maintenance.auto", "false")
+    env.git(root, "config", "gc.auto", "0")
+    env.git(root, "add", "-A")
+    env.git(root, "commit", "-q", "-m", "init", "--date", "2026-10-01T00:00:00")
+    env.git(root, "remote", "add", "origin", str(remote))
+    env.git(root, "push", "-q", "-u", "origin", "main")
+    env.git(root, "remote", "set-head", "origin", "main")
+    env.hook("SessionStart", root, session="cs")
+    reason = stop_reason(env, root, "cs")
+    record("S22 a valid canvas does not block", not reason, reason)
+
+    write(root, {name: CANVAS.replace('"x":0,', '"x":0.5,')})
+    reason = stop_reason(env, root, "cs")
+    record("S22 an invalid canvas file that the session wrote is reported", "Canvas errors:" in reason and "progress.canvas" in reason and "whole number" in reason, reason)
+    record("S24 an unpublished canvas file asks to commit and push", "Publish:" in reason and name in reason.split("Publish:")[-1], reason)
+    record("S16 the reminder with canvas notes stays under 1,200 characters", len(reason) < 1200, str(len(reason)))
+    reason = stop_reason(env, root, "cs")
+    record("S22 the same canvas error is reported once", not reason and "Canvas errors:" not in reason and "Publish:" not in reason, reason)
+    write(root, {name: CANVAS})
+    reason = stop_reason(env, root, "cs")
+    record("S22 a repaired canvas adds no note", not reason and "anvas" not in reason, reason)
+
+    write(root, {"PROGRESS.md": PROGRESS.replace("## Up next", "## Next up")})
+    reason = stop_reason(env, root, "cs")
+    record("S23 a section card whose heading the session changed is reported",
+           "Canvas:" in reason and "s-up-next" in reason and "#Up next" in reason and "progress.canvas" in reason, reason)
+    reason = stop_reason(env, root, "cs")
+    record("S23 a broken card is reported once", not reason and "s-up-next" not in reason, reason)
+    write(root, {"PROGRESS.md": PROGRESS})
+
+    write(root, {".horsemen/media/new-proof.svg": CHART, name: CANVAS.replace("Ask two testers", "Ask three testers")})
+    reason = stop_reason(env, root, "cs")
+    record("S24 new media and a changed canvas are unpublished", "Publish:" in reason and name in reason and ".horsemen/media/new-proof.svg" in reason, reason)
+    env.git(root, "add", "-A")
+    env.git(root, "commit", "-qm", "canvas")
+    env.git(root, "push", "-q", "origin", "main")
+    write(root, {".horsemen/media/chart.svg": CHART + "<!-- changed -->\n"})
+    write(root, {".horsemen/media/chart.svg": CHART})
+    reason = stop_reason(env, root, "cs2")
+    record("S24 published canvas files do not fire", not reason and "Publish:" not in reason, reason)
+
+    before = healthy_project(env, env.base / "canvas-before")
+    write(before, {name: CANVAS.replace("#Up next", "#Renamed")})
+    env.hook("SessionStart", before, session="cb")
+    write(before, {"PROGRESS.md": PROGRESS + "\n<!-- fictional edit -->\n"})
+    reason = stop_reason(env, before, "cb")
+    record("S23 a card that was broken before the session is not reported", not reason and "anvas" not in reason, reason)
+
+    old = healthy_project(env, env.base / "canvas-old-cache")
+    write(old, {name: CANVAS})
+    env.hook("SessionStart", old, session="co")
+    for cache in env.state.glob("*.json"):
+        state = json.loads(cache.read_text())
+        if state.get("root") == str(old):
+            state.pop("canvas", None)
+            cache.write_text(json.dumps(state))
+    write(old, {name: "not json"})
+    code, out, _, _ = env.hook("Stop", old, session="co", stop_hook_active=False)
+    record("S25 a cache from before canvases exits cleanly, with no canvas note", code == 0 and quiet(out), json.dumps(out))
+    wrong = healthy_project(env, env.base / "canvas-wrong-cache")
+    write(wrong, {name: CANVAS})
+    env.hook("SessionStart", wrong, session="cw")
+    for cache in env.state.glob("*.json"):
+        state = json.loads(cache.read_text())
+        if state.get("root") == str(wrong):
+            state["canvas"] = {"files": [1, 2], "broken": "x"}
+            cache.write_text(json.dumps(state))
+    write(wrong, {name: "not json"})
+    code, out, _, _ = env.hook("Stop", wrong, session="cw", stop_hook_active=False)
+    record("K7 hook survives a canvas baseline with the wrong shape", code == 0 and quiet(out), json.dumps(out))
+
+
 SCENARIOS = [scenario_noise, scenario_initialization, scenario_adoption, scenario_shipping, scenario_doc_only_commits,
              scenario_refactor, scenario_knowledge_migration, scenario_vision_change, scenario_publish, scenario_non_software,
              scenario_scale_and_staleness, scenario_nested, scenario_branch_switch, scenario_changelog_and_links,
              scenario_no_baseline, scenario_install, scenario_examples, scenario_preexisting_untracked,
              scenario_rearm, scenario_slow_git, scenario_install_permissions, scenario_orientation_safety, scenario_check_hardening,
              scenario_record_formats, scenario_structure_trees, scenario_task_review, scenario_state_identity,
-             scenario_state_resume, scenario_cache_shape, scenario_install_health]
+             scenario_state_resume, scenario_cache_shape, scenario_install_health,
+             scenario_canvas_check, scenario_legacy_mode, scenario_pointer, scenario_pointer_install, scenario_canvas_stop]
 
 
 def main():

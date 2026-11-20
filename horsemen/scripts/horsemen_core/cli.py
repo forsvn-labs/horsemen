@@ -59,7 +59,12 @@ def main(argv=None):
         if argv[0] != 'export-patch' and '--plan' not in argv:
             argv.append('--plan')
         compatibility = True
-    parser = argparse.ArgumentParser(prog='horsemen', description='Check one record, inspect a project, or explicitly update one local record.')
+    if argv and argv[0] in ('show', 'canvas', 'mcp'):
+        # Agent tools: short plain-text reads, canvas edits, and the local MCP server.
+        from . import agent_tools, mcp
+        legacy.git = git_read  # This CLI process only; compatibility scripts stay unchanged.
+        return {'show': agent_tools.cli_show, 'canvas': agent_tools.cli_canvas, 'mcp': mcp.cli}[argv[0]](argv[1:])
+    parser = argparse.ArgumentParser(prog='horsemen', description='Check one record, inspect a project, explicitly update one local record, or read and edit canvases.')
     parser.add_argument('--version', action='version', version=__version__)
     sub = parser.add_subparsers(dest='command', required=True)
     for name, filename in documents.NAMES.items():
@@ -83,10 +88,13 @@ def main(argv=None):
             command.add_argument('--plan', action='store_true', required=True, help='Produce a read-only proposal; never apply it')
         if name=='update':
             command.add_argument('--changes', help='Local JSON file with proposed edits and evidence references')
+    sub.add_parser('show', help='Print the workspace index, a record section, or a canvas outline as short text')
+    sub.add_parser('canvas', help='Change one canvas file in .horsemen/canvas; does not commit')
+    sub.add_parser('mcp', help='Run the local MCP server, or register it: mcp install, mcp status')
     if not compatibility:
         hidden = {'export-patch', 'init', 'update', 'upgrade'}
         sub._choices_actions[:] = [a for a in sub._choices_actions if a.dest not in hidden]
-        sub.metavar = '{brain,vision,structure,status,check,inspect,plan}'
+        sub.metavar = '{brain,vision,structure,status,check,inspect,plan,show,canvas,mcp}'
     args = parser.parse_args(argv)
     legacy.git = git_read  # This CLI process only; compatibility scripts stay unchanged.
     try:

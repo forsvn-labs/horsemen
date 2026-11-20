@@ -1,0 +1,10 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"v1","type":"link","x":0,"y":0,"width":320,"height":120,"url":"http://x"},
+{"id":"v2","type":"link","x":0,"y":0,"width":320,"height":120,"title":"","url":"https://例え.jp/パス?q=1#f"},
+{"id":"v3","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://example.com/<script>alert(1)</script>"},
+{"id":"v4","type":"link","x":0,"y":0,"width":320,"height":120,"url":"https://user:pw@example.com:8443/a%20b"}
+],
+"edges":[]
+}

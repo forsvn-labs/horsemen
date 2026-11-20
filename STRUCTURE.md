@@ -6,6 +6,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 
 ```text
 ./
+├── .horsemen/canvas/      Canvas files of this project, such as the roadmap board (`roadmap.canvas`)
 ├── web/                   GitHub canvas (local and hosted), Markdown, diagrams (vendored Mermaid in web/vendor/), images, themes, previews, and setup guide
 │   ├── assets/            Bundled fonts with their notice, icons, seals, and app icon
 │   ├── canvas-sections.js Rules for the generated canvas of a record: sections, card IDs, layout, card text, and links
@@ -17,9 +18,9 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   └── hosted.js          Hosted mode: proxy reads, the editor sign-in and saves, sign-out, and live commit checks
 ├── worker/                Cloudflare Worker for horsemen.forsvn.com: GitHub App sign-in, read-only proxy, and the optional canvas write route
 ├── docs/state-machines.md  Local reader lifecycle and failure coverage
-├── docs/product/           GUI requirements, artifact views, icon system, design audit, release boundaries, and the canvas workspace proposal with its file schema
+├── docs/product/           GUI requirements, artifact views, icon system, design audit, release boundaries, and the canvas workspace design with its file schema
 ├── docs/show-me/product-gui/ Interactive design, Excalidraw, and demo checks
-├── docs/show-me/canvas-workspace/ Canvas workspace mock, fictional fixture, and fixture check (proposal)
+├── docs/show-me/canvas-workspace/ Canvas workspace mock, fictional fixture, and fixture check
 ├── PRODUCT.md              GUI context and explicit prototype assumptions
 ├── assets/                 README cover and provenance notes
 ├── favicon.png             Project icon
@@ -29,9 +30,10 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   ├── REVIEW.md           Design decisions and remaining boundaries
 │   ├── references/         Templates and focused workflows
 │   └── scripts/            Compatibility hooks, provider helpers, tests
-│       └── horsemen_core/  Shared checker, CLI, local editor, and GitHub reader
+│       └── horsemen_core/  Shared checker, CLI, local editor, GitHub reader, canvas format (`canvas.py`), agent tools (`agent_tools.py`), and local MCP server (`mcp.py`)
 ├── scripts/                Build and end-to-end verification
-├── tests/                  Distribution regression tests
+├── tests/                  Distribution, GUI, canvas format, agent tool, and MCP server tests
+│   └── fixtures/canvas/    Shared canvas cases for the Python and JavaScript readers, with a fictional project
 ├── pyproject.toml          CLI packaging; version comes from shared source
 ├── CONTRIBUTING.md         Setup, verification, and release procedure
 ├── .impeccable/            Impeccable design-check settings (one intended-colour exception)
@@ -54,6 +56,11 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Deploy hosted viewer: `cd worker && bunx wrangler deploy`; see [deploy and limits](worker/README.md).
 - Canvas rule checks: `node tests/test_canvas_state.cjs`.
 - Generated canvas rule checks: `node tests/test_canvas_sections.cjs`.
+- Canvas format cases: `python3 -B -m unittest tests.test_canvas_format`; add `HORSEMEN_SCHEMA_CHECK=1` to compare with the JSON Schema (needs `uvx`). The [case contract](tests/fixtures/canvas/README.md) is for both languages.
+- Agent tool tests: `python3 -B -m unittest tests.test_canvas_edit tests.test_canvas_read tests.test_mcp_server` and `python3 -B horsemen/scripts/test_canvas_cli.py`.
+- Read a workspace with few tokens: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core show`; edit a canvas: `... canvas apply NAME --ops FILE`; see the [canvas guide](horsemen/references/canvas.md).
+- Run the local MCP server: `python3 -B horsemen/scripts/horsemen.py mcp` (stdio). `mcp install` changes agent settings; use it only for your own setup.
+- Agent session receipts: `python3 -B scripts/agent_sessions.py --output /tmp/horsemen-agent-sessions`. It starts a real Claude Code and Codex session in a temporary fictional project, with the server set for that run only. It uses your accounts and costs tokens, so verification does not run it.
 - Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.

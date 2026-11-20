@@ -185,14 +185,11 @@ Not in slice 2a (browser): the overview of references between canvases
 images, the "Stored in Git LFS" message, and all that needs embeds, tables,
 or editing.
 
-One difference from the shared cases is open. The generated card IDs of
-slice 1 are live with the rules in the table above (accents fold to plain
-letters, 56 characters, the headings of the reading view). The shared cases
-state other rules for section slugs: no folding, 58 characters, and `~~~`
-code blocks. The JavaScript test lists the cases that differ, so a change on
-either side fails it. An agent tool that saves a section card by its `s-` ID
-needs the same ID as the browser, so the owner must choose one rule for both
-sides.
+Section card IDs follow one rule on both sides: the live rule of slice 1 in
+`web/canvas-sections.js` (accents fold to plain letters, 56 characters, only
+backtick fences). The owner chose it on 2026-11-19 so that old `?node=` links
+keep working. The shared cases state this rule, and the Python agent tools
+and the browser both pass them.
 
 ### Slice 4a as built
 
@@ -642,6 +639,35 @@ gates before you act".
 The skill tells agents when to change a canvas: when the user asks, when a
 section card broke, and when new proof exists for a shipped item. A hook does
 not ask for canvas edits at each stop.
+
+### Agent tools as built
+
+Slice 3a and the Python half of slice 2a are built as this section says, with
+these additions. The [canvas guide](../../horsemen/references/canvas.md) is
+the reference for agents.
+
+| Item | As built |
+| --- | --- |
+| Read-only mark | The `read` definition has the MCP annotation `readOnlyHint`, so a host can run it with no approval question. The two definitions are 1,083 characters as compact JSON. `canvas_edit` writes and can remove elements, so it has no mark. |
+| Approval in Codex | Codex asks the person for each `canvas_edit` call. A run with no person (`codex exec`) waits for the answer. The person can allow the tool in the Codex settings; `mcp install` does not set this. |
+| Node types in an op | An op can make only `text`, `file`, `link`, and `group` nodes. A kind name from the outline, such as `note` or `image`, is read as its type, because real agents send it. Another type is refused. A node of another tool keeps its own type. |
+| Placement | A place that is taken moves along the side of the anchor, in the direction where the free place is nearer. |
+| Receipts | `python3 -B scripts/agent_sessions.py --output DIR` starts a new Claude Code and Codex session in a temporary fictional project and checks that each calls both tools. The server is set for that run only. |
+| Not built here | The JavaScript reader, drawing in the browser, the SVG blob test, and the browser checks of slice 2a. |
+
+### Hooks as built
+
+Slice 3b is built as the Hooks table says, with these details. The
+[hook reference](../../horsemen/references/hooks.md#pointer-mode) has the
+full rules.
+
+| Item | As built |
+| --- | --- |
+| Opt-in | `hooks install --pointer` adds `--pointer` to the SessionStart command only. Without it, session start gives the same bytes as before; a scenario compares them with the output of the release before canvases. |
+| Pointer lines | Root and records; canvas names; next action; gates; one line for STRUCTURE's "Read before changing" list (an addition, because that list is required reading in the default mode); up to three health lines; the read line with the review request. |
+| Gates | In full at 300 characters or less; else "Read progress#Gates before you act". A gate is never cut. The root, the gates, and the read line always stay; other lines go first when the limit is near. |
+| Stop rules | Canvas errors in a file that the session changed; a card on an unchanged canvas that broke in the session, reported once; `.horsemen/canvas/` and `.horsemen/media/` files in the Publish rule. These rules run in both modes, and only in a project with files in `.horsemen/`. |
+| Not done here | The done condition of slice 3b: the owner's installed skill runs pointer mode in one real project for a week with no missed gate. No installed skill or hook setting was changed. |
 
 ## Security and privacy
 

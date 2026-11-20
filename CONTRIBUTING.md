@@ -20,7 +20,8 @@ Then use one command, with a new output directory each time:
 ```
 
 It needs Node.js 20 or later for the hosted viewer tests. It runs unit tests, hosted viewer tests, source CLI tests, existing hook scenarios, a wheel build,
-installed CLI tests, and hook scenarios from the unpacked skill. The result
+installed CLI tests, and hook scenarios from the unpacked skill. The unit tests include the canvas format cases, the agent tools, and the
+local MCP server through a subprocess. They use fake host commands and never call a real agent host. The result
 directory contains logs, `verification.json`, the CLI wheel, and a skill ZIP
 with a file manifest. Builds and tests use temporary projects. They do not
 install global skills, change hook settings, or access provider accounts.
@@ -28,6 +29,18 @@ install global skills, change hook settings, or access provider accounts.
 The command fails on the first unsuccessful check and retains its output.
 Local results describe that machine only; CI covers Linux/macOS and Python
 3.10/3.14. A configured workflow is not a passing run.
+
+One check needs real agent hosts, so the verification command does not run it:
+
+```sh
+python3 -B scripts/agent_sessions.py --output /tmp/horsemen-agent-sessions
+```
+
+It starts a new Claude Code session and a new Codex session in a temporary
+copy of a fictional project. Each session must call `read` and `canvas_edit`.
+The MCP server is set for that run only; no host setting changes. The
+sessions use your accounts and cost tokens. Run it when the agent tools or
+the server change, and put the result in the pull request.
 
 ## Make a change
 
