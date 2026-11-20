@@ -274,15 +274,10 @@ else {
     assert.deepEqual([again.errors.length, again.text === report.text, again.canonical], [0, true, true], `${item.name}: canonical text does not change when it is read and written again`);
   }
   for (const item of suite.headings) assert.equal(!!F.findHeading(item.markdown, item.subpath), item.found, `heading ${JSON.stringify(item.subpath)} in ${JSON.stringify(item.markdown.slice(0, 40))}`);
-  /* Section card IDs. The generated canvases of slice 1 are live with the rules of web/canvas-sections.js:
-     accents fold to plain letters, a slug has 56 characters at most, and the reading view decides what a heading is.
-     The shared cases state other rules for these inputs. The difference is listed here so that a change on
-     either side fails this test; the pull request reports it. */
-  const KNOWN_SLUG_DIFFERENCES = ['Émile Zola', 'Über-Größe', 'İstanbul', 'a'.repeat(70), 'a'.repeat(57) + ' b c'];
-  const slugDifferences = suite.slugs.filter(item => S.slug(item.heading) !== item.slug).map(item => item.heading);
-  assert.deepEqual(slugDifferences, KNOWN_SLUG_DIFFERENCES, 'section slugs: only the known differences from the shared cases');
-  const cards = suite.sections.map(item => S.parse(item.markdown).map(s => s.id).join(' ') === item.sections.map(s => s.id).join(' '));
-  assert.deepEqual(cards, [true, false, true], 'section cards: the first and the third shared case match; the second differs (a ~~~ code block)');
+  /* Section card IDs. The shared cases state the live rule of slice 1 (web/canvas-sections.js), and the Python
+     agent tools follow it, so a card that an agent saves has the same ID as the card that the browser draws. */
+  for (const item of suite.slugs) assert.equal(S.slug(item.heading), item.slug, `section slug of ${JSON.stringify(item.heading)}`);
+  for (const item of suite.sections) assert.deepEqual(S.parse(item.markdown).map(s => ({ title: s.title, id: s.id })), item.sections, `section cards: ${item.note}`);
   console.log(`canvas format: ${suite.cases.length} shared cases, ${suite.headings.length} heading cases from ${fixtures.from}`);
 }
 
