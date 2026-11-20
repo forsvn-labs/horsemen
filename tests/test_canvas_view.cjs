@@ -132,9 +132,11 @@ assert.deepEqual([byId(nested, 's-shipped').record, byId(nested, 's-shipped').mi
 
 /* Input that is not valid: a message, and the generated canvas. */
 for (const [file, words] of [
-  [fileOf('progress', 'not json'), /progress\.canvas is not a valid canvas file\. The file is not valid JSON\. The canvas shows the sections of the record\./],
-  [fileOf('progress', '<<<<<<< HEAD\n{}\n=======\n{}\n>>>>>>> x'), /conflict markers/],
-  [fileOf('progress', JSON.stringify({ nodes: Array.from({ length: 5000 }, (_, i) => node({ id: 'n' + i })) })), /500 nodes at most/],
+  [fileOf('progress', 'not json'), /^progress\.canvas is not a valid canvas file: file is not valid JSON\. The canvas shows the sections of the record\.$/],
+  [fileOf('progress', '<<<<<<< HEAD\n{}\n=======\n{}\n>>>>>>> x'), /file has Git conflict markers\. Keep both lines of each conflict, then remove the markers\. The canvas shows/],
+  [fileOf('progress', JSON.stringify({ nodes: Array.from({ length: 5000 }, (_, i) => node({ id: 'n' + i })) })), /: more than 500 nodes\. /],
+  [fileOf('progress', '{"nodes":[],"pad":"' + 'x'.repeat(2 * 1024 * 1024) + '"}'), /: file is larger than 512 KiB\. /],
+  [fileOf('progress', JSON.stringify({ nodes: {}, edges: 7 })), /: nodes must be a list\. /],
   [{ name: 'progress', path: '.horsemen/canvas/progress.canvas', error: 'The canvas file is larger than 512 KiB.' }, /progress\.canvas was not read\. The canvas file is larger than 512 KiB\. The canvas shows the sections of the record\./],
 ]) {
   const fallen = compose('progress', file);
@@ -144,14 +146,20 @@ for (const [file, words] of [
 }
 const emptyBoard = compose('launch-plan', fileOf('launch-plan', '[]'));
 assert.deepEqual([emptyBoard.nodes.length, emptyBoard.notice.level], [0, 'error']);
-assert.match(emptyBoard.notice.text, /launch-plan\.canvas is not a valid canvas file\. A canvas file must be one JSON object\. No element of this file shows\./);
+assert.match(emptyBoard.notice.text, /^launch-plan\.canvas is not a valid canvas file: file must be a JSON object\. No element of this file shows\.$/);
+assert.deepEqual(compose('progress', fileOf('progress', JSON.stringify({ nodes: {}, edges: 7 }))).notice.details, ['nodes must be a list', 'edges must be a list'], 'the details list each fault');
 /* One bad element: the others show, and the message gives the count and the first fault. */
 const partial = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [node({ id: 'ok' }), { ...node({ id: 'evil' }), type: 'link', url: 'javascript:alert(1)' }, node({ id: 'css', color: 'red;background:url(https://example.com/x)' }), { ...node({ id: 'up' }), type: 'file', file: '../../secrets.md' }], edges: [{ id: 'e', fromNode: 'ok', toNode: 'evil' }] })));
 assert.deepEqual(partial.nodes.map(n => n.id), ['ok']);
 assert.deepEqual([partial.notice.level, partial.edges.length], ['warning', 0]);
-assert.match(partial.notice.text, /^launch-plan\.canvas has 4 elements that are not valid\. They do not show\. First: Node "evil": url must start with http/);
+assert.match(partial.notice.text, /^launch-plan\.canvas has 4 elements that do not show\. First fault: node evil: url must be an http or https address of 2,048 characters or less\.$/);
+assert.deepEqual(partial.notice.details.length, 3, 'the details list each fault');
 assert.ok(!/javascript:|secrets|background:/.test(JSON.stringify(partial)), 'no refused value is in the view');
-assert.match(compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [node({ x: 0.5 })] }))).notice.text, /has 1 element that is not valid\. It does not show\./);
+assert.match(compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [node({ x: 0.5 })] }))).notice.text, /has 1 element that does not show\. First fault: node a: x must be a whole number/);
+/* An edge to a node that is not there: the edge does not show, and the message says why. */
+const loose = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [node()], edges: [{ id: 'e', fromNode: 'a', toNode: 'ghost' }] })));
+assert.deepEqual([loose.nodes.length, loose.edges.length, loose.notice.level], [1, 0, 'warning']);
+assert.match(loose.notice.text, /has 1 element that does not show\. First fault: edge e: toNode ghost is not a node\.$/);
 assert.match(compose('launch-plan', fileOf('launch-plan', JSON.stringify({ horsemen: { version: 2 }, nodes: [node()] }))).notice.text, /launch-plan\.canvas uses format version 2\. This app knows version 1/);
 
 /* Hostile text is text. */
@@ -184,9 +192,9 @@ assert.ok(!V.cardHTML(byId(hostile, 'n')).includes('href="javascript'), 'a Markd
 assert.deepEqual([V.tone('3'), V.tone('#A1b2C3'), V.tone('red;x'), V.tone(undefined), V.tone('#fff'), V.tone(4)], [{ preset: '3' }, { hex: '#A1b2C3' }, null, null, null, null]);
 
 /* Images: only a file that the reader registered for this canvas loads; 100 at most. */
-const loose = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [{ ...node(), type: 'file', file: 'img/a.png' }] }), []));
-assert.deepEqual([loose.nodes[0].kind, loose.nodes[0].link], ['image', null]);
-assert.ok(!V.cardHTML(loose.nodes[0]).includes('md-image'), 'an image without a registered link is not loaded');
+const unlisted = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: [{ ...node(), type: 'file', file: 'img/a.png' }] }), []));
+assert.deepEqual([unlisted.nodes[0].kind, unlisted.nodes[0].link], ['image', null]);
+assert.ok(!V.cardHTML(unlisted.nodes[0]).includes('md-image'), 'an image without a registered link is not loaded');
 const many = Array.from({ length: 120 }, (_, i) => ({ ...node({ id: 'i' + String(i).padStart(3, '0') }), type: 'file', file: `img/${i}.png` }));
 const gallery = compose('launch-plan', fileOf('launch-plan', JSON.stringify({ nodes: many }), many.map(n => link(n.file))));
 assert.equal(gallery.nodes.filter(n => n.kind === 'image' && V.cardHTML(n).includes('md-image')).length, 100, 'a canvas loads 100 images at most');

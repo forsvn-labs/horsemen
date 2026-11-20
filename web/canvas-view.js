@@ -31,17 +31,22 @@
   }
   const encodePath = path => String(path).split('/').map(encodeURIComponent).join('/');
 
-  /* The message for a file that is not valid, was not read, or has elements that do not show. */
+  /* The message for a file that is not valid, was not read, or has elements that do not show.
+     The text of a fault names an element and a rule. The app shows it as text. */
   function notice(key, file, isRecord) {
     if (!file) return null;
     const name = file.name + '.canvas', tail = isRecord ? 'The canvas shows the sections of the record.' : 'No element of this file shows.';
     if (file.error) return { level: 'error', text: `${name} was not read. ${file.error} ${tail}`, details: [] };
     const parsed = file.parsed;
     if (!parsed) return null;
-    if (parsed.fatal) return { level: 'error', text: `${name} is not a valid canvas file. ${parsed.fatal.message} ${tail}`, details: [parsed.fatal.message] };
+    const details = parsed.errors.slice(0, 8).map(e => e.message);
+    if (parsed.fatal) {
+      const hint = parsed.fatal.rule === 'conflict' ? ' Keep both lines of each conflict, then remove the markers.' : '';
+      return { level: 'error', text: `${name} is not a valid canvas file: ${parsed.fatal.message}.${hint} ${tail}`, details };
+    }
     if (parsed.errors.length) {
       const n = parsed.skipped, one = n === 1;
-      return { level: 'warning', text: `${name} has ${n} ${one ? 'element that is' : 'elements that are'} not valid. ${one ? 'It does' : 'They do'} not show. First: ${parsed.errors[0].message}`, details: parsed.errors.slice(0, 8).map(e => e.message) };
+      return { level: 'warning', text: `${name} has ${n} ${one ? 'element that does' : 'elements that do'} not show. First fault: ${parsed.errors[0].message}.`, details };
     }
     if (parsed.version > 1) return { level: 'info', text: `${name} uses format version ${parsed.version}. This app knows version 1. Some elements can show in a different way.`, details: [] };
     return null;

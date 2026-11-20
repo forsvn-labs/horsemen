@@ -14,7 +14,10 @@
    - names: a canvas name with a path, an upper-case letter, or more than 64 characters is accepted
    - canonical text differs from the reference writer (check.py), or changes when it is written again
    - headings: a heading in a code block matches; `#Parent#Child` matches a child of another parent
-   - shared fixtures: the browser accepts a case that Python refuses, or gives another error code */
+   - shared fixtures (tests/fixtures/canvas): the browser accepts a case that Python refuses, or gives
+     another error code, another message, another order, or another canonical text
+   - bytes: a file that is not UTF-8, a byte order mark, nesting deeper than 32 levels, a number that is
+     too large, half of a surrogate pair */
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -38,30 +41,39 @@ assert.equal(F.parse(file({ horsemen: { version: 3 }, nodes: [node()] })).versio
 /* Input that is not a canvas: one fatal error, no elements, no exception. */
 for (const [text, rule] of [
   ['', 'json'], ['not json', 'json'], ['{"nodes":[', 'json'],
-  ['{\n"nodes":[\n<<<<<<< HEAD\n{"id":"a"}\n=======\n{"id":"b"}\n>>>>>>> theirs\n]\n}', 'json'],
+  ['{\n"nodes":[\n<<<<<<< HEAD\n{"id":"a"}\n=======\n{"id":"b"}\n>>>>>>> theirs\n]\n}', 'conflict'],
   ['[]', 'shape'], ['null', 'shape'], ['7', 'shape'], ['"text"', 'shape'],
-  [file({ nodes: {} }), 'shape'], [file({ edges: 'none' }), 'shape'],
+  [file({ nodes: {} }), 'list'], [file({ edges: 'none' }), 'list'], [file({ nodes: null }), 'list'],
   [file({ horsemen: 1 }), 'version'], [file({ horsemen: {} }), 'version'], [file({ horsemen: { version: 0 } }), 'version'], [file({ horsemen: { version: 1.5 } }), 'version'], [file({ horsemen: { version: '1' } }), 'version'],
   [file({ nodes: Array.from({ length: 5000 }, (_, i) => node({ id: 'n' + i })) }), 'too-many-nodes'],
   [file({ nodes: Array.from({ length: 501 }, (_, i) => node({ id: 'n' + i })) }), 'too-many-nodes'],
   [file({ nodes: [node()], edges: Array.from({ length: 1001 }, (_, i) => ({ id: 'e' + i, fromNode: 'a', toNode: 'a' })) }), 'too-many-edges'],
   [file({ nodes: [node({ text: 'x'.repeat(2 * 1024 * 1024) })] }), 'too-large'],
   ['{"nodes":[],"pad":"' + 'é'.repeat(300 * 1024) + '"}', 'too-large'],
-  ['['.repeat(200000) + ']'.repeat(200000), 'shape'],
+  ['['.repeat(200000) + ']'.repeat(200000), 'deep'],
+  ['{"nodes":' + '['.repeat(200000) + ']'.repeat(200000) + '}', 'deep'],
+  ['{"x":' + '['.repeat(32) + ']'.repeat(32) + '}', 'deep'],
+  ['{"nodes":[],"zoom":1e400}', 'number'], ['{"n":1' + '0'.repeat(5000) + '}', 'number'],
+  ['{"nodes":[],"note":"\\ud800"}', 'unicode'], ['{"nodes":[],"\\udfff":1}', 'unicode'],
+  [Buffer.from('fffe7b7d', 'hex'), 'utf8'], [new Uint8Array(512 * 1024 + 1).fill(32), 'too-large'],
 ]) {
   const result = F.parse(text);
-  assert.deepEqual([result.valid, result.fatal?.code, result.fatal?.rule, result.nodes.length, result.edges.length], [false, 'canvas-invalid', rule, 0, 0], `fatal ${rule}: ${text.slice(0, 40)}`);
+  assert.deepEqual([result.valid, result.fatal?.code, result.fatal?.rule, result.nodes.length, result.edges.length], [false, 'canvas-invalid', rule, 0, 0], `fatal ${rule}: ${String(text).slice(0, 40)}`);
   assert.deepEqual(result.errors, [result.fatal], 'a fatal error is the only error');
-  assert.match(result.fatal.message, /\.$/, 'a message is a sentence');
+  assert.match(result.fatal.message, /^[a-z]/, 'a message is the text of the shared rule');
 }
+assert.deepEqual(F.parse(file({ nodes: {}, edges: 'x' })).errors.map(e => e.message), ['nodes must be a list', 'edges must be a list'], 'both lists are checked');
+assert.deepEqual(F.parse(file({ nodes: Array.from({ length: 501 }, () => 1), edges: Array.from({ length: 1001 }, () => 1) })).errors.map(e => e.message), ['more than 500 nodes', 'more than 1,000 edges'], 'both counts are checked, and no element is checked');
+assert.equal(F.parse('{"x":' + '['.repeat(31) + ']'.repeat(31) + '}').valid, true, 'unknown data can nest to 32 levels');
+/* Bytes and text give the same result. One byte order mark is removed from bytes. */
+assert.deepEqual([F.parse(Buffer.from('efbbbf7b7d', 'hex')).valid, F.parse(new Uint8Array(Buffer.from('{"nodes":[]}'))).valid, F.parse(Buffer.from('efbbbfefbbbf7b7d', 'hex')).fatal?.rule], [true, true, 'json']);
 assert.equal(F.parse(file({ nodes: Array.from({ length: 500 }, (_, i) => node({ id: 'n' + i })) })).valid, true, '500 nodes is the limit, not over it');
-/* Very deep nesting does not stop the reader: a deep value is one bad element, or an unknown key that the app never reads. */
+/* Very deep nesting does not stop the reader, also in an unknown key that the app never reads. */
 const deep = '['.repeat(200000) + ']'.repeat(200000);
-assert.deepEqual([F.parse('{"nodes":' + deep + '}').errors.map(e => e.rule), F.parse('{"nodes":' + deep + '}').nodes.length], [['element'], 0]);
 const deepKey = '{"nodes":[{"id":"a","type":"text","x":0,"y":0,"width":320,"height":160,"text":"x","tool":' + deep + '}]}';
-assert.deepEqual([F.parse(deepKey).valid, F.parse(deepKey).nodes.length, F.isCanonical(deepKey)], [true, 1, false]);
+assert.deepEqual([F.parse(deepKey).fatal.rule, F.parse(deepKey).nodes.length, F.isCanonical(deepKey)], ['deep', 0, false]);
 assert.equal(F.parse(undefined).fatal.rule, 'json', 'no text is not a canvas');
-assert.equal(F.parse({ nodes: [] }).fatal.rule, 'json', 'parse reads text only');
+assert.equal(F.parse({ nodes: [] }).fatal.rule, 'json', 'parse reads text or bytes only');
 
 /* One bad element: an error names it; the other elements stay. */
 const bad = (extra, rule, type = 'node') => {
@@ -109,13 +121,17 @@ assert.equal(F.parse(file({ nodes: [node({ id: 'g', type: 'group', label: '😀'
 
 /* References inside one file. */
 const twice = F.parse(file({ nodes: [node({ text: 'First.' }), node({ text: 'Same id.' })] }));
-assert.deepEqual([codes(twice), rules(twice), twice.nodes.map(n => n.text)], [['canvas-invalid'], ['duplicate-id'], ['First.']], 'the first element keeps a repeated ID');
+assert.deepEqual([codes(twice), rules(twice), twice.nodes.map(n => n.text), twice.errors[0].message], [['canvas-invalid'], ['duplicate-id'], ['First.'], 'duplicate id a'], 'the first element keeps a repeated ID');
 const shared = F.parse(file({ nodes: [node(), node({ id: 'b' })], edges: [{ id: 'a', fromNode: 'a', toNode: 'b' }, { id: 'e', fromNode: 'a', toNode: 'b' }, { id: 'e', fromNode: 'b', toNode: 'a' }] }));
 assert.deepEqual([rules(shared), shared.edges.map(e => e.id + e.fromNode)], [['duplicate-id', 'duplicate-id'], ['ea']], 'node and edge IDs share one space');
 const dangling = F.parse(file({ nodes: [node()], edges: [{ id: 'e', fromNode: 'a', toNode: 'ghost' }, { id: 'f', fromNode: 'ghost', toNode: 'a' }, { id: 'g', fromNode: 'a', toNode: 'a' }] }));
-assert.deepEqual([codes(dangling), rules(dangling), dangling.edges.map(e => e.id)], [['canvas-invalid', 'canvas-invalid'], ['dangling-edge', 'dangling-edge'], ['g']], 'an edge needs both of its nodes');
+assert.deepEqual([codes(dangling), rules(dangling), dangling.edges.map(e => e.id), dangling.valid], [['canvas-dangling-ref', 'canvas-dangling-ref'], ['dangling-edge', 'dangling-edge'], ['g'], false], 'an edge needs both of its nodes');
+assert.deepEqual(dangling.errors.map(e => e.message), ['edge e: toNode ghost is not a node', 'edge f: fromNode ghost is not a node']);
 const orphan = F.parse(file({ nodes: [node(), node({ id: 'b', x: 0.5 })], edges: [{ id: 'e', fromNode: 'a', toNode: 'b' }] }));
-assert.deepEqual([rules(orphan), orphan.edges.length], [['x', 'dangling-edge'], 0], 'an edge to a refused node goes with it');
+assert.deepEqual([rules(orphan), orphan.edges.length, orphan.skipped], [['x'], 0, 2], 'an edge to a refused node goes with it; the fault of the node is the one error');
+/* A report holds 20 errors at most; the count of elements that do not show stays exact. */
+const many = F.parse(file({ nodes: Array.from({ length: 30 }, (_, i) => node({ id: 'b' + i, color: 'red' })) }));
+assert.deepEqual([many.errors.length, many.skipped, many.nodes.length], [20, 30, 0]);
 
 /* Unknown keys and types stay. Known types keep their values. */
 const kept = F.parse(file({ nodes: [{ ...node(), tool: { z: 1 }, styleAttributes: {} }, { id: 'u', type: 'sticker', x: 0, y: 0, width: 20, height: 20, anything: [1, 2] }], edges: [], other: { keep: true } }));
@@ -180,7 +196,7 @@ assert.equal(F.findHeading(RECORD.replace(/\n/g, '\r\n'), '#Shipped').text, 'Shi
 
 /* References to other files: the app and `horsemen check` name the same faults. */
 const lookup = { files: { 'PROGRESS.md': RECORD, 'README.md': '# Readme\n## Get started\n', '.horsemen/media/route-map.svg': null, '.horsemen/canvas/launch-plan.canvas': null } };
-const refs = doc => F.references(F.parse(file(doc)), p => Object.hasOwn(lookup.files, p) ? { text: lookup.files[p] } : null);
+const refs = doc => F.references(F.parse(file(doc)), p => Object.hasOwn(lookup.files, p) ? { size: 100, text: lookup.files[p] } : null);
 assert.deepEqual(refs({ nodes: [{ ...node(), type: 'file', file: 'PROGRESS.md', subpath: '#Shipped' }, { ...node({ id: 'b' }), type: 'file', file: '.horsemen/media/route-map.svg' }, { ...node({ id: 'c' }), type: 'file', file: 'README.md' }] }), []);
 assert.deepEqual(refs({ nodes: [{ ...node(), type: 'file', file: '.horsemen/media/not-there.png' }] }).map(e => [e.code, e.rule, e.id]), [['canvas-dangling-ref', 'missing-file', 'a']]);
 assert.deepEqual(refs({ nodes: [{ ...node(), type: 'file', file: 'PROGRESS.md', subpath: '#Renamed heading' }] }).map(e => [e.code, e.rule, e.id]), [['canvas-dangling-ref', 'missing-heading', 'a']]);
@@ -189,15 +205,85 @@ assert.deepEqual(refs({ nodes: [{ ...node(), type: 'file', file: '.horsemen/medi
 /* The design fixture: each invalid case is refused with the code of its `check` rule. */
 const EXPECTED = { 'schema-absolute-path': 'file', 'schema-bad-colour': 'color', 'schema-bad-id': 'id', 'schema-fraction': 'x', 'schema-missing-size': 'width', 'schema-path-escape': 'file', 'schema-script-url': 'url',
   'semantic-dangling-edge': 'dangling-edge', 'semantic-duplicate-id': 'duplicate-id', 'semantic-missing-file': 'missing-file', 'semantic-missing-heading': 'missing-heading' };
-const designFile = p => { const full = path.join(design, p); return fs.existsSync(full) && fs.statSync(full).isFile() ? { text: /\.md$/.test(p) ? fs.readFileSync(full, 'utf8') : null } : null; };
+const designFile = p => { const full = path.join(design, p); return fs.existsSync(full) && fs.statSync(full).isFile() ? { size: fs.statSync(full).size, text: /\.md$/.test(p) ? fs.readFileSync(full, 'utf8') : null } : null; };
 const invalid = fs.readdirSync(path.join(design, 'invalid')).filter(n => n.endsWith('.json')).sort();
 assert.deepEqual(invalid.map(n => n.replace('.json', '')), Object.keys(EXPECTED).sort(), 'each invalid design case has an expected error');
 for (const name of invalid) {
   const result = F.parse(fs.readFileSync(path.join(design, 'invalid', name), 'utf8')), found = [...result.errors, ...F.references(result, designFile)];
   const reference = /missing-(file|heading)/.test(name);
-  assert.deepEqual([found[0]?.code, found[0]?.rule], [reference ? 'canvas-dangling-ref' : 'canvas-invalid', EXPECTED[name.replace('.json', '')]], name);
+  assert.deepEqual([found[0]?.code, found[0]?.rule], [reference || /dangling/.test(name) ? 'canvas-dangling-ref' : 'canvas-invalid', EXPECTED[name.replace('.json', '')]], name);
   assert.equal(result.valid, reference, name + (reference ? ' is a valid file with a broken reference' : ' is not a valid file'));
 }
 for (const name of ['progress', 'launch-plan']) assert.deepEqual(F.references(F.parse(fs.readFileSync(path.join(design, `.horsemen/canvas/${name}.canvas`), 'utf8')), designFile), [], name + ' has no broken reference');
+
+/* ---------------------------------------------------------------- shared fixtures
+   tests/fixtures/canvas holds the cases that the Python reader (horsemen_core.canvas) and this reader must
+   read in the same way: the same errors, in the same order, with the same codes and messages, and the same
+   canonical text. The folder comes with the Python half of this slice. Until that half is in this checkout,
+   the cases are read from its branch when Git has it. With neither, this part does not run and says so. */
+const os = require('node:os');
+const S = require('../web/canvas-sections.js');
+function sharedFixtures() {
+  const local = path.join(root, 'tests/fixtures/canvas');
+  if (fs.existsSync(path.join(local, 'cases.json'))) return { dir: local, from: 'tests/fixtures/canvas' };
+  for (const ref of [process.env.HORSEMEN_CANVAS_FIXTURES_REF, 'origin/canvas/agent-tools'].filter(Boolean)) {
+    try {
+      const tar = execFileSync('git', ['archive', '--format=tar', ref, 'tests/fixtures/canvas'], { cwd: root, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 256 * 1024 * 1024 });
+      const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'horsemen-canvas-fixtures-'));
+      execFileSync('tar', ['-x', '-C', temp], { input: tar });
+      process.on('exit', () => fs.rmSync(temp, { recursive: true, force: true }));
+      return { dir: path.join(temp, 'tests/fixtures/canvas'), from: `the Git ref ${ref}` };
+    } catch { /* The ref is not in this clone. */ }
+  }
+  return null;
+}
+const fixtures = sharedFixtures();
+if (!fixtures) console.log('canvas format: SKIPPED the shared fixtures. tests/fixtures/canvas is not in this checkout, and the branch origin/canvas/agent-tools is not fetched.');
+else {
+  const suite = JSON.parse(fs.readFileSync(path.join(fixtures.dir, 'cases.json'), 'utf8'));
+  const bytesOf = input => {
+    if (input.file) return fs.readFileSync(path.join(fixtures.dir, input.file));
+    return Buffer.concat(input.build.map(part => 'hex' in part ? Buffer.from(part.hex, 'hex') : 'text' in part ? Buffer.from(part.text, 'utf8')
+      : Buffer.from(Array.from({ length: part.count }, (_, i) => part.repeat.replaceAll('{i}', String(i))).join(part.join ?? ''), 'utf8')));
+  };
+  /* A project path to a regular file inside the workspace: its size, and its text when it is Markdown. */
+  const lookupIn = (folder, virtual = {}) => target => {
+    if (Object.hasOwn(virtual, target)) return { size: virtual[target].size, text: null };
+    if (target.split('/').some(part => part === '')) return null;
+    const full = path.join(fixtures.dir, folder, target);
+    let stat; try { stat = fs.lstatSync(full); } catch { return null; }
+    return stat.isFile() ? { size: stat.size, text: /\.md$/i.test(target) ? fs.readFileSync(full, 'utf8') : null } : null;
+  };
+  const plain = errors => errors.map(e => ({ code: e.code, message: e.message }));
+  const isText = bytes => { try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes).charCodeAt(0) !== 0xfeff; } catch { return false; } };
+  assert.ok(suite.cases.length >= 60, 'the shared cases are present');
+  for (const item of suite.cases) {
+    const bytes = bytesOf(item.input), lookup = item.workspace ? lookupIn(item.workspace, item.virtual) : null;
+    const report = F.check(bytes, lookup);
+    assert.deepEqual(plain(report.errors), item.expect.errors, `${item.name}: the same errors as the shared case`);
+    assert.ok(report.errors.every(e => ['canvas-invalid', 'canvas-dangling-ref', 'canvas-media-too-large'].includes(e.code)));
+    /* The browser gets text from its readers, not bytes: the result is the same. */
+    if (isText(bytes)) assert.deepEqual(plain(F.check(bytes.toString('utf8'), lookup).errors), item.expect.errors, `${item.name}: text gives the same errors as bytes`);
+    if (!item.workspace) assert.equal(F.parse(bytes).valid, item.expect.errors.length === 0, `${item.name}: valid as a file`);
+    if (item.expect.errors.length) continue;
+    if ('canonical' in item.expect) assert.equal(report.canonical, item.expect.canonical, `${item.name}: canonical`);
+    if ('text' in item.expect) assert.equal(report.text, typeof item.expect.text === 'string' ? item.expect.text : fs.readFileSync(path.join(fixtures.dir, item.expect.text.file), 'utf8'), `${item.name}: canonical text`);
+    if (item.expect.canonical) assert.equal(report.text, bytes.toString('utf8'), `${item.name}: the input is its own canonical text`);
+    assert.equal(report.readOnly, item.expect.read_only === true, `${item.name}: read-only`);
+    const again = F.check(Buffer.from(report.text, 'utf8'), lookup);
+    assert.deepEqual([again.errors.length, again.text === report.text, again.canonical], [0, true, true], `${item.name}: canonical text does not change when it is read and written again`);
+  }
+  for (const item of suite.headings) assert.equal(!!F.findHeading(item.markdown, item.subpath), item.found, `heading ${JSON.stringify(item.subpath)} in ${JSON.stringify(item.markdown.slice(0, 40))}`);
+  /* Section card IDs. The generated canvases of slice 1 are live with the rules of web/canvas-sections.js:
+     accents fold to plain letters, a slug has 56 characters at most, and the reading view decides what a heading is.
+     The shared cases state other rules for these inputs. The difference is listed here so that a change on
+     either side fails this test; the pull request reports it. */
+  const KNOWN_SLUG_DIFFERENCES = ['Émile Zola', 'Über-Größe', 'İstanbul', 'a'.repeat(70), 'a'.repeat(57) + ' b c'];
+  const slugDifferences = suite.slugs.filter(item => S.slug(item.heading) !== item.slug).map(item => item.heading);
+  assert.deepEqual(slugDifferences, KNOWN_SLUG_DIFFERENCES, 'section slugs: only the known differences from the shared cases');
+  const cards = suite.sections.map(item => S.parse(item.markdown).map(s => s.id).join(' ') === item.sections.map(s => s.id).join(' '));
+  assert.deepEqual(cards, [true, false, true], 'section cards: the first and the third shared case match; the second differs (a ~~~ code block)');
+  console.log(`canvas format: ${suite.cases.length} shared cases, ${suite.headings.length} heading cases from ${fixtures.from}`);
+}
 
 console.log('canvas format: ok');
