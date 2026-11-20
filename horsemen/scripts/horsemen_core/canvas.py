@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import re
+import unicodedata
 from collections import namedtuple
 from decimal import Decimal
 from pathlib import Path
@@ -482,8 +483,28 @@ def section_text(markdown, subpath):
     return title, '\n'.join(rows[start + 1:end]).strip('\n')
 
 
+# Generated section cards follow web/canvas-sections.js, the live rule of slice 1, so a card that an agent
+# saves has the same `s-` ID as the card that the browser draws, and old `?node=` links keep working.
+SLUG_MAX = 56
+_COMMENT = re.compile(r'<!--.*?-->', re.S)
+_CARD_FENCE = re.compile(r'\s*```')
+_CARD_HEADING = re.compile(r'##\s+(.+)')
+
+
+def plain(value):
+    """Heading text without Markdown marks, as web/previews.js `plain` gives it."""
+    value = _COMMENT.sub('', value)
+    value = re.sub(r'<[^>]*>', '', value)
+    value = re.sub(r'!?\[([^\]]*)\]\([^)]*\)', r'\1', value)
+    value = re.sub(r'[*`]', '', value)
+    value = re.sub(r'(?m)^\s*[-+]\s+', '', value)
+    return value.strip()
+
+
 def slug(title):
-    return re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:58].rstrip('-')
+    """Fold accents to plain letters, lower-case, join runs of other characters with "-", cut to 56."""
+    folded = ''.join(c for c in unicodedata.normalize('NFKD', str(title)) if not '\u0300' <= c <= '\u036f')
+    return re.sub(r'[^a-z0-9]+', '-', folded.lower()).strip('-')[:SLUG_MAX].rstrip('-')
 
 
 def free_id(base, used):
@@ -496,15 +517,33 @@ def free_id(base, used):
     return candidate
 
 
+def _generated_sections(markdown):
+    """(title, card id, line index) for each generated section card, as web/canvas-sections.js `parse`
+    finds them: `##` and white space at the start of a line, outside code fenced with backticks."""
+    text = _COMMENT.sub(lambda m: re.sub(r'[^\n]', '', m.group(0)), markdown)
+    found, counts, used, fenced = [], {}, set(), False
+    for index, line in enumerate(text.split('\n')):
+        if _CARD_FENCE.match(line):
+            fenced = not fenced
+        match = None if fenced else _CARD_HEADING.match(line)
+        if not match:
+            continue
+        title = plain(match.group(1))
+        name = slug(title) or 'section'
+        base = 's-' + name
+        counts[name] = ordinal = counts.get(name, 0) + 1
+        card = base if ordinal == 1 else f'{base}-{ordinal}'
+        while card in used:
+            ordinal += 1
+            card = f'{base}-{ordinal}'
+        used.add(card)
+        found.append((title or match.group(1).strip(), card, index))
+    return found
+
+
 def section_cards(markdown):
     """(title, card id) for each second-level heading: the generated section cards of a record."""
-    cards, used = [], set()
-    for level, title, _ in headings(markdown):
-        if level == 2:
-            card = free_id('s-' + (slug(title) or 'section'), used)
-            used.add(card)
-            cards.append((title, card))
-    return cards
+    return [(title, card) for title, card, _ in _generated_sections(markdown)]
 
 
 # ---------------------------------------------------------------- element kinds
@@ -630,10 +669,10 @@ def _section_card(doc, ref, record, added):
             return node['id']
     level, title, line = found[hit]
     sections = [(other_title, other_line) for other_level, other_title, other_line in found if other_level == 2]
-    generated = dict(zip((other_line for _, other_line in sections), (card for _, card in section_cards(markdown))))
+    generated = {card_line: card for _, card, card_line in _generated_sections(markdown)}
     parts = [part.strip(' \t') for part in ref.split('#')[1:]]
     subpath = '#' + title if len(parts) == 1 else '#' + '#'.join(parts)
-    card_id = free_id(generated.get(line) or 's-' + (slug(' '.join(parts)) or 'section'), _used(doc))
+    card_id = free_id(generated.get(line) or 's-' + (slug(plain(' '.join(parts))) or 'section'), _used(doc))
     width, height = SIZES['section']
     shown = {find_heading(found, node['subpath']) for node in doc['nodes']
              if node.get('type') == 'file' and node.get('file') == filename and subpath_ok(node.get('subpath'))}
@@ -731,7 +770,7 @@ def _add(doc, op, record, lookup, summary):
         anchor = _anchor(doc, op['near'], record, summary['added']) if 'near' in op else None
         if 'id' not in item:
             if what == 'section' and subpath_ok(item.get('subpath')):
-                item['id'] = free_id('s-' + (slug(item['subpath'][1:].replace('#', ' ')) or 'section'), _used(doc))
+                item['id'] = free_id('s-' + (slug(plain(item['subpath'][1:].replace('#', ' '))) or 'section'), _used(doc))
             else:
                 item['id'] = _numbered(PREFIXES.get(what, 'el'), _used(doc))
         sized = all(_whole(item.get(key), 16, 8192) for key in ('width', 'height'))

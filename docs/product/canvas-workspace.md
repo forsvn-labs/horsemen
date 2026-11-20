@@ -182,14 +182,11 @@ Not in slice 2a (browser): the overview of references between canvases
 images, the "Stored in Git LFS" message, and all that needs embeds, tables,
 or editing.
 
-One difference from the shared cases is open. The generated card IDs of
-slice 1 are live with the rules in the table above (accents fold to plain
-letters, 56 characters, the headings of the reading view). The shared cases
-state other rules for section slugs: no folding, 58 characters, and `~~~`
-code blocks. The JavaScript test lists the cases that differ, so a change on
-either side fails it. An agent tool that saves a section card by its `s-` ID
-needs the same ID as the browser, so the owner must choose one rule for both
-sides.
+Section card IDs follow one rule on both sides: the live rule of slice 1 in
+`web/canvas-sections.js` (accents fold to plain letters, 56 characters, only
+backtick fences). The owner chose it on 2026-11-19 so that old `?node=` links
+keep working. The shared cases state this rule, and the Python agent tools
+and the browser both pass them.
 
 ### Connections between artifacts
 

@@ -2036,11 +2036,11 @@
   },
   {
    "heading": "\u00c9mile Zola",
-   "slug": "mile-zola"
+   "slug": "emile-zola"
   },
   {
    "heading": "\u00dcber-Gr\u00f6\u00dfe",
-   "slug": "ber-gr-e"
+   "slug": "uber-gro-e"
   },
   {
    "heading": "\u65e5\u672c\u8a9e",
@@ -2052,7 +2052,7 @@
   },
   {
    "heading": "\u0130stanbul",
-   "slug": "i-stanbul"
+   "slug": "istanbul"
   },
   {
    "heading": "2026-11-19",
@@ -2064,11 +2064,11 @@
   },
   {
    "heading": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-   "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   {
    "heading": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa b c",
-   "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+   "slug": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
   },
   {
    "heading": "UPPER lower 123",
@@ -2115,7 +2115,7 @@
    ]
   },
   {
-   "note": "Headings in fenced code are not sections. Closing hashes are removed. CRLF works.",
+   "note": "Section cards use the slice 1 rule: only backtick fences hide a heading (a ~~~ block does not), the title keeps a closing run of hashes, and CRLF works.",
    "markdown": "## Real\r\n```\r\n## In fence\r\n```\r\n~~~\n## In tilde\n~~~\n## Closed ##\n## C#\n##NoSpace\n ## Indented\n### Deeper\n##\tTabbed\n## \n",
    "sections": [
     {
@@ -2123,7 +2123,11 @@
      "id": "s-real"
     },
     {
-     "title": "Closed",
+     "title": "In tilde",
+     "id": "s-in-tilde"
+    },
+    {
+     "title": "Closed ##",
      "id": "s-closed"
     },
     {

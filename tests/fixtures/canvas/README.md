@@ -201,12 +201,25 @@ of these cases.
   trimming and lower-casing. Take the first heading that matches `A`; then
   look for `B` after it, and stop at the next heading of the same or a
   higher level than `A`. The `headings` list has cases.
-- A generated section card exists for each second-level heading. Its ID is
-  `s-` plus the slug of the title:
-  `title.toLowerCase().replace(/[^a-z0-9]+/g, '-')`, with `-` removed at
-  both ends, cut to 58 characters, with a `-` at the end removed again. An
-  empty slug is `section`. When the ID is in use, add `-2`, then `-3`, until
-  one is free. The `slugs` and `sections` lists have cases.
+- A generated section card exists for each second-level heading. The rule
+  is the live rule of slice 1 in `web/canvas-sections.js`, so a card that an
+  agent saves has the same ID as the card that the browser draws:
+  - Remove HTML comments. Split on line feeds. A line that starts with three
+    backticks, after optional white space, starts or ends fenced code; a
+    `~~~` line does not. A card heading is `##`, white space, then the title.
+  - The title is the heading text without Markdown marks: no HTML tags, link
+    text instead of links, no `*` or backticks, white space removed at both
+    ends.
+  - The ID is `s-` plus the slug of the title: decompose (NFKD), remove the
+    combining marks U+0300 to U+036F, lower-case, join each run of other
+    characters than `a-z` and `0-9` with `-`, remove `-` at both ends, cut
+    to 56 characters, and remove a `-` at the end again. An empty slug is
+    `section`. The second card with the same slug gets `-2`, the third
+    `-3`; an ID that is in use takes the next free number.
+  - The `slugs` and `sections` lists have cases.
+- The subpath rules above trim spaces and tabs only, not other white space.
+  Heading references are checked in `.md` files only; a `.markdown` file is
+  a document, and its headings are not checked.
 
 ## Change a case
 
