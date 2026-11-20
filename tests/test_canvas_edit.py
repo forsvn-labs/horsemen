@@ -2,7 +2,8 @@
 
 Failure modes covered:
 - add: no id (one is made), a used id, a node without its content, an edge to a missing node,
-  both `node` and `edge`, neither
+  both `node` and `edge`, neither; a type that is a kind name from the outline (`note`), which
+  must not become an "unsupported" card without an error
 - update: unknown id, a new id, a value that breaks a rule, null removes a key
 - remove: unknown id; the edges of a removed node go with it
 - one bad op in a batch: nothing is written, and the reply names the op and the rule
@@ -106,6 +107,22 @@ class Edit(unittest.TestCase):
             for b in placed[i + 1:]:
                 self.assertFalse(overlap(a, b), (a['id'], b['id']))
         self.assert_canonical('launch-plan')
+
+    def test_add_with_a_type_that_is_not_a_json_canvas_type_is_refused(self):
+        # The outline shows kinds (note, section, image). An agent that sends a kind as the type must get the rule.
+        reply = self.refused('progress', [{'op': 'add', 'node': {'type': 'note', 'text': 'Receipt.'}}], 'op 1 (add)', 'type must be text, file, link, or group')
+        self.assertIn('note', reply.text)
+        self.refused('progress', [{'op': 'add', 'node': {'type': 'image', 'file': '.horsemen/media/route-map.svg'}}], 'op 1', 'type must be')
+        self.refused('progress', [{'op': 'add', 'node': {'type': 'sticker', 'x': 0, 'y': 0, 'width': 100, 'height': 100}}], 'op 1', 'type must be')
+        self.refused('progress', [{'op': 'update', 'id': 'note-risk', 'node': {'type': 'note'}}], 'op 1 (update)', 'type must be')
+
+    def test_a_node_of_another_tool_with_an_unknown_type_can_still_change(self):
+        self.path('board').write_bytes((FIXTURES / 'files/unknown-keys.canvas').read_bytes())
+        other = next(n for n in self.doc('board')['nodes'] if n['type'] not in ('text', 'file', 'link', 'group'))
+        reply = self.edit('board', [{'op': 'update', 'id': other['id'], 'node': {'x': 900, 'type': other['type']}}])
+        self.assertTrue(reply.ok, reply.text)
+        self.assertEqual(self.node('board', other['id'])['x'], 900)
+        self.assertEqual(self.node('board', other['id'])['type'], other['type'])
 
     def test_add_with_a_used_id_is_refused(self):
         self.refused('progress', [{'op': 'add', 'node': {'id': 'note-risk', 'text': 'Again.'}}], 'op 1', 'note-risk')

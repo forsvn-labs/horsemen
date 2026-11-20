@@ -30,6 +30,18 @@ The command fails on the first unsuccessful check and retains its output.
 Local results describe that machine only; CI covers Linux/macOS and Python
 3.10/3.14. A configured workflow is not a passing run.
 
+One check needs real agent hosts, so the verification command does not run it:
+
+```sh
+python3 -B scripts/agent_sessions.py --output /tmp/horsemen-agent-sessions
+```
+
+It starts a new Claude Code session and a new Codex session in a temporary
+copy of a fictional project. Each session must call `read` and `canvas_edit`.
+The MCP server is set for that run only; no host setting changes. The
+sessions use your accounts and cost tokens. Run it when the agent tools or
+the server change, and put the result in the pull request.
+
 ## Make a change
 
 1. Read PROGRESS and STRUCTURE, then the relevant source.

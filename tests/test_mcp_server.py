@@ -134,6 +134,13 @@ class McpServer(unittest.TestCase):
         self.assertEqual(ops['items']['properties']['side'], {'enum': ['right', 'left', 'below', 'above']})
         self.assertEqual(self.start().request('tools/list')['result']['tools'], mcp.TOOLS)
 
+    def test_only_the_read_tool_is_marked_read_only(self):
+        # Hosts use the mark to run `read` with no approval prompt. `canvas_edit` writes and can remove
+        # elements, so it has no mark: the host and the person decide on its approval.
+        read, edit = mcp.TOOLS
+        self.assertEqual(read['annotations'], {'readOnlyHint': True})
+        self.assertNotIn('annotations', edit)
+
     def test_protocol_version(self):
         for asked, given in (('2024-11-05', '2024-11-05'), ('2025-03-26', '2025-03-26'), ('1999-01-01', '2025-06-18'), (None, '2025-06-18')):
             params = {'capabilities': {}} if asked is None else {'protocolVersion': asked, 'capabilities': {}}

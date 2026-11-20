@@ -54,6 +54,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 - Agent tool tests: `python3 -B -m unittest tests.test_canvas_edit tests.test_canvas_read tests.test_mcp_server` and `python3 -B horsemen/scripts/test_canvas_cli.py`.
 - Read a workspace with few tokens: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core show`; edit a canvas: `... canvas apply NAME --ops FILE`; see the [canvas guide](horsemen/references/canvas.md).
 - Run the local MCP server: `python3 -B horsemen/scripts/horsemen.py mcp` (stdio). `mcp install` changes agent settings; use it only for your own setup.
+- Agent session receipts: `python3 -B scripts/agent_sessions.py --output /tmp/horsemen-agent-sessions`. It starts a real Claude Code and Codex session in a temporary fictional project, with the server set for that run only. It uses your accounts and costs tokens, so verification does not run it.
 - Canvas proposal fixture check: `python3 docs/show-me/canvas-workspace/check.py --schema` (needs `uvx` for the schema step).
 - Preview checks: `node tests/test_gui_previews.cjs`.
 - Artifact view checks: `node tests/test_gui_views.cjs`.

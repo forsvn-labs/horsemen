@@ -543,6 +543,21 @@ The skill tells agents when to change a canvas: when the user asks, when a
 section card broke, and when new proof exists for a shipped item. A hook does
 not ask for canvas edits at each stop.
 
+### Agent tools as built
+
+Slice 3a and the Python half of slice 2a are built as this section says, with
+these additions. The [canvas guide](../../horsemen/references/canvas.md) is
+the reference for agents.
+
+| Item | As built |
+| --- | --- |
+| Read-only mark | The `read` definition has the MCP annotation `readOnlyHint`, so a host can run it with no approval question. The two definitions are 1,083 characters as compact JSON. `canvas_edit` writes and can remove elements, so it has no mark. |
+| Approval in Codex | Codex asks the person for each `canvas_edit` call. A run with no person (`codex exec`) waits for the answer. The person can allow the tool in the Codex settings; `mcp install` does not set this. |
+| Node types in an op | An op can make only `text`, `file`, `link`, and `group` nodes. A kind name from the outline, such as `note`, is refused with the type to use. A node of another tool keeps its own type. |
+| Placement | A place that is taken moves along the side of the anchor, in the direction where the free place is nearer. |
+| Receipts | `python3 -B scripts/agent_sessions.py --output DIR` starts a new Claude Code and Codex session in a temporary fictional project and checks that each calls both tools. The server is set for that run only. |
+| Not built here | The JavaScript reader, drawing in the browser, the SVG blob test, and the browser checks of slice 2a. |
+
 ## Security and privacy
 
 | Topic | Rule |

@@ -107,7 +107,7 @@ python3 <this-skill>/scripts/horsemen.py canvas apply progress          # only r
 
 | Op | Rule |
 | --- | --- |
-| `add` | Give `node` or `edge`. The tool makes the ID when there is none (`note-1`, `e-1`). A node takes its type from `text`, `url`, or `file`, and a default size |
+| `add` | Give `node` or `edge`. The tool makes the ID when there is none (`note-1`, `e-1`). A node takes its type from `text`, `url`, or `file`, and a default size. A `type` that you give must be `text`, `file`, `link`, or `group`. A kind name from the outline, such as `note` or `image`, is not a type |
 | `near`, `side` | Puts a node in free space beside an element: `right` (default), `left`, `below`, `above`. You need no coordinates. Without `near`, `x`, and `y`, the node goes to the right of all elements |
 | `#Heading` | In `near` or as an edge end, on a record canvas. The tool saves the section card first, with its `s-` ID, when the canvas has none |
 | `update` | Give `id` and the keys to change in `node` or `edge`. `null` removes a key. An ID does not change. `near` moves a node |
@@ -126,8 +126,9 @@ python3 <this-skill>/scripts/horsemen.py canvas apply progress          # only r
   that you write. Nothing fetches the page.
 - **Reply.** `ok rev=5e0c77aa added=s-gates,note-1 updated=1 removed=0`, then
   at most five warnings for broken cards that the edit did not touch.
-- **Limits.** 50 ops in one call. A node type other than `text`, `file`,
-  `link`, and `group` is kept, with all unknown keys.
+- **Limits.** 50 ops in one call. A node that another tool made with a type
+  other than `text`, `file`, `link`, and `group` is kept, with all unknown
+  keys. An op cannot make such a node.
 
 The tool does not commit. Commit and push `.horsemen/` with the record
 changes of the task, when the project's rules allow. The hosted viewer shows
@@ -170,6 +171,14 @@ the project from there. Start a new session after `install`.
 
 `status` asks each host if the server is registered. It does not prove that
 the host loaded the tools.
+
+A host can ask the person before it runs a tool. `read` has the read-only
+mark of MCP, so a host can run it with no question. `canvas_edit` writes a
+file and has no mark, so the host decides. Codex asks the person for each
+`canvas_edit` call. A Codex run with no person (`codex exec`) waits for that
+answer and does not end. For such runs, the person can allow the tool in the
+Codex settings, with `approval_mode = "approve"` below
+`[mcp_servers.horsemen.tools.canvas_edit]`. `install` does not set this.
 
 ## Check
 

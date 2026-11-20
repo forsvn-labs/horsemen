@@ -36,6 +36,8 @@ TOOLS = [
             },
             'required': ['target'],
         },
+        # `read` changes nothing, so a host can run it with no approval prompt. `canvas_edit` has no mark.
+        'annotations': {'readOnlyHint': True},
     },
     {
         'name': 'canvas_edit',
