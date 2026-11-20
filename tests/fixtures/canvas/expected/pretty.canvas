@@ -1,0 +1,14 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"a-group","type":"group","x":-40,"y":260,"width":400,"height":220},
+{"id":"g-frame","type":"group","x":-40,"y":-60,"width":800,"height":260,"label":"Frame"},
+{"id":"Z-upper","type":"text","x":0,"y":300,"width":320,"height":140,"text":"Upper case sorts before lower case."},
+{"id":"note-a","type":"text","x":0,"y":0,"width":320,"height":140,"color":"3","text":"First note."},
+{"id":"note-b","type":"text","x":400,"y":0,"width":320,"height":140,"text":"Second note."}
+],
+"edges":[
+{"id":"e-1","fromNode":"note-b","toNode":"g-frame"},
+{"id":"e-2","fromNode":"note-a","toNode":"note-b","fromSide":"right","label":"then","toSide":"left"}
+]
+}

@@ -1,0 +1,15 @@
+{"nodes":[
+{"id":"k1","type":"text","x":0,"y":0,"width":320,"height":140},
+{"id":"k2","type":"text","x":0,"y":0,"width":320,"height":140,"text":5},
+{"id":"k3","type":"link","x":0,"y":0,"width":320,"height":140},
+{"id":"k4","type":"file","x":0,"y":0,"width":320,"height":140},
+{"id":"k5","type":"file","x":0,"y":0,"width":320,"height":140,"file":"PROGRESS.md","subpath":"Shipped"},
+{"id":"k6","type":"file","x":0,"y":0,"width":320,"height":140,"file":"PROGRESS.md","subpath":"#"},
+{"id":"k7","type":"file","x":0,"y":0,"width":320,"height":140,"file":"PROGRESS.md","subpath":"#a\u0001b"},
+{"id":"k8","type":"file","x":0,"y":0,"width":320,"height":140,"file":"PROGRESS.md","subpath":5},
+{"id":"k9","type":"file","x":0,"y":0,"width":320,"height":140,"file":"a.png","alt":5},
+{"id":"k10","type":"link","x":0,"y":0,"width":320,"height":140,"url":"https://example.com","title":5},
+{"id":"k11","type":"group","x":0,"y":0,"width":320,"height":140,"label":5},
+{"id":"k12","type":"group","x":0,"y":0,"width":320,"height":140,"backgroundStyle":"stretch"},
+{"id":"k13","type":"text","x":0,"y":0,"width":320,"height":140,"text":null}
+]}

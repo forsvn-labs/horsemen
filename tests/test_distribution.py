@@ -47,6 +47,9 @@ class Distribution(unittest.TestCase):
                     self.assertEqual(package.read(str(path.relative_to(self.source))), path.read_bytes())
             self.assertIn("horsemen/scripts/horsemen_core/legacy.py", package.namelist())
             self.assertIn("horsemen/references/templates.md", package.namelist())
+            for name in ("scripts/horsemen_core/canvas.py", "scripts/horsemen_core/agent_tools.py",
+                         "scripts/horsemen_core/mcp.py", "scripts/test_canvas_cli.py", "references/canvas.md"):
+                self.assertIn("horsemen/" + name, package.namelist())
             self.assertEqual(package.read("horsemen/LICENSE"), (ROOT / "LICENSE").read_bytes())
         receipt = json.loads((self.output / "skill-manifest.json").read_text())
         self.assertEqual(receipt["version"], distribution.version(self.source))
@@ -92,6 +95,45 @@ class Distribution(unittest.TestCase):
         with self.assertRaises(ValueError):
             distribution.build_skill(self.source, self.output)
         self.assertFalse(self.output.exists())
+
+    def test_missing_canvas_module_fails_before_output(self):
+        for name in ("canvas.py", "agent_tools.py", "mcp.py"):
+            source = self.root / ("source-" + name)
+            shutil.copytree(self.source, source)
+            (source / "horsemen/scripts/horsemen_core" / name).unlink()
+            with self.assertRaises(ValueError):
+                distribution.build_skill(source, self.root / ("out-" + name))
+            self.assertFalse((self.root / ("out-" + name)).exists())
+
+    def test_packaged_skill_explains_canvases(self):
+        archive = distribution.build_skill(self.source, self.output)
+        with zipfile.ZipFile(archive) as package:
+            entry = package.read("horsemen/SKILL.md").decode()
+            guide = package.read("horsemen/references/canvas.md").decode()
+        self.assertIn("## Canvases", entry)
+        self.assertIn("references/canvas.md", entry)
+        for words in ("canvas_edit", "horsemen.py show", "horsemen.py canvas apply", "horsemen.py mcp install", ".horsemen/canvas/"):
+            self.assertIn(words, guide)
+
+    def test_packaged_skill_serves_the_tools_without_the_wheel(self):
+        archive = distribution.build_skill(self.source, self.output)
+        unpacked = self.root / "unpacked"
+        with zipfile.ZipFile(archive) as package:
+            package.extractall(unpacked)
+        project = self.root / "project"
+        shutil.copytree(ROOT / "tests/fixtures/canvas/workspace", project)
+        requests = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}}},
+                    {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+                    {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "read", "arguments": {"target": "progress.canvas"}}}]
+        result = subprocess.run([sys.executable, "-B", str(unpacked / "horsemen/scripts/horsemen.py"), "mcp"], cwd=project,
+                                input="".join(json.dumps(r) + "\n" for r in requests), capture_output=True, text=True, timeout=60)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        replies = [json.loads(line) for line in result.stdout.splitlines()]
+        self.assertEqual([tool["name"] for tool in replies[1]["result"]["tools"]], ["read", "canvas_edit"])
+        self.assertIn("11 nodes 7 edges", replies[2]["result"]["content"][0]["text"])
+        check = subprocess.run([sys.executable, "-B", str(unpacked / "horsemen/scripts/horsemen_core/legacy.py"), "check", str(project), "--json"],
+                               capture_output=True, text=True, timeout=60)
+        self.assertFalse(any(item["code"].startswith("canvas") for item in json.loads(check.stdout)["errors"]), check.stdout)
 
     def test_existing_output_is_preserved(self):
         archive = distribution.build_skill(self.source, self.output)

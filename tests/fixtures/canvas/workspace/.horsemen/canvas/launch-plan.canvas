@@ -1,0 +1,20 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"g-decided","type":"group","x":780,"y":-60,"width":560,"height":420,"label":"Decided"},
+{"id":"g-ideas","type":"group","x":-40,"y":-60,"width":760,"height":420,"label":"Ideas"},
+{"id":"decision-date","type":"text","x":820,"y":0,"width":480,"height":120,"color":"4","text":"**Decision:** the autumn route opens on the first Friday of December."},
+{"id":"idea-lanterns","type":"text","x":0,"y":0,"width":320,"height":140,"color":"3","text":"Give each guest a paper lantern at the first stop."},
+{"id":"idea-partners","type":"text","x":360,"y":0,"width":320,"height":140,"color":"3","text":"Ask two harbour cafés to sell tickets.\n\n- Who asks them?\n- What do they earn?"},
+{"id":"idea-press","type":"text","x":0,"y":180,"width":320,"height":140,"color":"3","text":"Invite the local paper to the first autumn walk."},
+{"id":"loom-pitch","type":"link","x":360,"y":180,"width":320,"height":140,"title":"Partner pitch, first take","url":"https://www.loom.com/share/00000000000000000000000000000000"},
+{"id":"ref-next","type":"file","x":820,"y":420,"width":480,"height":120,"file":"PROGRESS.md","subpath":"#Up next"},
+{"id":"sheet-budget","type":"link","x":820,"y":150,"width":480,"height":170,"title":"Launch budget","url":"https://docs.google.com/spreadsheets/d/EXAMPLE-FICTIONAL-SHEET/edit"}
+],
+"edges":[
+{"id":"e-budget","fromNode":"decision-date","toNode":"sheet-budget"},
+{"id":"e-date","fromNode":"idea-press","toNode":"decision-date","label":"needs a date"},
+{"id":"e-next","fromNode":"decision-date","toNode":"ref-next","fromSide":"bottom","label":"then","toSide":"top"},
+{"id":"e-pitch","fromNode":"idea-partners","toNode":"loom-pitch","label":"pitch"}
+]
+}

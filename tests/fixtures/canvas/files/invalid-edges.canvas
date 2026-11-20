@@ -1,0 +1,16 @@
+{"nodes":[
+{"id":"a","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x"},
+{"id":"b","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x"}
+],"edges":[
+null,
+{"id":"e2","toNode":"b"},
+{"id":"e3","fromNode":"a","toNode":5},
+{"id":"e4","fromNode":"a","toNode":"b","fromSide":"middle"},
+{"id":"e5","fromNode":"a","toNode":"b","toEnd":"circle"},
+{"id":"e6","fromNode":"a","toNode":"b","label":5},
+{"id":"bad id","fromNode":"a","toNode":"b"},
+{"id":"e8","fromNode":"a","toNode":"b","color":"9"},
+{"id":"e9","fromNode":"a","toNode":"b","toSide":1},
+{"id":"e10","fromNode":"a","toNode":"b","fromEnd":null},
+{"id":"e11","fromNode":"a b","toNode":"b"}
+]}

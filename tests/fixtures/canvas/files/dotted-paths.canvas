@@ -1,0 +1,13 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"d1","type":"file","x":0,"y":0,"width":320,"height":160,"file":"..a/b.md"},
+{"id":"d2","type":"file","x":0,"y":0,"width":320,"height":160,"file":"a../b"},
+{"id":"d3","type":"file","x":0,"y":0,"width":320,"height":160,"file":"..."},
+{"id":"d4","type":"file","x":0,"y":0,"width":320,"height":160,"file":"a/.../b"},
+{"id":"d5","type":"file","x":0,"y":0,"width":320,"height":160,"file":".hidden/.file"},
+{"id":"d6","type":"file","x":0,"y":0,"width":320,"height":160,"file":"%2e%2e/x.md"},
+{"id":"d7","type":"file","x":0,"y":0,"width":320,"height":160,"file":"a//b/"}
+],
+"edges":[]
+}

@@ -1,0 +1,10 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"g","type":"group","x":0,"y":0,"width":400,"height":300,"background":".horsemen/media/route-map.svg","backgroundStyle":"cover","label":"Route"},
+{"id":"portal","type":"file","x":0,"y":400,"width":320,"height":100,"file":".horsemen/canvas/launch-plan.canvas"},
+{"id":"record","type":"file","x":400,"y":400,"width":320,"height":100,"file":"PROGRESS.md"},
+{"id":"sub","type":"file","x":800,"y":400,"width":320,"height":100,"file":"PROGRESS.md","subpath":"#shipped"}
+],
+"edges":[]
+}

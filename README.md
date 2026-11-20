@@ -83,6 +83,12 @@ Read one record with `horsemen brain`, `horsemen vision`, `horsemen structure`,
 or `horsemen status`. Use `horsemen check` for all records and `horsemen inspect`
 for local project context. Setup and migration proposals live under `horsemen plan`.
 
+Agents can read a project with few tokens and change a canvas file:
+`horsemen show` prints an index, one section, or a canvas outline, and
+`horsemen canvas apply` checks and writes a canvas in `.horsemen/canvas/`.
+`horsemen mcp` gives the same two tools to Claude Code and Codex through a
+local server. [Canvas guide](horsemen/references/canvas.md).
+
 For an explicit local update:
 
 ```sh

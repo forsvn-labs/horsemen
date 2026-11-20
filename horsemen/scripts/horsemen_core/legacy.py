@@ -5,8 +5,11 @@ usage:
   horsemen.py check [DIR] [--json]
   horsemen.py hook session-start|stop          (reads hook JSON on stdin)
   horsemen.py hooks install|uninstall|status [--claude-settings P] [--codex-hooks P] [--script-path P]
+  horsemen.py show [TARGET]                    (workspace index, record section, or canvas outline)
+  horsemen.py canvas apply NAME [--ops FILE]   (change one canvas file; does not commit)
+  horsemen.py mcp [install|status]             (local MCP server with the tools read and canvas_edit)
 
-No dependencies. Git is optional. See references/hooks.md for the contract.
+No dependencies. Git is optional. See references/hooks.md and references/canvas.md for the contracts.
 """
 
 import hashlib
@@ -467,6 +470,17 @@ def is_pointer(text):
     return len(body) <= 400 and "PROGRESS.md" in body and "|" not in body and not re.search(rf"(?m)^##\s+{DATE}", text)
 
 
+def core(name):
+    """A sibling module of this package. It also loads when this file runs as a script."""
+    import importlib
+    if __package__:
+        return importlib.import_module("." + name, __package__)
+    here = str(Path(__file__).resolve().parent.parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    return importlib.import_module("horsemen_core." + name)
+
+
 def codes_of(report):
     return {i["code"] for i in report["errors"] + report["warnings"]}
 
@@ -611,6 +625,11 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
         for item in [e for e in report["errors"] if e["code"] in ("structure-missing-path", "broken-link")]:
             report["errors"].remove(item)
             report["warnings"].append(dict(item, message=item["message"] + " (legacy record; fix during migration)"))
+
+    if only is None and not fast:
+        # Canvas files in .horsemen/canvas: format, references, and media size (references/canvas.md).
+        for level, code, file, message in core("canvas").check_project(root):
+            add(level, code, file, message)
 
     changelog = texts["CHANGELOG.md"]
     if changelog is not None:
@@ -1152,6 +1171,8 @@ def main(argv):
         return run_hook(argv[1])
     if argv and argv[0] == "hooks":
         return hooks_cli(argv[1:])
+    if argv and argv[0] in ("show", "canvas", "mcp"):
+        return core("cli").main(argv)
     if argv and argv[0] == "check":
         rest = [a for a in argv[1:] if a != "--json"]
         start = Path(rest[0]) if rest else Path.cwd()

@@ -1,0 +1,16 @@
+{"nodes":[
+{"id":"c1","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"red;background:url(https://example.com/x)"},
+{"id":"c2","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"#12345g"},
+{"id":"c3","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"#fff"},
+{"id":"c4","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"1\n"},
+{"id":"c5","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"7"},
+{"id":"c6","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"0"},
+{"id":"c7","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":"#1234567"},
+{"id":"c8","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":1},
+{"id":"c9","type":"group","x":0,"y":0,"width":320,"height":140,"color":"expression(alert(1))"},
+{"id":"c10","type":"link","x":0,"y":0,"width":320,"height":140,"url":"https://example.com","color":""},
+{"id":"c11","type":"shape","x":0,"y":0,"width":320,"height":140,"color":" 1"},
+{"id":"c12","type":"text","x":0,"y":0,"width":320,"height":140,"text":"x","color":null}
+],"edges":[
+{"id":"e1","fromNode":"c1","toNode":"c2","color":"url(x)"}
+]}

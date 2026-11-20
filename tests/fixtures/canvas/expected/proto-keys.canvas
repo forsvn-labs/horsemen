@@ -1,0 +1,9 @@
+{
+"horsemen":{"version":1},
+"nodes":[
+{"id":"n","type":"text","x":0,"y":0,"width":320,"height":140,"__proto__":{"polluted":true},"constructor":{"prototype":1},"hasOwnProperty":false,"text":"Keys that are special in JavaScript are plain data.","toString":"x"}
+],
+"edges":[],
+"__proto__":{"polluted":true},
+"constructor":"top"
+}

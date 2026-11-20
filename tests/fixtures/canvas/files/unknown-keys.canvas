@@ -1,0 +1,5 @@
+{"zoom":1.5,"nodes":[
+{"id":"shape-1","type":"shape","x":0,"y":0,"width":100,"height":100,"points":[[0,0],[1,1]],"style":{"stroke":"red","fill":null}},
+{"id":"note-1","type":"text","x":0,"y":200,"width":320,"height":140,"text":"Kept.","zIndex":3,"meta":{"b":1,"a":[true,null,{"y":2,"x":1}]},"url":"not checked on a text node"}
+],"horsemen":{"version":1,"savedBy":"another tool"},"meta":{"b":1,"a":2},
+"edges":[{"id":"e-1","fromNode":"shape-1","toNode":"note-1","weight":2,"data":{"k":"v"}}]}

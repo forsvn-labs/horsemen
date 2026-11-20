@@ -12,6 +12,9 @@ reasoning, evidence gathering and authorized host/provider workflows.
 | Setup/migration | `init` / `upgrade`: gather missing input and preserve existing content | `horsemen plan init/upgrade PATH`: proposal only |
 | Broad maintenance | `update` / `inspect-and-update`: explicit authorized scope | `horsemen plan update PATH --changes FILE`: proposal only |
 | Review a batch | Review exact changes and permission gaps | `horsemen plan export-patch PATH --plan-file FILE`: stdout, no application |
+| Read with few tokens | The `read` tool, or `horsemen.py show TARGET` | `horsemen show [TARGET] [--max-chars N] [--offset N] [--if-rev REV]` |
+| Edit a canvas | The `canvas_edit` tool, in the three cases in [canvases](canvas.md) | `horsemen canvas apply NAME [--ops FILE] [--base-rev REV] [--dry-run]` |
+| Give a host the tools | Only when the user asks | `horsemen mcp install`, `horsemen mcp status`; `horsemen mcp` runs the server |
 | Diagram | Existing Mermaid/show-me-bro workflows | Not implemented |
 | Help | Menu without project reads | `horsemen --help` |
 
@@ -35,6 +38,17 @@ bypass a provider hold or update a mounted provider file. An unsupported
 `--provider` fails without a local fallback. Provider updates still require
 the existing authorized host and revision-aware adapter; no live connection
 is added to the CLI. Drive Markdown writes remain unsupported.
+
+## Canvas commands
+
+`show`, `canvas apply`, and the MCP server use one implementation, so each
+gives the same text and the same limits; see [canvases](canvas.md). `show`
+reads records and canvas files only. `canvas apply` writes one file in
+`.horsemen/canvas/` and nothing else; it does not commit, and it does not
+use the exclusive-writer contract of record updates. It refuses the write
+when the file changed after it was read. `mcp install` calls the host's own
+command and edits no host file. The legacy script accepts the same three
+commands, so an installed skill needs no wheel.
 
 ## Compatibility and release gate
 
