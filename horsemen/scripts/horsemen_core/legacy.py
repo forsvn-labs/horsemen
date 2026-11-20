@@ -1159,16 +1159,17 @@ def unpublished_records(root, top, names, files=()):
 
 
 def completion_reminder(notes):
-    reason = ("Horsemen: before finishing this task, review VISION, BRAIN, PROGRESS, and STRUCTURE, including work outside Git. "
-              "Honor read-only commands: plain inspect and check report proposed changes without writing. Keep VISION unless the user requested or agreed to a direction change. Use BRAIN's saved destinations and "
-              "permissions: update originals; bin stale copies only when authorized. Write PROGRESS in plain words; fix "
-              "STRUCTURE when locations change. Check README, CHANGELOG, and TECHSTACK if affected. Proactively open relevant brain originals; check freshness, "
-              "links, and duplicates. Update or archive only when authorized; preserve history and report unsaved blockers. If nothing changed, leave files and "
-              "dates alone. Shipped needs delivery evidence. Do this silently; do not narrate the review or add a Horsemen "
-              "section to the task report unless asked. Still surface necessary permission questions and actionable blockers.")
-    if notes:
-        budget = (1180 - len(reason) - len(notes) * 3) // len(notes)
-        reason += "\n" + "\n".join("- " + (note if len(note) <= budget else note[:budget - 1] + "…") for note in notes)
+    """Block only for specific drift. A block forces one more agent turn, and hosts show that turn as the final reply,
+    so a routine block would hide the task report. SessionStart carries the routine end-of-task review."""
+    if not notes:
+        return None
+    reason = ("Horsemen found record drift. Fix it in VISION, BRAIN, PROGRESS, or STRUCTURE (and README, CHANGELOG, or TECHSTACK if affected). "
+              "Honor read-only commands: plain inspect and check report proposed changes without writing. Keep VISION unless the user agreed "
+              "to a change. Also open relevant brain originals; update or archive only when authorized. Leave unchanged files and dates alone. "
+              "Do this silently, with no Horsemen section unless asked; still surface permission questions and actionable blockers. "
+              "The user sees only your last message, so end with your full task report again, not a note about this review.")
+    budget = (1180 - len(reason) - len(notes) * 3) // len(notes)
+    reason += "\n" + "\n".join("- " + (note if len(note) <= budget else note[:budget - 1] + "…") for note in notes)
     return {"decision": "block", "reason": reason}
 
 

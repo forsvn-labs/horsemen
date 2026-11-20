@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import horsemen
-from e2e import Env, healthy_project, context, review_requested
+from e2e import Env, healthy_project, context, quiet
 
 class Tests(unittest.TestCase):
     def setUp(self):
@@ -56,7 +56,7 @@ class Tests(unittest.TestCase):
         self.codes(); horsemen.completion_reminder([])
         self.assertEqual(before,{p.name:(p.read_bytes(),p.stat().st_mtime_ns) for p in self.root.iterdir()})
     def test_stop_reviews_real_brain_and_techstack(self):
-        reason=horsemen.completion_reminder([])['reason']
+        reason=horsemen.completion_reminder(['Progress: drift.'])['reason']
         self.assertIn('TECHSTACK',reason); self.assertIn('open relevant brain originals',reason)
         self.assertIn('authorized',reason); self.assertIn('silently',reason)
     def test_no_project_not_inferred_from_companion(self):
@@ -97,9 +97,7 @@ class LifecycleTests(unittest.TestCase):
         for _ in range(2):
             code, out, _, _ = self.env.hook('Stop', self.root)
             self.assertEqual(code, 0)
-            self.assertTrue(review_requested(out))
-            self.assertIn('silently', out['reason'])
-            self.assertIn('TECHSTACK', out['reason'])
+            self.assertTrue(quiet(out))
         self.assertEqual(before, self.snapshot())
     def test_techstack_only_commit_does_not_claim_product_progress(self):
         self.env.hook('SessionStart', self.root)
@@ -107,8 +105,7 @@ class LifecycleTests(unittest.TestCase):
         self.env.git(self.root, 'add', 'TECHSTACK.md')
         self.env.git(self.root, 'commit', '-qm', 'Update tool inventory')
         _, out, _, _ = self.env.hook('Stop', self.root)
-        self.assertTrue(review_requested(out))
-        self.assertNotIn('work commit', out['reason'])
+        self.assertTrue(quiet(out))
     def test_legacy_name_never_becomes_project_marker(self):
         with tempfile.TemporaryDirectory() as d:
             root=Path(d); (root/'TECH.md').write_text('# Legacy tools\n')
@@ -120,14 +117,14 @@ class LifecycleTests(unittest.TestCase):
         self.env.git(self.root, 'mv', 'TECH.md', 'TECHSTACK.md')
         self.env.git(self.root, 'commit', '-qm', 'Migrate inventory name')
         _, out, _, _ = self.env.hook('Stop', self.root)
-        self.assertNotIn('work commit', out['reason'])
+        self.assertNotIn('work commit', (out or {}).get('reason', ''))
         self.assertEqual(horsemen.commits_since(self.root, "PROGRESS.md")[0], 0)
     def test_legacy_companion_privacy_is_still_checked(self):
         (self.root/'TECH.md').write_text('https://drive.google.com/file/d/private-id/view\n')
         (self.root/'BRAIN.md').write_text('# Brain\nVisibility: public\n')
         _, report=self.env.check(self.root)
         self.assertIn(('TECH.md','private-locator'), {(x['file'],x['code']) for x in report['errors']})
-    def test_resume_with_pre_techstack_cache_still_reviews(self):
+    def test_resume_with_pre_techstack_cache_stays_quiet(self):
         self.env.hook('SessionStart', self.root)
         files=list(self.env.state.rglob('*.json'))
         self.assertTrue(files)
@@ -136,7 +133,6 @@ class LifecycleTests(unittest.TestCase):
             data['hashes'].pop('TECHSTACK.md',None)
             path.write_text(json.dumps(data))
         _, out, _, _ = self.env.hook('Stop', self.root)
-        self.assertTrue(review_requested(out))
-        self.assertIn('TECHSTACK',out['reason'])
+        self.assertTrue(quiet(out))
 
 if __name__=='__main__': unittest.main()
