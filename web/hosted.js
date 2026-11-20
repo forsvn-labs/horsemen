@@ -181,6 +181,7 @@
     async save(payload) {
       const res = await writeJSON('/write/canvas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
       if (res.data.code === 'editor-signin') { editorInfo.signed_in = false; access.clear(); }
+      if (res.data.code === 'editor-install' || res.data.code === 'no-push') access.clear();  // Ask GitHub again next time.
       return res;
     },
     /* The text of a canvas file by its blob SHA, through the read-only proxy with the viewer token. */
