@@ -160,7 +160,9 @@ test('the proxy forwards only allowlisted GitHub reads with the user token', asy
   const sha = 'a'.repeat(40);
   const allowed = ['/user', '/user/installations?per_page=100&page=2', '/user/installations/5/repositories?per_page=100&page=1',
     '/repos/example/alpha/commits/feature%2Fx', `/repos/example/alpha/git/trees/${sha}?recursive=1`, `/repos/example/alpha/git/blobs/${sha}`,
-    `/repos/example/alpha/contents/docs/a%20b.md?ref=${sha}`, '/repos/example/alpha/pulls/7'];
+    `/repos/example/alpha/contents/docs/a%20b.md?ref=${sha}`, '/repos/example/alpha/pulls/7',
+    /* Canvas files are blobs of the tree; the media that a canvas names use the contents route. */
+    `/repos/example/alpha/contents/.horsemen/media/board-1a2b3c4d.png?ref=${sha}`, `/repos/example/alpha/contents/apps/web/.horsemen/media/route-map.svg?ref=${sha}`];
   for (const p of allowed) {
     const res = await call('/gh' + p, { headers }); assert.equal(res.status, 200, p);
     const forwarded = calls.at(-1); assert.equal(forwarded.url, 'https://api.github.test' + p);

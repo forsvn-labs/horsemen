@@ -1,5 +1,6 @@
 """Read explicit Markdown connections without following outside providers."""
 import hashlib
+import json
 import posixpath
 import re
 from urllib.parse import quote, unquote, urlsplit
@@ -33,4 +34,41 @@ def connections(text, source_path, repo, revision):
         result.append({'id':hashlib.sha256((source_path+'\0'+href).encode()).hexdigest()[:24],
                        'title':title,'href':href,'path':path,'kind':kind,'source':source_path})
         if len(result)>=200:break
+    return result
+
+MAX_CANVAS_NODES=500
+
+def _safe_file(target):
+    """A path inside the project, as a canvas file states it. The same rule as web/hosted-reader.js."""
+    if not isinstance(target,str) or not 1<=len(target)<=1024 or target.startswith('/') or '\\' in target:return False
+    if any(ord(c)<32 for c in target):return False
+    try: target.encode('utf-8')
+    except UnicodeError:return False
+    return all(part not in ('','.','..') for part in target.split('/'))
+
+def _no_constant(name):
+    raise ValueError(name)
+
+def canvas_links(text, source_path, root, repo, revision):
+    """Files that a canvas file names, as links. Only these files can be read for the canvas.
+
+    The browser checks the canvas in full. This reader takes file nodes with a safe path from
+    text that is JSON; a portal to another canvas needs no read."""
+    try: doc=json.loads(text,parse_constant=_no_constant)
+    except (ValueError,RecursionError):return []
+    nodes=doc.get('nodes') if isinstance(doc,dict) else None
+    if not isinstance(nodes,list) or len(nodes)>MAX_CANVAS_NODES:return []
+    result=[];seen=set()
+    for node in nodes:
+        if not isinstance(node,dict) or node.get('type')!='file':continue
+        target=node.get('file')
+        if not _safe_file(target) or target.endswith('.canvas'):continue
+        path=f'{root}/{target}' if root else target
+        href=f'https://github.com/{repo}/blob/{revision}/{quote(path,safe="/")}'
+        if href in seen:continue
+        seen.add(href)
+        alt=node.get('alt')
+        result.append({'id':hashlib.sha256((source_path+'\0'+href).encode()).hexdigest()[:24],
+                       'title':alt if isinstance(alt,str) and alt else posixpath.basename(path),'href':href,'path':path,
+                       'kind':'document' if path.lower().endswith(('.md','.markdown')) else 'attachment','source':source_path})
     return result

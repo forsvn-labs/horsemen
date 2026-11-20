@@ -1,9 +1,11 @@
 # Canvas workspace design
 
 Status: the owner approved this design and all eleven proposed answers on
-2026-11-19. Slice 1 (the sidebar and generated canvases, read-only) is built
-and waits for review; it is not deployed. See
-[slice 1 as built](#slice-1-as-built). Nothing else on this page is built.
+2026-11-19. Slice 1 (the sidebar and generated canvases, read-only) is live.
+See [slice 1 as built](#slice-1-as-built). The browser half of slice 2a
+(canvas files shown in the browser, read-only) is built and waits for review;
+it is not deployed. See [slice 2a as built](#slice-2a-as-built). The Python
+half of slice 2a and the agent tools have their own pull request.
 The owner gave the direction and three decisions on 2026-11-19; this page
 turns them into a design and a build plan.
 
@@ -147,6 +149,47 @@ Slice 1 has step 1 and the fixed grid of step 3. The rules are in
 
 Not in slice 1: the order by most recent use, a saved last canvas across
 reloads, "No records yet" entries, and all that needs a canvas file.
+
+### Slice 2a as built
+
+Slice 2a has steps 2, 3, and 4 of the generated canvas, the drawing of canvas
+files, and the JavaScript reader. This section is about the browser half. The
+Python reader, the `check` rules, and the shared cases come with the pull
+request of the agent tools.
+
+| Item | Rule in the code |
+| --- | --- |
+| Modules | `web/canvas-format.js` reads and checks a file. `web/canvas-view.js` makes one drawing from the file and the generated canvas. Both are pure rules that the app and the tests share. `web/app.js` draws the result. |
+| Same rules in two languages | The JavaScript reader gives the same errors as the Python reader, in the same order, with the same codes (`canvas-invalid`, `canvas-dangling-ref`, `canvas-media-too-large`) and the same messages, and the same canonical text. `tests/test_canvas_format.cjs` runs the shared cases in `tests/fixtures/canvas/`. A report holds 20 errors at most. |
+| Readers | Both readers find `<project root>/.horsemen/canvas/<name>.canvas` in the tree of the repository, 20 at most for a root, in name order. A file in a sub-folder, with a name that the rule refuses, or behind a symlink is not listed. A file larger than 512 KiB is refused by its listed size and is not requested. The hosted reader uses the blob route, in the signed-in view and in the public view. The saved index keeps the path and the SHA, never the text. |
+| Files that a canvas names | The reader registers each `file` node with a safe path. Only a registered file can be read. An image loads through the existing image route (1 MiB, the content must match the type) when it comes into view; a canvas loads 100 images at most. |
+| Artifact | A file with a reserved name belongs to the canvas of that record. Another name is a board. The rail lists the boards after the records, in name order, in title case. `home.canvas` is reserved and is not shown in this slice. |
+| A record with a file | The saved elements show at their places and sizes. Each section that no saved element shows gets a generated card in one column at the left of the saved elements, in record order, with the pitch of the fixed grid. A saved section card matches a generated card by the line of its heading, not by its ID. A file with no element keeps the fixed grid. |
+| IDs | An element keeps the ID of the file. A generated card keeps its `s-` ID; when the file uses that ID for another element, the generated card gets `-2`, `-3`. |
+| Section card | `file` and `subpath` name the section. The text comes from the record at the loaded commit. `#Parent#Child` names a deeper heading: the card shows its text and opens the section that holds it. A card of another record has a "from Vision" tag and opens that record. When the heading is gone, the card says "Section not found" and still opens the record. |
+| Other elements | A note is Markdown from the safe renderer. A portal opens a canvas of the same project root, or says "Canvas not found". A Markdown file that is not a record is a document card that opens in the reading view. An image shows from a `blob:` address with its `alt` text. A link card shows the stored title and the host; the app fetches nothing. A group is a frame behind the other elements. Another file is a file card with a link to GitHub. An unknown type shows as "Not supported". |
+| Embeds and tables | Not in this slice. A video or design address is a link card. A CSV, TSV, or XLSX file is a file card. They come with slice 2b. |
+| Connectors | A curve from border to border. A stated side wins; if not, the app takes the sides that face each other. The end has an arrow unless the file says `none`. The label sits at the middle of the curve. The list view states each connector as a text line of its start element. |
+| Colours | A preset takes a colour of the active theme: 1 vermilion, 2 between vermilion and gilt, 3 gilt, 4 verdigris, 5 between verdigris and indigo, 6 indigo. A hex value is set as a value, never as CSS text. Each theme draws its own card border, so the colour also shows as a stripe. |
+| A file that is not valid | A file that fails before its elements are checked (size, UTF-8, JSON, conflict markers, nesting, numbers, Unicode, shape, version, counts) shows no element: the record shows its generated canvas, and a board is empty. One message above the canvas names the file and the fault, with a link to the file. For a file with some bad elements, the other elements show; the message gives the count of elements that do not show and the first fault, and a list of 8 faults at most. An edge to an element that does not show does not show. The first element with an ID keeps it. A file with a higher version shows with a note. The rail marks a canvas whose file shows no element. |
+| Interaction | Read-only. An element has a fixed place; a drag on it moves the canvas. Click selects. Enter selects the element with focus and opens the selected element when it can open: a section card, a record or document card, and a portal. A link inside a note or a card stays a link. |
+| Links | `?canvas=<name>&node=<id>` and `#p=<project>&c=<name>&n=<id>` name a board or a record canvas and one element. A link to a canvas or an element that is gone opens what exists and says so. |
+| List view | Elements outside groups from top to bottom, then each group with its elements. A phone opens in the list. |
+| Untrusted content | The app builds each tag itself and escapes each value of a file. The checks cover script text in each text key, a `javascript:` address, CSS in a colour, a path with `..`, 5,000 nodes, a file of 2 MiB, IDs with the names of records and of built-in keys, and an SVG with a script. The SVG blob test opens the `blob:` address of the image as a page, in the local app and under the Worker's content security policy, and checks that the script did not run. |
+
+Not in slice 2a (browser): the overview of references between canvases
+(dashed lines on Home and the "Referenced from" list), group background
+images, the "Stored in Git LFS" message, and all that needs embeds, tables,
+or editing.
+
+One difference from the shared cases is open. The generated card IDs of
+slice 1 are live with the rules in the table above (accents fold to plain
+letters, 56 characters, the headings of the reading view). The shared cases
+state other rules for section slugs: no folding, 58 characters, and `~~~`
+code blocks. The JavaScript test lists the cases that differ, so a change on
+either side fails it. An agent tool that saves a section card by its `s-` ID
+needs the same ID as the browser, so the owner must choose one rule for both
+sides.
 
 ### Connections between artifacts
 

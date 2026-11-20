@@ -11,7 +11,11 @@
      a clear during a scan, the 16-project cache, transient failures not cached
    - documents: only links from loaded records can be opened
    - images: only registered image attachments load; types, sizes, content checks,
-     and decode errors match the Python reader */
+     and decode errors match the Python reader
+   - canvas files: a file outside the canvas folder of a project root is listed; a file over
+     512 KiB is fetched; a bad blob stops the project; a path with `..` becomes a readable link;
+     the saved index keeps canvas text or an old index hides new canvas files; a folder named
+     `__proto__` changes shared objects */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { execFileSync } = require('node:child_process');
@@ -23,13 +27,15 @@ function python(cases) {
   const code = `
 import json,sys
 import base64,hashlib
-from horsemen_core.gui import discover_roots, decode_image, ProviderError
-from horsemen_core.gui_links import connections
+from horsemen_core.gui import discover_roots, discover_canvases, decode_image, ProviderError
+from horsemen_core.gui_links import connections, canvas_links
 from horsemen_core.legacy import sections
 out=[]
 for c in json.load(sys.stdin):
     if c['kind']=='links': out.append(connections(c['text'],c['source'],c['repo'],c['revision']))
     elif c['kind']=='sections': out.append(dict(sections(c['text'])))
+    elif c['kind']=='canvases': out.append(discover_canvases(c['entries'],discover_roots(c['entries'])))
+    elif c['kind']=='canvas-links': out.append(canvas_links(c['text'],c['source'],c['root'],c['repo'],c['revision']))
     elif c['kind']=='image':
         try:
             kind,data=decode_image(c['blob'],c['path']);out.append({'type':kind,'size':len(data),'sha':hashlib.sha256(data).hexdigest()})
@@ -253,14 +259,17 @@ test('share links carry a canvas and one element', () => {
   assert.equal(R.shareURL('https://h.test', p, null, 'progress', 's-shipped'), 'https://h.test/Example/Alpha?canvas=progress&node=s-shipped');
   assert.equal(R.shareURL('https://h.test', nested, 'progress', 'progress', 's-shipped'), 'https://h.test/example/mono?root=apps%2Fweb&canvas=progress&node=s-shipped&record=progress');
   assert.equal(R.shareURL('https://h.test', p, 'brain', 'home', 's-shipped'), 'https://h.test/Example/Alpha?record=brain', 'Home needs no canvas; an element needs a record canvas');
-  assert.equal(R.shareURL('https://h.test', p, null, 'boards', 'bad id'), 'https://h.test/Example/Alpha');
+  assert.equal(R.shareURL('https://h.test', p, null, 'Boards', 'bad id'), 'https://h.test/Example/Alpha');
+  assert.equal(R.shareURL('https://h.test', p, null, 'launch-plan', 'note-risk'), 'https://h.test/Example/Alpha?canvas=launch-plan&node=note-risk', 'a board has the name of its canvas file');
+  assert.equal(R.shareURL('https://h.test', p, null, '../x', 'a'), 'https://h.test/Example/Alpha');
   assert.equal(R.shareURL('https://h.test', p, null, 'vision', 'bad id'), 'https://h.test/Example/Alpha?canvas=vision');
   const t = R.shareTarget(new URL('https://h.test/example/mono?root=apps%2Fweb&canvas=progress&node=s-shipped&record=progress'));
   assert.deepEqual(t, { repo: 'example/mono', root: 'apps/web', record: 'progress', canvas: 'progress', node: 's-shipped' });
   assert.deepEqual(R.shareTarget(new URL(R.shareURL('https://h.test', nested, 'brain', 'brain', 's-providers'))), { repo: 'example/mono', root: 'apps/web', record: 'brain', canvas: 'brain', node: 's-providers' }, 'a link survives a round trip');
   const old = R.shareTarget(new URL('https://h.test/example/alpha?record=progress'));
   assert.deepEqual([old.record, old.canvas, old.node], ['progress', null, null], 'a link from before canvases opens the record over Home');
-  for (const [query, canvas, node] of [['canvas=Progress&node=s-a', null, null], ['canvas=home&node=s-a', null, null], ['node=s-a', null, null], ['canvas=constructor', null, null],
+  for (const [query, canvas, node] of [['canvas=Progress&node=s-a', null, null], ['canvas=home&node=s-a', null, null], ['node=s-a', null, null], ['canvas=constructor', 'constructor', null], ['canvas=launch-plan&node=note-risk', 'launch-plan', 'note-risk'],
+    ['canvas=a%2Fb', null, null], ['canvas=..', null, null], ['canvas=' + 'a'.repeat(65), null, null], ['canvas=launch_plan', null, null], ['canvas=-a', null, null],
     ['canvas=vision&node=%3Cb%3E', 'vision', null], ['canvas=vision&node=' + 'a'.repeat(65), 'vision', null], ['canvas=vision&node=-x', 'vision', null]]) {
     const found = R.shareTarget(new URL('https://h.test/example/alpha?' + query));
     assert.deepEqual([found.canvas, found.node], [canvas, node], query);
@@ -325,4 +334,109 @@ test('images load only from registered image links at the pinned revision', asyn
 
 test('the vendor folder is not a share link', () => {
   assert.equal(R.shareTarget(new URL('https://h.test/vendor/mermaid.min.js')), null);
+});
+
+/* Canvas files. Same fictional cases as tests/test_gui_canvas.py. */
+const fileNode = (extra = {}) => ({ id: 'a', type: 'file', x: 0, y: 0, width: 320, height: 160, ...extra });
+const CANVAS = JSON.stringify({ nodes: [fileNode({ id: 'img', file: 'img/board.png', alt: 'Pilot board' }), fileNode({ id: 's-shipped', file: 'PROGRESS.md', subpath: '#Shipped' }), fileNode({ id: 'doc', file: 'docs/research.md' }),
+  fileNode({ id: 'up', file: '../outside.png' }), fileNode({ id: 'abs', file: '/etc/passwd' }), fileNode({ id: 'portal', file: '.horsemen/canvas/launch-plan.canvas' }), { id: 'note', type: 'text', x: 0, y: 0, width: 320, height: 160, text: 'A note.' }] });
+
+test('canvas discovery and canvas links match the Python reader', async () => {
+  const paths = ['VISION.md', 'PROGRESS.md', '.horsemen/canvas/progress.canvas', '.horsemen/canvas/launch-plan.canvas', 'apps/web/VISION.md', 'apps/web/BRAIN.md', 'apps/web/.horsemen/canvas/brain.canvas',
+    'other/.horsemen/canvas/x.canvas', '.horsemen/canvas/sub/deep.canvas', '.horsemen/canvas/Bad.canvas', '.horsemen/canvas/a_b.canvas', '.horsemen/canvas/.canvas', '.horsemen/canvas/x.json', '.horsemen/media/x.canvas',
+    'docs/.horsemen/canvas/y.canvas', 'x.horsemen/canvas/z.canvas', '.horsemen/canvas/' + 'a'.repeat(64) + '.canvas', '.horsemen/canvas/' + 'a'.repeat(65) + '.canvas', '.horsemen/canvas/constructor.canvas', '.horsemen/canvas/2026.canvas'];
+  const bad = ['../outside.png', 'a/../../b.png', '/etc/passwd', 'a\\b.png', 'a\nb.png', 'a\u0000.png', './a.png', 'a/./b.png', 'a//b.png', 'a/', '', 'x'.repeat(1025), '..', '.', 7, null, ['a.png'], '\ud800.png', '😀'.repeat(1025)];
+  const good = ['a b/é 😀.png', 'x'.repeat(1024), '😀'.repeat(1024), '.horsemen/media/route-map.svg', 'a..b/c...png', 'docs/Guide.MD', 'notes/x.markdown', 'img/"><script>.png', 'a%2Fb.png', 'a?b#c.png'];
+  const source = { source: '.horsemen/canvas/progress.canvas', root: '', repo: 'example/alpha', revision: 'a'.repeat(40) };
+  const cases = [
+    { kind: 'canvases', entries: [...entries(paths), { path: '.horsemen/canvas/link.canvas', type: 'blob', mode: '120000', sha: 'x', size: 1 }, { path: '.horsemen/canvas/tree.canvas', type: 'tree', mode: '040000', sha: 'x' }] },
+    { kind: 'canvases', entries: entries(['VISION.md', 'PROGRESS.md', ...Array.from({ length: 30 }, (_, i) => `.horsemen/canvas/board-${String(29 - i).padStart(2, '0')}.canvas`)]) },
+    { kind: 'canvases', entries: entries(['README.md', '.horsemen/canvas/progress.canvas']) },
+    { kind: 'canvas-links', text: CANVAS, ...source },
+    { kind: 'canvas-links', text: CANVAS, source: 'apps/web/.horsemen/canvas/progress.canvas', root: 'apps/web', repo: 'o/r', revision: 'c'.repeat(40) },
+    { kind: 'canvas-links', text: JSON.stringify({ nodes: [...bad.map((file, i) => fileNode({ id: 'n' + i, file })), { id: 'l', type: 'link', url: 'https://example.com/a.png', file: 'x.png' }, { id: 't', type: 'text', file: 'y.png' }, 'node', null, 7, ['a']] }), ...source },
+    { kind: 'canvas-links', text: JSON.stringify({ nodes: good.map((file, i) => fileNode({ id: 'n' + i, file, alt: i % 2 ? 'Alt ' + i : '' })) }), ...source },
+    { kind: 'canvas-links', text: JSON.stringify({ nodes: [fileNode({ file: 'a.png' }), fileNode({ id: 'b', file: 'a.png', alt: 'Again' }), fileNode({ id: 'c', file: 'b.png', alt: 7 }), fileNode({ id: 'd', file: 'c.png', alt: '\ud800' })] }), ...source },
+    ...['', 'not json', '[]', 'null', '7', '{"nodes":{}}', '{"nodes":"x"}', '{"nodes":[{"type":"file","file":"a.png","x":NaN}]}', '{"nodes":[{"type":"file","file":"a.png","x":Infinity}]}', ' \n{"nodes":[{"type":"file","file":"a.png"}]}\n',
+      '{"nodes":[{"type":"file","file":"a.png"},{"type":"file","file":"a.png","file":"b.png"}],"nodes2":1}', '{"nodes":' + '['.repeat(100000) + ']'.repeat(100000) + '}',
+      JSON.stringify({ nodes: Array.from({ length: 501 }, (_, i) => fileNode({ id: 'n' + i, file: `img/${i}.png` })) }), JSON.stringify({ nodes: Array.from({ length: 500 }, (_, i) => fileNode({ id: 'n' + i, file: `img/${i}.png` })) }),
+    ].map(text => ({ kind: 'canvas-links', text, ...source })),
+  ];
+  const expected = python(cases);
+  for (const [i, c] of cases.entries()) {
+    const actual = c.kind === 'canvases' ? R.discoverCanvases(c.entries, R.discoverRoots(c.entries)) : await R.canvasLinks(c.text, c.source, c.root, c.repo, c.revision);
+    assert.deepEqual(actual, expected[i], `case ${i} (${c.kind})`);
+  }
+  assert.deepEqual(Object.keys(expected[0]['']).sort(), ['2026', 'a'.repeat(64), 'constructor', 'launch-plan', 'progress'].sort());
+  assert.equal(Object.keys(expected[1]['']).length, 20);
+  assert.deepEqual(expected[3].map(l => l.path), ['img/board.png', 'PROGRESS.md', 'docs/research.md']);
+  assert.deepEqual([expected[5].length, expected[6].length, expected.at(-1).length, expected.at(-2).length], [0, good.length, 500, 0]);
+});
+
+test('a folder with the name of a built-in key does not change shared objects', async () => {
+  const tree = entries(['__proto__/VISION.md', '__proto__/PROGRESS.md', '__proto__/.horsemen/canvas/progress.canvas', 'constructor/VISION.md', 'constructor/BRAIN.md', 'constructor/.horsemen/canvas/toString.canvas', 'constructor/.horsemen/canvas/valueof.canvas']);
+  const [roots, canvases] = python([{ kind: 'roots', entries: tree }, { kind: 'canvases', entries: tree }]);
+  assert.deepEqual(R.discoverRoots(tree), roots); assert.deepEqual(R.discoverCanvases(tree, R.discoverRoots(tree)), canvases);
+  assert.deepEqual([{}.vision, {}.progress, Object.keys(Object.prototype)], [undefined, undefined, []]);
+  assert.deepEqual(Object.keys(roots).sort(), ['__proto__', 'constructor']);
+  const f = fake(); const api = f.api;
+  f.api = async p => p.includes('/git/trees/') ? { truncated: false, tree } : api(p);
+  const s = state(f); await s.scanSync();
+  assert.deepEqual(s.snapshot().projects.map(p => p.root).sort(), ['__proto__', 'constructor']);
+  const loaded = await s.loadProject(s.snapshot().projects.find(p => p.root === 'constructor').id);
+  assert.deepEqual(Object.keys(loaded.canvases), ['valueof']); assert.equal({}.valueof, undefined);
+});
+
+function canvasFake(canvases = { progress: CANVAS, 'launch-plan': '{"nodes":[]}' }, sizes = {}) {
+  const f = fake(), api = f.api;
+  const blob = data => typeof data === 'string' || Buffer.isBuffer(data) ? { encoding: 'base64', content: Buffer.from(data).toString('base64') } : data;
+  f.api = async p => {
+    if (p.includes('/git/blobs/canvas-')) { f.calls.push(p); const name = p.split('/git/blobs/canvas-')[1]; if (f.deny === name) throw new R.ProviderError('GitHub denied access or reached a rate limit. Check access, then retry.', 403); return blob(canvases[name]); }
+    if (p.includes('/contents/img/board.png?')) { f.calls.push(p); return contents(PNG); }
+    if (p.includes('/contents/docs/research.md?')) { f.calls.push(p); return contents(Buffer.from('# Research\nBody')); }
+    const result = await api(p);
+    if (p.includes('/git/trees/')) result.tree.push(...Object.entries(canvases).map(([name, data]) => ({ path: `.horsemen/canvas/${name}.canvas`, type: 'blob', mode: '100644', sha: 'canvas-' + name, size: sizes[name] ?? (typeof data === 'string' ? Buffer.byteLength(data) : 10) })));
+    return result;
+  };
+  return f;
+}
+
+test('a project loads its canvas files; a failure stays with one canvas', async () => {
+  const f = canvasFake(); const s = state(f); await s.scanSync(); const [p] = s.snapshot().projects;
+  assert.deepEqual([p.canvases, p.files], [undefined, undefined], 'the project list has no file lists');
+  const data = await s.loadProject(p.id), canvas = data.canvases.progress;
+  assert.equal(data.project.canvases, undefined);
+  assert.deepEqual([canvas.name, canvas.path, canvas.url, canvas.content], ['progress', '.horsemen/canvas/progress.canvas', `https://github.com/example/alpha/blob/${'a'.repeat(40)}/.horsemen/canvas/progress.canvas`, CANVAS]);
+  assert.deepEqual(canvas.connections.map(l => [l.path, l.kind, l.title]), [['img/board.png', 'attachment', 'Pilot board'], ['PROGRESS.md', 'document', 'PROGRESS.md'], ['docs/research.md', 'document', 'research.md']]);
+  const image = await s.loadImage(p.id, canvas.connections[0].id);
+  assert.equal(image.type, 'image/png'); assert.ok(f.calls.at(-1).endsWith('/contents/img/board.png?ref=' + 'a'.repeat(40)));
+  assert.equal((await s.loadDocument(p.id, canvas.connections[2].id)).content, '# Research\nBody', 'a document that a canvas names opens');
+  await assert.rejects(s.loadImage(p.id, canvas.connections[2].id), /image linked from a loaded record/);
+  const calls = f.calls.length; await s.loadProject(p.id);
+  assert.equal(f.calls.slice(calls).filter(c => c.includes('/git/blobs/')).length, 0, 'a complete load is cached');
+
+  const MAX = R.MAX_FILE, cases = { big: Buffer.alloc(MAX + 1, 'x'), binary: Buffer.from([0xff, 0xfe, 0x00]), encoding: { encoding: 'utf-8', content: '{}' }, base64: { encoding: 'base64', content: '!bad!' }, missing: { encoding: 'base64' },
+    bom: Buffer.from('\ufeff{"nodes":[]}'), 'not-json': 'not json', edge: '{"nodes":[],"pad":"' + 'x'.repeat(MAX - 21) + '"}', huge: '{}' };
+  const g = canvasFake(cases, { ...Object.fromEntries(Object.keys(cases).map(name => [name, 10])), huge: 2 * 1024 * 1024 }); const t = state(g); await t.scanSync();
+  const loaded = await t.loadProject(t.snapshot().projects[0].id);
+  assert.deepEqual(Object.fromEntries(Object.entries(loaded.canvases).map(([name, c]) => [name, c.error ?? null])), { big: 'The canvas file is larger than 512 KiB.', binary: 'The canvas file could not be decoded as UTF-8 text.', encoding: 'Unsupported canvas encoding.',
+    base64: 'The canvas file could not be decoded as UTF-8 text.', missing: 'The canvas file could not be decoded as UTF-8 text.', bom: null, 'not-json': null, edge: null, huge: 'The canvas file is larger than 512 KiB.' });
+  assert.equal(g.calls.some(c => c.includes('canvas-huge')), false, 'a file over the limit is not fetched');
+  assert.deepEqual([loaded.canvases.bom.content, loaded.canvases['not-json'].content, loaded.canvases['not-json'].connections, Buffer.byteLength(loaded.canvases.edge.content)], ['{"nodes":[]}', 'not json', [], MAX]);
+  assert.ok('content' in loaded.records.vision, 'the records load when a canvas does not');
+
+  const h = canvasFake(); h.deny = 'launch-plan'; const u = state(h); await u.scanSync(); const id = u.snapshot().projects[0].id;
+  assert.match((await u.loadProject(id)).canvases['launch-plan'].error, /denied access/);
+  h.deny = null; assert.ok('content' in (await u.loadProject(id)).canvases['launch-plan'], 'a failed canvas is read again, not cached');
+});
+
+test('the saved index lists canvas files without their text; an index from before canvas files is not used', async () => {
+  const f = canvasFake(); const s = state(f); await s.scanSync(); await s.loadProject(s.snapshot().projects[0].id);
+  const index = JSON.parse(JSON.stringify(s.exportIndex()));
+  assert.equal(index.version, 2);
+  assert.deepEqual(index.projects[0].canvases.progress, { path: '.horsemen/canvas/progress.canvas', sha: 'canvas-progress', size: Buffer.byteLength(CANVAS) });
+  assert.equal(JSON.stringify(index).includes('Pilot board') || JSON.stringify(index).includes('A note.'), false, 'no canvas text');
+  const t = state(canvasFake()); assert.equal(t.restore(index, 'operator'), true);
+  assert.deepEqual(Object.keys((await t.loadProject(t.snapshot().projects[0].id)).canvases).sort(), ['launch-plan', 'progress'], 'a restored project has its canvases');
+  assert.equal(state(canvasFake()).restore({ ...index, version: 1 }, 'operator'), false, 'an index from before canvas files starts a new scan');
 });

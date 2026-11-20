@@ -23,14 +23,25 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   traversal. GitHub error text is never passed to the browser.
 - **Parsing.** The browser runs `web/hosted-reader.js`, a port of the Python
   reader. `tests/test_hosted_reader.cjs` checks that both produce the same
-  links, sections, and project roots.
+  links, sections, project roots, and canvas file lists.
+- **Canvas files.** The reader finds `.horsemen/canvas/<name>.canvas` in the
+  tree that discovery already reads, so this costs no extra request. When a
+  project opens, the browser reads each canvas file (20 at most) as a blob,
+  checks it with `web/canvas-format.js`, and draws it. A file larger than
+  512 KiB is not requested. An image that a canvas names loads through the
+  contents route when it comes into view. The Worker has no new route and no
+  new permission: canvas files and their media use the blob and contents
+  reads that are already on the list, in the signed-in view and in the
+  public view. The server does not parse or keep a canvas file. See
+  [canvas files](../web/README.md#canvas-files).
 - **Live updates.** While a project is open and its tab is visible, the browser
   checks the branch every `POLL_SECONDS` (default 60) with an ETag. An
   unchanged branch returns 304, which GitHub does not count against the rate
   limit. A new commit reloads the project; an open record waits until it closes.
 - **Fast reloads.** After discovery, the browser saves a discovery index in
   `localStorage`: repository names, record paths, revisions, and ETags. It
-  never saves record text. A reload shows the projects at once and opens the
+  never saves record text or canvas text; for a canvas file it keeps the
+  path and the SHA. A reload shows the projects at once and opens the
   last project, then checks every branch in the background. Only changed or
   new repositories are scanned again. Sign-out and Clear workspace remove the
   index. Discovery reads up to 12 repositories in parallel.
@@ -38,6 +49,7 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   readable link. `https://horsemen.forsvn.com/owner/repo?record=progress`
   opens a record. `?canvas=progress` opens the canvas of a record, and
   `?canvas=progress&node=s-shipped` opens it with one section card selected.
+  `?canvas=launch-plan&node=note-risk` opens a board at one element.
   A project in a subfolder adds `root=apps%2Fweb`. The address bar always
   shows the link for the open project, canvas, card, and record; **Copy
   link** in the header and in the record copies it. A signed-out visitor
@@ -66,7 +78,10 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   read-only proxy and shows it from a `blob:` URL; SVG files load as images,
   so their scripts never run. External images stay links. Images larger than
   1 MiB stay links.
-- **Agents.** Agents update records the normal way: edit, commit, and push.
+- **Agents.** Agents update records and canvas files the normal way: edit,
+  commit, and push. A canvas file that an agent writes by hand shows after
+  the push, at the next check of the branch. A file that is not valid shows
+  a message and the generated canvas of the record.
   The viewer shows the default branch, so unpushed edits do not appear. The
   Horsemen Stop hook reminds the agent when a record it changed has not
   reached the remote default branch (see the Publish rule in
@@ -111,8 +126,13 @@ and a reload. `wrangler dev` uses HTTP/1.1, so the browser sends at most six
 requests at a time; production uses HTTP/2, so real parallel reads are faster.
 
 The end-to-end check runs `wrangler dev` against a fake GitHub. It signs in,
-opens a fictional project, detects a new commit, and signs out. It needs
-`agent-browser` and saves screenshots and logs to `--output`.
+opens a fictional project, detects a new commit, and signs out. It also
+pushes canvas files to the fake repository: a hand-written board shows with
+no reload, a file that is not valid shows a message and the generated
+canvas, a later push repairs it, and the public view opens a board from a
+link. It needs `agent-browser` and saves screenshots and logs to `--output`.
+Run `bun install` in `worker/` first, so that the check uses the local
+`wrangler`.
 
 ## Limits
 
@@ -124,5 +144,8 @@ opens a fictional project, detects a new commit, and signs out. It needs
 - Links to private repositories work only for people with GitHub access.
   Public links to private repositories would need stored share settings.
 - Private PR image attachments open on GitHub; the viewer does not load them.
+- Canvas files are read-only here. A project shows 20 canvas files at most;
+  each one is one blob read when the project opens. A canvas loads 100
+  images at most, one contents read for each image that comes into view.
 - Cloudflare's free plan allows 100,000 Worker requests a day. Each GitHub
   read is one request.

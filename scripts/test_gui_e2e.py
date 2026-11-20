@@ -9,6 +9,7 @@ import threading
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tests'))
 from test_gui import Fake
 from horsemen_core.gui import GitHubReader, ScanState, make_server
+from canvas_fixture import BOARDS, CANVASES, HEAVY_SIZE, MEDIA
 
 parser=argparse.ArgumentParser();parser.add_argument('--output',required=True,type=Path);args=parser.parse_args();args.output.mkdir(parents=True,exist_ok=True)
 root=Path(__file__).resolve().parents[1]
@@ -36,6 +37,12 @@ class ProgressiveFake(Fake):
         'structure':'# Structure\n## Map\n```text\napp/ — operator workspace (start here)\ndocs/ — decisions and references\ntests/ — verification\n```\n## Read before changing\nStart with the current progress snapshot.\n## Commands\npython3 scripts/serve_gui.py'
     }
     def __call__(self,path,paginate=False):
+        # Canvas files and the media that they name. The 2 MiB file has a size in the tree only: a request for its content is a fault.
+        if '/git/blobs/canvas-' in path:
+            self.calls.append(path);name=path.rsplit('/git/blobs/canvas-',1)[1]
+            return {'encoding':'base64','content':base64.b64encode(CANVASES[name].encode()).decode()}
+        for name,data in MEDIA.items():
+            if f'/contents/{name}?' in path:return {'type':'file','sha':'3'*40,'size':len(data),'encoding':'base64','content':base64.b64encode(data).decode()}
         for name,data in [('img/board.png',BOARD),('img/logo.svg',LOGO)]:
             if f'/contents/{name}?' in path:return {'type':'file','sha':'2'*40,'size':len(data),'encoding':'base64','content':base64.b64encode(data).decode()}
         if '/contents/img/' in path:
@@ -54,11 +61,16 @@ class ProgressiveFake(Fake):
         if '/git/trees/' in path:
             result['tree'] += [{'path':name,'type':'blob','mode':'100644','sha':name.split('.')[0].lower(),'size':200} for name in ['TECHSTACK.md','CHANGELOG.md']]
             for file in result['tree']:file['sha']=file['path'].split('.')[0].lower()
+            result['tree'] += [{'path':f'.horsemen/canvas/{name}.canvas','type':'blob','mode':'100644','sha':'canvas-'+name,'size':len(text.encode())} for name,text in CANVASES.items()]
+            result['tree'] += [{'path':'.horsemen/canvas/heavy.canvas','type':'blob','mode':'100644','sha':'canvas-heavy','size':HEAVY_SIZE},
+                               {'path':'.horsemen/canvas/Bad Name.canvas','type':'blob','mode':'100644','sha':'canvas-bad','size':20},
+                               {'path':'notes/.horsemen/canvas/stray.canvas','type':'blob','mode':'100644','sha':'canvas-stray','size':20}]
         if path.startswith('/user/repos'):
             second=dict(result[0],id=2,full_name='example/aardvark');return result+[second]
         if '/repos/example/aardvark/commits/' in path:release_scan.wait(45)
         return result
-server=make_server(0,ScanState(GitHubReader(ProgressiveFake())),root/'web')
+fake=ProgressiveFake()
+server=make_server(0,ScanState(GitHubReader(fake)),root/'web')
 thread=threading.Thread(target=server.serve_forever,daemon=True);thread.start()
 log=[]
 def browser(*args):
@@ -326,7 +338,7 @@ try:
     place='JSON.stringify(location.hash.replace(/^#p=[a-f0-9]{24}/,""))'
     # The heading of a section is at the top of the reading view, or the page is at its end.
     at_section=lambda name:value('JSON.stringify((()=>{const area=document.querySelector(".peek-content"),top=area.getBoundingClientRect().top,want=HorsemenSections.slug("'+name+'");const el=[...document.querySelectorAll("#peek-content [data-outline],#peek-content .prose h2")].find(e=>HorsemenSections.slug(e.dataset.outline||e.textContent)===want);if(!el)return "missing";const y=el.getBoundingClientRect().top-top;return (y>=-2&&y<=140)||area.scrollTop+area.clientHeight>=area.scrollHeight-2})())')
-    assert value('JSON.stringify([...document.querySelectorAll("#canvases [data-canvas]")].map(b=>b.dataset.canvas))')==['home','vision','progress','brain','structure','changelog','techstack'], 'The rail lists Home and the records that are found; the missing README has no canvas'
+    assert value('JSON.stringify([...document.querySelectorAll("#canvases [data-canvas]")].map(b=>b.dataset.canvas))')==['home','vision','progress','brain','structure','changelog','techstack',*BOARDS], 'The rail lists Home, the records that are found, and the boards; the missing README has no canvas'
     assert value('JSON.stringify([...document.querySelectorAll("#canvases [aria-current=page]")].map(b=>b.dataset.canvas))')==['home']
     browser('click','[data-canvas="progress"]')
     assert value('JSON.stringify([...document.querySelectorAll(".section-card")].map(e=>e.dataset.node))')==['s-latest-day','s-shipped','s-in-progress','s-up-next','s-gates','s-historical-ships','s-upcoming-roadmap'], 'One card for each second-level heading, in order'
@@ -411,6 +423,120 @@ try:
     assert value('JSON.stringify(canvasKey)')=='brain', 'A project opens on its last canvas'
     browser('click','[data-canvas="home"]')
     assert value('JSON.stringify([canvasKey,recordCards.every(e=>!e.hidden),document.querySelectorAll(".section-card").length,document.querySelector("#project-name").textContent,location.hash==="#p="+projects[current].id])')==['home',True,0,'alpha',True], 'Home returns with its record cards'
+
+    # Canvas files (.horsemen/canvas): boards in the rail, the elements of a file over the generated canvas, and a message for a file that is not valid.
+    assert value('JSON.stringify([...document.querySelectorAll("#canvases > *")].map(e=>e.dataset.canvas||e.textContent))')==['home','vision','progress','brain','structure','changelog','techstack','Boards',*BOARDS], 'Boards follow the records in name order; home.canvas, a bad file name, and a file outside the project root are not boards'
+    assert value('JSON.stringify([...document.querySelectorAll("#canvases .canvas-fault")].map(e=>e.closest("[data-canvas]").dataset.canvas))')==['brain','crowd','heavy'], 'A canvas file that is not valid has a mark in the rail'
+    assert not any('canvas-heavy' in call for call in fake.calls), 'The 2 MiB file is refused by its listed size; its content is never requested'
+    watch_csp=lambda:browser('eval','window.__csp=[];document.addEventListener("securitypolicyviolation",e=>window.__csp.push(e.violatedDirective+" "+e.blockedURI))')
+    watch_csp();browser('click','[data-canvas="structure"]')
+    nodes=value('JSON.stringify(Object.fromEntries([...document.querySelectorAll(".canvas-node")].map(e=>[e.dataset.node,[e.dataset.kind,e.tagName,e.classList.contains("saved")]])))')
+    assert nodes=={'s-map':['section','BUTTON',True],'s-read-before-changing':['section','BUTTON',False],'s-commands':['section','BUTTON',False],'note-risk':['note','DIV',True],'g-proof':['group','DIV',True],
+                   'img-board':['image','DIV',True],'img-logo':['image','DIV',True],'link-survey':['link','DIV',True],'ref-shipped':['section','BUTTON',True],'doc-research':['document','BUTTON',True],
+                   'sheet-signups':['file','DIV',True],'to-launch':['portal','BUTTON',True],'odd':['unknown','DIV',True]}, 'Each element of the file shows with its kind; each section that the file does not place is a generated card'
+    assert value('JSON.stringify([document.querySelector("#project-name").textContent,document.querySelector("#project-description").textContent.startsWith("3 sections · 11 elements from structure.canvas · example/alpha"),document.querySelector("#canvas-notice").hidden])')==['Structure',True,True], 'The header counts the sections and the elements of the file; a valid file has no message'
+    assert value('JSON.stringify((e=>[position("s-map"),e.offsetWidth,e.offsetHeight,e.dataset.tone,e.innerText.includes("operator workspace")])(document.querySelector("[data-node=s-map]")))')==[[0,0],320,220,'4',True], 'A saved section card keeps its place, size, and colour, and shows the text of the record'
+    assert value('JSON.stringify((()=>{const cards=[...document.querySelectorAll(".canvas-node:not(.group)")].map(e=>({id:e.dataset.node,x:position(e.dataset.node)[0],y:position(e.dataset.node)[1],w:e.offsetWidth,h:e.offsetHeight}));const hits=[];for(const a of cards)for(const b of cards)if(a.id<b.id&&HorsemenCanvas.overlaps(a,b,0))hits.push(a.id+"/"+b.id);return hits})())')==[], 'Generated cards do not overlap saved elements'
+    assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].every(e=>{const r=e.getBoundingClientRect(),c=document.querySelector(".canvas").getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom}))') is True, 'A canvas with a file fits the screen'
+    assert value('JSON.stringify((g=>[getComputedStyle(g).zIndex,g.querySelector(".group-label").textContent,[...document.querySelectorAll(".canvas-node:not(.group)")].every(e=>getComputedStyle(e).zIndex!=="0")])(document.querySelector("[data-node=g-proof]")))')==['0','Proof for the pilot',True], 'A group is a frame behind the other elements'
+    # Hostile text in a note is text. A relative link goes to GitHub at the loaded commit; a script address is not a link.
+    note=value('JSON.stringify((n=>[n.querySelector("strong").textContent,n.innerText.includes("<script>window.pwned=1</script>"),n.querySelectorAll("script,img,[onerror]").length,[...n.querySelectorAll("a")].map(a=>[a.textContent,a.href,a.target,a.rel]),n.dataset.tone])(document.querySelector("[data-node=note-risk]")))')
+    assert note==['Risk:',True,0,[['Research','https://github.com/example/alpha/blob/'+'a'*40+'/docs/research.md','_blank','noopener noreferrer']],'1'], 'A note shows Markdown from the safe renderer'
+    # Images come from blob: addresses through the reader. The SVG has a script; nothing runs.
+    browser('wait','--fn','document.querySelectorAll(".file-node.image .md-image[data-state=shown] img").length === 2')
+    assert value('JSON.stringify([...document.querySelectorAll(".file-node.image img")].map(i=>[i.alt,i.src.startsWith("blob:"),i.naturalWidth>0,i.closest("[data-node]").dataset.node]))')==[['Pilot board',True,True,'img-board'],['Pilot logo',True,True,'img-logo']], 'Repository images load as blob: images with their alternative text'
+    assert value('JSON.stringify(document.querySelectorAll(".canvas-node svg:not(.icon), .canvas-node iframe, .canvas-node object, .canvas-node embed").length)')==0, 'No image is inline or in a frame'
+    link=value('JSON.stringify((n=>[n.querySelector("b").textContent,n.querySelector(".card-line").textContent,[...n.querySelectorAll("a")].map(a=>[a.href,a.target,a.rel])])(document.querySelector("[data-node=link-survey]")))')
+    assert link==['Pilot survey results','example.com',[['https://example.com/survey?round=1','_blank','noopener noreferrer']]], 'A link card shows the stored title and the host; nothing is fetched'
+    assert value('JSON.stringify([document.querySelector("[data-node=sheet-signups] a").href,document.querySelector("[data-node=odd]").innerText.includes("Not supported"),document.querySelector("[data-node=ref-shipped] .card-from").textContent])')==['https://github.com/example/alpha/blob/'+'a'*40+'/.horsemen/media/signups.csv',True,'from Progress'], 'A table file is a file card; an unknown type says so; a section of another record names its record'
+    # Connectors: a curve, an arrow, and a label. A hostile label is text.
+    edges=value('JSON.stringify([...document.querySelectorAll(".wires .edge")].map(g=>[g.dataset.edge,g.querySelector("text").textContent,g.querySelectorAll("polygon").length,g.dataset.tone||null,/^M [-\\d.]+ [-\\d.]+ C /.test(g.querySelector("path").getAttribute("d"))]))')
+    assert edges==[['e-proof','proof',1,None,True],['e-risk','blocks',1,'1',True],['e-hostile','<img src=x onerror=window.pwned=1>',2,None,True]], 'Each connector has its label and its arrows'
+    assert value('JSON.stringify([document.querySelectorAll(".wires img,.wires script,.wires foreignObject,.wires circle").length,window.pwned??null,window.__csp])')==[0,None,[]], 'No script ran and nothing broke the content security policy'
+    browser('wait','--fn','document.getAnimations().every(a=>a.playState === "finished") && document.querySelector("#toast").hidden')
+    browser('screenshot',str(args.output/'canvas-file-structure.png'))
+    # Selection, keyboard, and links. An element of a file has a fixed place. Enter selects; a note does not open.
+    browser('click','[data-node="note-risk"]')
+    assert value(shown)==['structure',['note-risk'],False] and value(place)=='&c=structure&n=note-risk', 'A click selects an element and the address names it'
+    assert 'selected.' in browser('get','text','#selection-label') and 'Press Enter' not in browser('get','text','#selection-label'), 'The status names the selected element; a note has nothing to open'
+    spot=value('JSON.stringify(position("note-risk"))');camera_before=value('JSON.stringify(camera)')
+    box=value('JSON.stringify((()=>{const r=document.querySelector("[data-node=note-risk]").getBoundingClientRect();return {x:r.x,y:r.y}})())')
+    drag_points((box['x']+20,box['y']+12),(box['x']+60,box['y']+42))
+    assert value('JSON.stringify(position("note-risk"))')==spot and value('camera.x')>camera_before['x'], 'A drag on an element of a file moves the canvas; the element keeps its place'
+    browser('press','Enter')
+    assert value(shown)==['structure',['note-risk'],False], 'Enter on a selected note opens nothing'
+    browser('press','Escape');browser('focus','[data-node="img-board"]');browser('press','Enter')
+    assert value(shown)==['structure',['img-board'],False], 'Enter selects an element that is not a button'
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+    assert value(shown)==['structure',['img-board'],False] and value('JSON.stringify(document.activeElement.dataset.node)')=='img-board', 'A reload returns to the canvas and the element'
+    # A section of another record opens that record at the section. The link keeps the canvas, the card, and the record.
+    browser('dblclick','[data-node="ref-shipped"]');browser('wait','#peek[open]')
+    assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Progress' and at_section('Shipped') is True and value(place)=='&c=structure&n=ref-shipped&r=progress', 'A section card of another record opens that record at the section'
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"');browser('wait','#peek[open]')
+    assert value(shown)==['structure',['ref-shipped'],True] and value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Progress' and at_section('Shipped') is True, 'A reload returns to the section of the other record'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open && document.activeElement.dataset.node === "ref-shipped"')
+    # A document card opens the document in the reading view.
+    browser('dblclick','[data-node="doc-research"]');browser('wait','--fn','document.querySelector("#peek").open && document.querySelector("#peek-content").innerText.includes("Operators need a clear next step.")')
+    assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='research.md', 'A document card opens its document'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open')
+    # List view: the same elements in reading order, with the connectors as text. A section opens with one click; a note does not.
+    browser('click','#list-view')
+    assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].map(e=>e.dataset.node))')==value('JSON.stringify(HorsemenCanvasView.listOrder(canvasView.nodes).map(n=>n.id))'), 'The list has the order of the view rules'
+    tops=value('JSON.stringify([...document.querySelectorAll(".canvas-node")].map(e=>Math.round(e.getBoundingClientRect().top)))')
+    assert tops==sorted(tops) and len(set(tops))==len(tops), 'The list shows one element after the other'
+    assert value('JSON.stringify([[...document.querySelectorAll("[data-node=s-map] .card-links .card-line")].map(e=>e.textContent),document.querySelector(".canvas").scrollWidth<=document.querySelector(".canvas").clientWidth,[...document.querySelectorAll(".canvas-node")].every(e=>e.scrollWidth<=e.clientWidth+1)])')==[['proof → Pilot board'],True,True], 'The list names the connectors of an element, and nothing scrolls sideways'
+    order=value('JSON.stringify([...document.querySelectorAll(".canvas-node")].map(e=>e.dataset.node))')
+    assert order.index('g-proof')<order.index('img-board')<order.index('img-logo')<order.index('link-survey'), 'A group comes before its elements'
+    browser('screenshot',str(args.output/'canvas-file-list.png'))
+    browser('click','[data-node="note-risk"] p');assert value(shown)[2] is False, 'A click on a note in the list opens nothing'
+    browser('click','[data-node="s-map"]');browser('wait','#peek[open]')
+    assert value(place)=='&c=structure&n=s-map&r=structure' and at_section('Map') is True, 'One click in the list opens a saved section card at its section'
+    browser('press','Escape');browser('wait','--fn','!document.querySelector("#peek").open');browser('click','#canvas-view')
+    # A portal opens its canvas: a board. Elements can have the IDs of records and of built-in keys.
+    browser('focus','[data-node="to-launch"]');browser('press','Enter');browser('press','Enter')
+    browser('wait','--fn','canvasKey === "launch-plan"')
+    assert value('JSON.stringify([document.querySelector("#project-name").textContent,document.querySelector("#project-description").textContent.startsWith("7 elements from launch-plan.canvas · example/alpha"),[...document.querySelectorAll("#canvases [aria-current=page]")].map(b=>b.dataset.canvas)])')==['Launch plan',True,['launch-plan']] and value(place)=='&c=launch-plan', 'Enter on a selected portal opens its canvas, and the rail marks the board'
+    assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].map(e=>e.dataset.node).sort())')==['constructor','g-ideas','progress','ref-gone','ref-shipped','to-nowhere','to-structure'], 'A board shows only the elements of its file'
+    browser('click','[data-node="progress"]')
+    assert value(shown)==['launch-plan',['progress'],False] and value(place)=='&c=launch-plan&n=progress', 'An element with the ID of a record is an element of this canvas'
+    assert value('JSON.stringify([document.querySelector("#selection-label").textContent,recordCards.every(e=>e.hidden&&!e.classList.contains("canvas-selected")),document.querySelectorAll(".card-links-toggle:not([hidden]),.wires>path,.wires>circle").length])')==['Invite the pilot guests in one message. selected.',True,0], 'The hidden Home card with the same ID stays out of it'
+    browser('press','Enter');assert value(shown)==['launch-plan',['progress'],False], 'Enter on that note opens nothing, also not the Progress record'
+    browser('click','[data-node="constructor"]')
+    assert value(shown)==['launch-plan',['constructor'],False] and value('JSON.stringify([document.querySelector("#selection-label").textContent,document.querySelector("[data-node=constructor]").dataset.tone,getComputedStyle(document.querySelector("[data-node=constructor]")).getPropertyValue("--tone")])')==['Ask two partners for a quote. selected.','hex','#33407A'], 'An element with the ID of a built-in key works; a hex colour is set as a value'
+    assert value('JSON.stringify([(e=>[e.tagName,e.innerText.includes("Canvas not found")])(document.querySelector("[data-node=to-nowhere]")),(e=>[e.tagName,e.innerText.includes("Section not found. The heading is not in Progress now.")])(document.querySelector("[data-node=ref-gone]"))])')==[['DIV',True],['BUTTON',True]], 'A portal to a canvas that is not there says so; a section card whose heading is gone says so'
+    browser('screenshot',str(args.output/'canvas-file-board.png'))
+    browser('dblclick','[data-node="to-structure"]');browser('wait','--fn','canvasKey === "structure"')
+    # A file that is not valid: a message, and the generated canvas of the record.
+    browser('click','[data-canvas="brain"]')
+    assert value('JSON.stringify([document.querySelector("#canvas-notice").hidden,document.querySelector("#canvas-notice").dataset.level,document.querySelector("#canvas-notice p").textContent,document.querySelector("#canvas-notice a").href])')==[False,'error','brain.canvas is not a valid canvas file: file is not valid JSON. The canvas shows the sections of the record.','https://github.com/example/alpha/blob/'+'a'*40+'/.horsemen/canvas/brain.canvas'], 'A file that is not JSON gives a clear message with a link to the file'
+    assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].map(e=>[e.dataset.node,position(e.dataset.node)]))')==value('JSON.stringify(HorsemenSections.canvas("brain",records.brain.content).nodes.map(n=>[n.id,[n.x,n.y]]))'), 'The generated canvas of the record shows in place of the file'
+    browser('screenshot',str(args.output/'canvas-file-invalid.png'))
+    # Hostile elements: the reader refuses a script address, CSS in a colour, and a path with "..". The others show as text.
+    watch_csp();browser('click','[data-canvas="review"]')
+    assert value('JSON.stringify([document.querySelector("#canvas-notice").dataset.level,document.querySelector("#canvas-notice p").textContent,[...document.querySelectorAll("#canvas-notice li")].map(e=>e.textContent.split(":")[0])])')==['warning','review.canvas has 3 elements that do not show. First fault: node evil: url must be an http or https address of 2,048 characters or less.',['node evil','node css','node up']], 'The message gives the count and each fault'
+    assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].map(e=>e.dataset.node).sort())')==['label','ok','quoted'], 'The valid elements still show'
+    hostile=value('JSON.stringify([document.querySelectorAll("#map script,#map [onerror],#map img:not([src^=\\"blob:\\"]),a[href^=\\"javascript\\" i]").length,[...document.querySelectorAll(".canvas-node")].some(e=>/url\\(|background:/.test(e.getAttribute("style"))),document.querySelector("[data-node=label] .group-label").textContent.startsWith("<script>"),document.querySelector("[data-node=quoted] a").href.startsWith("https://example.com/?q="),window.pwned??null,window.__csp])')
+    assert hostile==[0,False,True,True,None,[]], 'Script text is text, no script address is a link, no colour carries CSS, and no script ran'
+    browser('screenshot',str(args.output/'canvas-file-hostile.png'))
+    for name,words in [('crowd','crowd.canvas is not a valid canvas file: more than 500 nodes. No element of this file shows.'),('heavy','heavy.canvas was not read. The canvas file is larger than 512 KiB. No element of this file shows.')]:
+        browser('click',f'[data-canvas="{name}"]')
+        assert value('JSON.stringify([document.querySelector("#canvas-notice p").textContent,document.querySelectorAll(".canvas-node").length,document.querySelector("#canvas-note").hidden,document.querySelector("#canvas-note").textContent])')==[words,0,False,'This canvas has no elements to show.'], name+': the file gives a message and no element'
+    # A board with the name of a built-in key opens from the rail, from a link, and from Jump.
+    browser('click','[data-canvas="constructor"]')
+    assert value('JSON.stringify([canvasKey,document.querySelector("#project-name").textContent,document.querySelectorAll(".canvas-node").length,document.querySelector("#canvas-notice").hidden])')==['constructor','Constructor',1,True] and value(place)=='&c=constructor'
+    browser('reload');browser('wait','--fn','document.body.dataset.state === "ready"')
+    assert value(shown)==['constructor',[],False], 'A reload returns to the board'
+    go('&c=not-there&n=x')
+    assert value(shown)==['home',[],False] and 'no canvas with the name' in browser('get','text','#toast'), 'A link to a canvas that is not in the project opens Home and says so'
+    go('&c=launch-plan&n=gone')
+    assert value(shown)==['launch-plan',[],False] and 'not in Launch plan now' in browser('get','text','#toast'), 'A link to an element that is gone says so'
+    browser('press','Control+k');browser('wait','#palette[open]');browser('fill','#palette-input','review canvas');browser('press','Enter')
+    assert value('JSON.stringify([canvasKey,document.querySelector("#palette").open])')==['review',False], 'Jump opens a board'
+    # The SVG blob test: the image address opened as a page runs no script.
+    browser('click','[data-canvas="structure"]');browser('wait','--fn','document.querySelectorAll(".file-node.image .md-image[data-state=shown] img").length === 2')
+    browser('eval','location.href=document.querySelector("[data-node=img-logo] img").src');browser('wait','--fn','location.protocol === "blob:" && document.documentElement.localName === "svg"')
+    assert value('JSON.stringify([document.documentElement.namespaceURI,document.querySelectorAll("script").length,window.pwned??null])')==['http://www.w3.org/2000/svg',1,None], 'The SVG opened as a page from its blob: address has its script element, and the script did not run'
+    browser('open',f'http://127.0.0.1:{server.server_port}/#p={pid}');browser('wait','--fn','document.body.dataset.state === "ready"');watch_csp()
     # Shortcut sheet: from ? and from Jump.
     browser('focus','.canvas');browser('press','?');browser('wait','#shortcuts[open]')
     assert 'Collapse all linked branches' in browser('get','text','#shortcuts'), 'The shortcut sheet lists the canvas keys'
@@ -607,6 +733,12 @@ try:
         assert browser('eval','document.documentElement.scrollWidth <= innerWidth').strip()=='true', t['id']+' fits a phone'
         browser('eval','showCanvas("progress")')
         assert value('JSON.stringify([document.documentElement.scrollWidth<=innerWidth,(r=>r.scrollWidth<=r.clientWidth+1)(document.querySelector(".rail")),[...document.querySelectorAll(".section-card")].every(e=>e.scrollWidth<=e.clientWidth+1&&e.getBoundingClientRect().right<=innerWidth)])')==[True,True,True], t['id']+' fits a record canvas on a phone'
+        # A canvas with a file on a phone, in each theme: the list of its elements fits, and a preset colour is a colour of the theme.
+        browser('eval','showCanvas("structure")')
+        assert value('JSON.stringify([document.querySelector("#map").classList.contains("list"),document.documentElement.scrollWidth<=innerWidth,[...document.querySelectorAll(".canvas-node")].every(e=>e.scrollWidth<=e.clientWidth+1&&e.getBoundingClientRect().right<=innerWidth),document.querySelectorAll(".canvas-node").length])')==[True,True,True,13], 'A canvas with a file fits a phone as a list in '+t['id']
+        tones=value('JSON.stringify(["s-map","note-risk","s-commands"].map(id=>getComputedStyle(document.querySelector("[data-node="+id+"]"),"::before").backgroundColor))')
+        assert len(set(tones))==3 and tones[2]=='rgba(0, 0, 0, 0)', 'Each preset colour shows as a colour of the theme in '+t['id']
+        if t['id'] in ('engraved','terminal'):browser('screenshot',str(args.output/f'canvas-file-phone-{t["id"]}.png'))
         browser('eval','showCanvas("home")')
         for key in ['progress','vision','brain','structure','changelog','techstack']:
             browser('eval',f'openPeek("{key}",document.querySelector("[data-artifact={key}]"))');browser('wait','#peek[open]')
@@ -625,7 +757,7 @@ try:
     assert browser('get','text','#peek-content').strip()==''
     assert browser('get','text','#project-name').strip()=='Workspace cleared'
     assert not browser('errors').strip()
-    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, generated canvases with section links and keyboard use, mobile bounds, every theme at desktop and phone width, no browser errors.')
+    print('PASS: local sign-in scan, real-provider adapter, record peek/source/missing states, safe Markdown, canvas/list, generated canvases with section links and keyboard use, canvas files (boards, elements, connectors, list, messages, hostile content, the SVG blob test), mobile bounds, every theme at desktop and phone width, no browser errors.')
 except BaseException:
     try:
         browser('screenshot',str(args.output/'failure.png'))

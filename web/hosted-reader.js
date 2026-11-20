@@ -7,6 +7,8 @@
   const FILES = { vision: 'VISION.md', progress: 'PROGRESS.md', brain: 'BRAIN.md', structure: 'STRUCTURE.md', readme: 'README.md', changelog: 'CHANGELOG.md', techstack: 'TECHSTACK.md' };
   const EXCLUDED = new Set(['.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor']);
   const MAX_FILE = 512 * 1024;
+  /* An own property, also for a key such as __proto__. */
+  const put = (object, key, value) => { Object.defineProperty(object, key, { value, enumerable: true, writable: true, configurable: true }); return value; };
   const CORE = ['vision', 'progress', 'brain', 'structure'];
 
   class ProviderError extends Error { constructor(message, status = 502) { super(message); this.status = status; } }
@@ -120,35 +122,92 @@
 
   function discoverRoots(entries) {
     const reverse = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [v, k])); reverse['STATUS.md'] = 'progress';
-    const roots = {};
+    /* A folder can have the name of a built-in key, such as __proto__: each root is an own property. */
+    const roots = {}, own = (object, key) => Object.hasOwn(object, key) ? object[key] : undefined;
     for (const entry of entries) {
       if (entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) continue;
       // PurePosixPath parts: drop empty and '.' segments; '..' stays as written.
       const parts = String(entry.path).split('/').filter(x => x && x !== '.'), name = parts[parts.length - 1];
       if (parts.some(p => EXCLUDED.has(p)) || !Object.hasOwn(reverse, name)) continue;
       const root = parts.slice(0, -1).join('/');
-      const files = roots[root] || (roots[root] = {});
+      const files = own(roots, root) || put(roots, root, {});
       const key = reverse[name];
-      if (key === 'progress' && key in files && name === 'STATUS.md') continue;
+      if (key === 'progress' && Object.hasOwn(files, key) && name === 'STATUS.md') continue;
       files[key] = { path: entry.path ?? null, sha: entry.sha ?? null, size: entry.size ?? null };
     }
     const out = {};
     for (const [root, files] of Object.entries(roots)) {
-      if (CORE.filter(k => k in files).length >= 2 && ('vision' in files || 'progress' in files)) out[root] = files;
+      if (CORE.filter(k => Object.hasOwn(files, k)).length >= 2 && (Object.hasOwn(files, 'vision') || Object.hasOwn(files, 'progress'))) put(out, root, files);
     }
     return out;
   }
 
-  function decodeBlob(blob) {
-    if (!blob || blob.encoding !== 'base64') throw new ProviderError('Unsupported record encoding.');
-    if (typeof blob.content !== 'string') throw new ProviderError('Record could not be decoded as UTF-8 Markdown.');
+  /* Canvas files: <project root>/.horsemen/canvas/<name>.canvas. Same rules as discover_canvases and canvas_links
+     in the Python reader. The app checks and draws the text (canvas-format.js); this reader finds the files,
+     loads the text, and registers the files that a canvas names. */
+  const CANVAS_DIR = '.horsemen/canvas', CANVAS_NAME = /^[a-z0-9][a-z0-9-]{0,63}$/, MAX_CANVASES = 20, MAX_CANVAS_NODES = 500;
+  const CANVAS_TOO_LARGE = 'The canvas file is larger than 512 KiB.', CANVAS_UNREADABLE = 'The canvas file could not be decoded as UTF-8 text.';
+  function discoverCanvases(entries, roots) {
+    const found = {};
+    for (const root of Object.keys(roots)) put(found, root, {});
+    for (const entry of entries) {
+      if (entry.type !== 'blob' || !['100644', '100755'].includes(entry.mode)) continue;
+      const path = String(entry.path), cut = path.lastIndexOf('/'), folder = cut < 0 ? '' : path.slice(0, cut), filename = path.slice(cut + 1);
+      if (!filename.endsWith('.canvas') || !CANVAS_NAME.test(filename.slice(0, -7))) continue;
+      let root;
+      if (folder === CANVAS_DIR) root = '';
+      else if (folder.endsWith('/' + CANVAS_DIR)) root = folder.slice(0, -CANVAS_DIR.length - 1);
+      else continue;
+      if (Object.hasOwn(found, root)) put(found[root], filename.slice(0, -7), { path: entry.path ?? null, sha: entry.sha ?? null, size: entry.size ?? null });
+    }
+    const out = {};
+    for (const [root, files] of Object.entries(found)) {
+      const kept = {};
+      for (const name of Object.keys(files).sort().slice(0, MAX_CANVASES)) put(kept, name, files[name]);
+      put(out, root, kept);
+    }
+    return out;
+  }
+  /* A path inside the project, as a canvas file states it. */
+  const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+  function safeFile(target) {
+    if (typeof target !== 'string' || target.length < 1 || target.startsWith('/') || target.includes('\\')) return false;
+    if (target.length > 1024 && [...target].length > 1024) return false;
+    if (/[\x00-\x1f]/.test(target) || LONE_SURROGATE.test(target)) return false;
+    return target.split('/').every(part => part !== '' && part !== '.' && part !== '..');
+  }
+  /* Files that a canvas file names, as links. Only these files can be read for the canvas. */
+  async function canvasLinks(text, sourcePath, root, repo, revision) {
+    let doc; try { doc = JSON.parse(text); } catch { return []; }
+    const nodes = doc !== null && typeof doc === 'object' && !Array.isArray(doc) && Object.hasOwn(doc, 'nodes') ? doc.nodes : null;
+    if (!Array.isArray(nodes) || nodes.length > MAX_CANVAS_NODES) return [];
+    const result = [], seen = new Set();
+    for (const node of nodes) {
+      if (node === null || typeof node !== 'object' || Array.isArray(node) || !Object.hasOwn(node, 'type') || node.type !== 'file') continue;
+      const target = Object.hasOwn(node, 'file') ? node.file : null;
+      if (!safeFile(target) || target.endsWith('.canvas')) continue;
+      const path = root ? `${root}/${target}` : target;
+      const href = `https://github.com/${repo}/blob/${revision}/${quote(path, '/')}`;
+      if (seen.has(href)) continue;
+      seen.add(href);
+      const alt = Object.hasOwn(node, 'alt') ? node.alt : null, lower = path.toLowerCase();
+      result.push({ id: await sha24(sourcePath + '\0' + href), title: typeof alt === 'string' && alt ? alt : path.split('/').pop(), href, path,
+        kind: lower.endsWith('.md') || lower.endsWith('.markdown') ? 'document' : 'attachment', source: sourcePath });
+    }
+    return result;
+  }
+
+  const RECORD_WORDS = { encoding: 'Unsupported record encoding.', unreadable: 'Record could not be decoded as UTF-8 Markdown.', large: 'Record exceeds the size limit.' };
+  function decodeBlob(blob, words = RECORD_WORDS) {
+    if (!blob || blob.encoding !== 'base64') throw new ProviderError(words.encoding);
+    if (typeof blob.content !== 'string') throw new ProviderError(words.unreadable);
     const encoded = blob.content.replace(/\s/g, '');
-    if (encoded.length > MAX_FILE * 2) throw new ProviderError('Record exceeds the size limit.', 413);
-    if (encoded.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new ProviderError('Record could not be decoded as UTF-8 Markdown.');
+    if (encoded.length > MAX_FILE * 2) throw new ProviderError(words.large, 413);
+    if (encoded.length % 4 || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new ProviderError(words.unreadable);
     let bytes;
-    try { bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0)); } catch { throw new ProviderError('Record could not be decoded as UTF-8 Markdown.'); }
-    if (bytes.length > MAX_FILE) throw new ProviderError('Record exceeds the size limit.', 413);
-    try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new ProviderError('Record could not be decoded as UTF-8 Markdown.'); }
+    try { bytes = Uint8Array.from(atob(encoded), c => c.charCodeAt(0)); } catch { throw new ProviderError(words.unreadable); }
+    if (bytes.length > MAX_FILE) throw new ProviderError(words.large, 413);
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { throw new ProviderError(words.unreadable); }
   }
 
   /* Repository images. Same rules and messages as decode_image in horsemen_core.gui. GitHub's contents API
@@ -189,6 +248,8 @@
   }
 
   const without = (obj, key) => Object.fromEntries(Object.entries(obj).filter(([k]) => k !== key));
+  /* A project without its file lists, for the project list and a loaded project. */
+  const publicProject = project => without(without(project, 'files'), 'canvases');
   const clone = value => structuredClone(value);
 
   class Reader {
@@ -207,17 +268,34 @@
       const revision = commit.sha, treeSha = commit.commit.tree.sha;
       const tree = await this.api(`/repos/${name}/git/trees/${treeSha}?recursive=1`);
       if (tree.truncated) throw new ProviderError('Repository tree is too large for a complete scan. Use a smaller repository or a future explicit-root import.', 422);
-      const output = [];
-      for (const [root, files] of Object.entries(discoverRoots(tree.tree || []))) {
+      const output = [], roots = discoverRoots(tree.tree || []), canvases = discoverCanvases(tree.tree || [], roots);
+      for (const [root, files] of Object.entries(roots)) {
         output.push({ id: await sha24(`${repo.id}:${root}`), repo: name, root, name: root ? root.split('/').pop() : name.split('/').pop(),
-          private: !!repo.private, archived: !!repo.archived, branch, revision, files,
+          private: !!repo.private, archived: !!repo.archived, branch, revision, files, canvases: canvases[root],
           missing: CORE.filter(k => !(k in files)), scanned_at: now() });
       }
       return { revision, projects: output };
     }
     async load(project) {
-      const entries = await Promise.all(Object.entries(FILES).map(async ([key, name]) => [key, await this.loadRecord(project, key, name)]));
-      return { project: without(project, 'files'), records: Object.fromEntries(entries), loaded_at: now() };
+      const [entries, drawings] = await Promise.all([
+        Promise.all(Object.entries(FILES).map(async ([key, name]) => [key, await this.loadRecord(project, key, name)])),
+        Promise.all(Object.keys(project.canvases || {}).map(async name => [name, await this.loadCanvas(project, name)]))]);
+      const canvases = {};
+      for (const [name, canvas] of drawings) put(canvases, name, canvas);
+      return { project: publicProject(project), records: Object.fromEntries(entries), canvases, loaded_at: now() };
+    }
+    /* The text of one canvas file and the files that it names. A failure stays with this canvas. */
+    async loadCanvas(project, name) {
+      const file = project.canvases[name], path = file.path;
+      const rec = { name, path, url: `https://github.com/${project.repo}/blob/${project.revision}/${quote(path, '/')}`, blob: file.sha };
+      try {
+        if (typeof file.size !== 'number' || !Number.isInteger(file.size) || file.size > MAX_FILE) throw new ProviderError(CANVAS_TOO_LARGE, 413);
+        const text = decodeBlob(await this.api(`/repos/${project.repo}/git/blobs/${file.sha}`), { encoding: 'Unsupported canvas encoding.', unreadable: CANVAS_UNREADABLE, large: CANVAS_TOO_LARGE });
+        Object.assign(rec, { content: text, connections: await canvasLinks(text, path, project.root, project.repo, project.revision) });
+      } catch (error) {
+        rec.error = error instanceof ProviderError ? error.message : CANVAS_UNREADABLE;
+      }
+      return rec;
     }
     async loadRecord(project, key, fallback, blob = null) {
       const file = project.files[key];
@@ -269,7 +347,7 @@
     begin() { if (this.data.phase === 'scanning') return null; this.clear(); this.reader.profileCache = null; this.data.phase = 'scanning'; return this.generation; }
     start() { const generation = this.begin(); if (generation === null) return false; this.running = this.scan(generation); return true; }
     async scanSync() { const generation = this.begin(); if (generation !== null) await this.scan(generation); }
-    publish() { this.data.projects = [...this.projects.values()].map(p => without(p, 'files')); }
+    publish() { this.data.projects = [...this.projects.values()].map(publicProject); }
     async scan(generation) {
       const live = () => generation === this.generation;
       try {
@@ -318,9 +396,9 @@
       if (this.cache.has(key)) return clone(this.cache.get(key));
       const result = await this.reader.load(project);
       if (generation !== this.generation) throw new ProviderError('Discovery changed. Open the project again.', 409);
-      this.registerLinks(key, Object.values(result.records));
-      // Bound memory to 16 projects; never cache transient record failures.
-      if (Object.keys(project.files).every(k => 'content' in result.records[k])) {
+      this.registerLinks(key, [...Object.values(result.records), ...Object.values(result.canvases)]);
+      // Bound memory to 16 projects; never cache transient record or canvas failures.
+      if (Object.keys(project.files).every(k => 'content' in result.records[k]) && Object.values(result.canvases).every(canvas => 'content' in canvas)) {
         if (this.cache.size >= 16) this.cache.delete(this.cache.keys().next().value);
         this.cache.set(key, clone(result));
       }
@@ -368,12 +446,13 @@
       if (generation !== this.generation) return null;
       this.replaceRepo(repo, revision, found);
       this.publish();
-      return this.projects.has(key) ? without(this.projects.get(key), 'files') : null;
+      return this.projects.has(key) ? publicProject(this.projects.get(key)) : null;
     }
   }
 
-  /* Saved discovery index: repository names, record paths, and revisions only. */
-  const INDEX_VERSION = 1;
+  /* Saved discovery index: repository names, record and canvas paths, and revisions only.
+     Version 2 lists canvas files; an index of version 1 is not used, so a new scan finds them. */
+  const INDEX_VERSION = 2;
   const REPO_FIELDS = ['id', 'full_name', 'default_branch', 'private', 'archived', 'pushed_at', 'revision'];
   Object.assign(ScanState.prototype, {
     replaceRepo(repo, revision, found) {
@@ -451,10 +530,11 @@
     const record = url.searchParams.get('record');
     return { repo: `${owner}/${repo}`, root: url.searchParams.get('root') || '', record: Object.hasOwn(FILES, record || '') ? record : null, ...viewLink(url.searchParams.get('canvas'), url.searchParams.get('node')) };
   }
-  /* A place on a canvas: a record canvas and at most one element on it. Home is the default and has no name in a link. */
+  /* A place on a canvas: the canvas of a record or a board (the name of a canvas file), and at most one element on it.
+     Home is the default and has no name in a link. The app opens Home when the project has no canvas with the name. */
   const NODE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
   function viewLink(canvas, node) {
-    const known = typeof canvas === 'string' && Object.hasOwn(FILES, canvas) ? canvas : null;
+    const known = typeof canvas === 'string' && canvas !== 'home' && CANVAS_NAME.test(canvas) ? canvas : null;
     return { canvas: known, node: known && typeof node === 'string' && NODE_ID.test(node) ? node : null };
   }
   function shareURL(origin, project, record = null, canvas = null, node = null) {
@@ -471,6 +551,6 @@
     ? [...repos.filter(r => r.full_name.toLowerCase() === target.repo.toLowerCase()), ...repos.filter(r => r.full_name.toLowerCase() !== target.repo.toLowerCase())]
     : repos;
 
-  const api = { MAX_IMAGE, imageType, decodeImage, shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
+  const api = { MAX_CANVASES, discoverCanvases, canvasLinks, MAX_IMAGE, imageType, decodeImage, shareTarget, shareURL, matchesTarget, prioritize, FILES, MAX_FILE, ProviderError, quote, unquote, urlsplit, normpath, connections, sections, discoverRoots, decodeBlob, Reader, ScanState };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenReader = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);
