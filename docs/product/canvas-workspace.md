@@ -9,7 +9,9 @@ tools, and the hooks are merged. Slice 2b (click-to-load players and CSV and
 TSV tables) is merged and deployed. See [slice 2b as built](#slice-2b-as-built).
 Slice 4a (browser editing with the opt-in editor app) is built and waits for
 review; the editor app does not exist on the live site yet. See
-[slice 4a as built](#slice-4a-as-built).
+[slice 4a as built](#slice-4a-as-built). Slice 4c (saves to a `horsemen/canvas`
+branch when the default branch is protected) is built and waits for review.
+See [slice 4c as built](#slice-4c-as-built).
 The owner gave the direction and three decisions on 2026-11-19; this page
 turns them into a design and a build plan.
 
@@ -233,7 +235,7 @@ checks the browser against a fake GitHub.
 | Request checks | In this order: the editor app is configured (else `404`), a session (`401`), same origin and the CSRF token (`403`), POST (`405`), an `Origin` header that is this site (`403`), `Content-Type: application/json` (`415`), a declared `Content-Length` of 2 MiB or less when there is one (`413`), an editor token (`403`), a body of 2 MiB or less while it is read (`413`), JSON with exactly `repo`, `root`, `canvas`, `base`, and `text` (`400`), each name (`400`), and the canvas (`422`). |
 | Names | `repo`: `owner/name` with the characters that GitHub allows, not `.` or `..`. `root`: empty, or up to 16 folders of letters, digits, `_`, `.`, and `-`, with 200 characters at most; a folder cannot start with `.`. `canvas`: the canvas name rule, not `home`. `base`: a blob SHA (40 or 64 hex characters) or `null`. Media is not accepted in this slice. |
 | Canvas | `canvas-format.js` checks the text, as in the browser. Each error refuses the save, also an edge to a missing node. A file with a higher version is refused. The Worker writes the canonical text. It does not check that each `file` exists or that each `subpath` matches a heading. |
-| Commit | `GET /repos/{repo}` (default branch, push permission), `GET` the file at the default branch (blob SHA), then `PUT` the file. A SHA that is not `base` is a conflict (`409`, `conflict`, with the current SHA or `null`). The same text as on GitHub makes no commit (`unchanged`). A `409` or `422` from the `PUT` reads the file again: a new SHA is a conflict; the same SHA means that the head moved, and the `PUT` runs again, three times at most (then `409`, `busy`). `403` or `404` from GitHub is `editor-install`; a user without push access gets `no-push`. GitHub error text never goes to the browser. |
+| Commit | `GET /repos/{repo}` (default branch, push permission), `GET` the file at the default branch (blob SHA), then `PUT` the file. A SHA that is not `base` is a conflict (`409`, `conflict`, with the current SHA or `null`). The same text as on GitHub makes no commit (`unchanged`). A `409` or `422` from the `PUT` reads the file again: a new SHA is a conflict; the same SHA means that the head moved, and the `PUT` runs again, three times at most (since slice 4c, the save then goes to `horsemen/canvas`). `403` or `404` from GitHub is `editor-install`; a user without push access gets `no-push`. GitHub error text never goes to the browser. |
 | Message | `canvas(<name>): <counts> [skip ci]`. The counts come from the old and the new file: add (new nodes), move (only position or size changed), edit (other keys changed), connect (new edges), remove (nodes and edges). No text from the file goes into the message. A replayed request finds a new SHA and is a conflict. |
 | Edit mode | Hosted and signed in only; the Worker adds `canvas-edit.js`, `canvas-editor.js`, and `canvas-editor.css`. Edit opens on a record canvas or a board whose file is valid and of version 1. Move (drag, arrow keys), add a note (in free space in the middle of the view), edit a note (double-click, Enter), connect or disconnect two selected elements, delete, and save (Ctrl/Cmd + S) with a preview of the file, the message, the branch, the changed elements, and a warning for a public repository. A generated section card goes into the file with `file` and `subpath` when it moves or connects; a card whose heading is repeated or has `#` cannot. A generated card cannot be deleted. |
 | Draft | The canvas document in `sessionStorage`, with the SHA and the document that it started from. It comes back with Edit after a reload. If the file changed since, the draft merges with the new file first. The page warns before it closes with an unsaved draft. Sign-out removes drafts. Done asks: save, discard, or keep the draft. |
@@ -265,6 +267,38 @@ give the cause of each `409` of the contents call. Thus the Worker reads the
 file again before it decides between "conflict" and "try again". The fake
 GitHub of the browser check follows this rule. The live check on a disposable
 repository confirms it on github.com before the first deploy with editing.
+
+### Slice 4c as built
+
+Slice 4c sends a save to the branch `horsemen/canvas` when GitHub does not
+allow a direct commit on the default branch. The person then opens a pull
+request on GitHub. Horsemen does not make the pull request. The rules are in
+`worker/src/index.js` (`editorGitHub`, `/write/canvas`, `/write/target`),
+`web/canvas-edit.js` (`PR_BRANCH`, `message`, `pullRequestLink`), and
+`web/canvas-editor.js`. `worker/test/protected.test.js` and
+`tests/test_canvas_edit.cjs` check them; `scripts/test_hosted_edit_e2e.py`
+checks the browser against a fake GitHub with a protected `main`.
+
+| Item | Rule in the code |
+| --- | --- |
+| Detection | Before a save, the Worker reads `GET /repos/{repo}/branches/{default}` (the classic `protected` flag) and `GET /repos/{repo}/rules/branches/{default}` (the ruleset rules that apply). The branch is protected when the flag is true or when a rule of type `update`, `pull_request`, `required_status_checks`, `required_deployments`, or `merge_queue` applies. Other rules, such as `deletion` or `non_fast_forward`, do not stop a commit. A check that fails counts as no protection. |
+| Refused commit | When no check finds protection but GitHub refuses the direct `PUT`, the save also goes to `horsemen/canvas`: a `403`, a `422`, or a `409` with an unchanged file, after three tries. A `409` with a changed file is still a conflict on the default branch. |
+| The one other branch | The Worker builds every ref. It writes only the default branch and `horsemen/canvas`. It never forces a ref and never deletes one. The request body has no branch or target key; a body with one is refused (`400`). |
+| Prepare the branch | Missing: `POST /git/refs` makes it from the head of the default branch. No commits of its own: a fast-forward with `force: false`. Ahead: used as it is. Behind and ahead: `POST /merges` merges the default branch into it; a merge conflict stops the save (`409`, `branch-conflict`, with the compare page). A branch that is deleted during the save is made again, once. |
+| Draft and merge | `GET /write/target?repo=&root=&canvas=` tells the editor where the next save goes and the blob SHA of the file there. On `horsemen/canvas`, the draft starts from the file on that branch, so earlier saves stay. The slice 4a conflict check and merge run against that branch. A draft whose base is the file on `horsemen/canvas` goes there, also when the default branch is not protected now. The 60-second check of the default branch does not mark the draft as changed. |
+| Message | `canvas(<name>): <counts>`, without `[skip ci]`, so the checks of the pull request run on its head commit. |
+| Reply | The slice 4a reply, with `branch: "horsemen/canvas"`, `default_branch`, and `pull_request.compare_url` (`<GitHub>/<repo>/compare/<default>...horsemen/canvas?expand=1`). A ruleset that refuses `horsemen/canvas` or its commit returns `409`, `refused`, with one plain message. GitHub error text never goes to the browser. |
+| Pull request link | The browser reads the open pull request of `<owner>:horsemen/canvas` through the read proxy, with the viewer token (Pull requests: Read). The proxy allows this list only with `state=open` and that `head`, and not in the public view. The link goes to that pull request, or to the compare page when there is none. The browser builds the address from the number on the GitHub host of the compare page; it does not use an address from GitHub text. |
+| Edit mode | The bar says "Saves to horsemen/canvas". The save preview says that the default branch is protected and shows the branch and the message. After a save, the bar links "Open a pull request" or "Pull request #N", and Jump lists the link. **Done** says that the canvas shows the default branch until the pull request merges. |
+
+The editor app needs no new permission: Contents: Read and write covers the
+ref, the merge, and the file. The browser check found that each end-to-end
+script used a fixed browser session name, so two checkouts that ran at the
+same time shared one browser. Each run now has its own session.
+
+Not in slice 4c: a choice of the target branch by the person, a pull request
+that Horsemen makes, and a download of the draft when both branches refuse
+the save.
 
 ### Connections between artifacts
 
@@ -506,7 +540,7 @@ same contract.
 | Batching | One save is one commit. There is no timed save. |
 | Message | `canvas(<name>): <summary> [skip ci]`, for example `canvas(progress): add 2, move 3 [skip ci]`. The Worker writes it from counts. |
 | Author | The signed-in user. GitHub signs the commit when it can. |
-| Branch | The default branch. On a protected branch, the first version says so and offers the file as a download. A later slice commits to a `horsemen/canvas` branch and links to "Open a pull request". |
+| Branch | The default branch. On a protected default branch, the save goes to the branch `horsemen/canvas`, and the editor links to "Open a pull request" or to the open pull request. See [slice 4c as built](#slice-4c-as-built). |
 | Who can save | A user with push access. The app reads the permission from the repository list and hides Edit for others. GitHub enforces it. |
 | Public repository | The editor shows "This repository is public. Anyone can see this canvas and its files." |
 

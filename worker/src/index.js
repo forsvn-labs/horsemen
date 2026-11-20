@@ -412,7 +412,6 @@ const WRITE_ERRORS = {
   install: [403, 'The Horsemen Editor app is not installed on this repository, or it cannot write there. Install it, then save again.', 'editor-install'],
   push: [403, 'Your GitHub account cannot push to this repository.', 'no-push'],
   github: [502, 'GitHub did not accept the save. Try again.', 'github'],
-  busy: [409, 'GitHub did not accept the commit. The branch can be protected or busy. Try again later.', 'busy'],
   refused: [409, 'GitHub refused the save on the default branch and on horsemen/canvas. A rule of this repository protects both. Your draft stays in this tab. Ask an owner of the repository to allow the branch horsemen/canvas, then save again.', 'refused'],
   'branch-conflict': [409, 'The branch horsemen/canvas has changes that conflict with the default branch. Resolve its pull request on GitHub, or delete the branch, then save again.', 'branch-conflict'],
 };
