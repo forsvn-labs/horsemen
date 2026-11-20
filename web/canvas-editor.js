@@ -310,7 +310,7 @@
       const go = await ask('Edit canvases of ' + p.repo, form => {
         para(form, 'Editing uses a second GitHub App, Horsemen Editor. It is separate from the viewer and you add it only if you want to edit.');
         const list = el('ul', { class: 'edit-facts' });
-        for (const t of ['GitHub asks for Contents: Read and write on the repositories where you install it. GitHub has no permission for one folder.', 'Horsemen uses it only to save canvas files in .horsemen/canvas/. It never changes your records.', 'Each save is one commit by you on the default branch, with [skip ci].', 'The viewer, the public view, and the local app stay read-only.']) list.append(el('li', {}, t));
+        for (const t of ['GitHub asks for Contents: Read and write on the repositories where you install it. GitHub has no permission for one folder.', 'Horsemen uses it only to save canvas files in .horsemen/canvas/ and the images and tables that you add in .horsemen/media/. It never changes your records.', 'Each save is one commit by you on the default branch, with [skip ci].', 'The viewer, the public view, and the local app stay read-only.']) list.append(el('li', {}, t));
         form.append(list);
       }, [['', 'Cancel'], ['go', 'Continue to GitHub', 'primary']]);
       if (go === 'go') hostedEditor.signIn();

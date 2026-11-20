@@ -13,7 +13,8 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 │   ├── canvas-format.js   Browser reader of canvas files (`.horsemen/canvas/*.canvas`): the same rules, limits, and errors as the Python reader
 │   ├── canvas-view.js     Rules that make one drawing from a canvas file and the generated canvas: elements, connectors, list order, and messages
 │   ├── canvas-edit.js     Edit rules shared by the browser and the Worker: draft operations, the commit message, and the merge by element ID
-│   ├── canvas-editor.js   Hosted edit mode (signed-in only): move, add a note, connect, delete, save, and merge; canvas-editor.css styles it
+│   ├── canvas-editor.js   Hosted edit mode (signed-in only): move, add a note, drop or paste a file or an address, connect, delete, save, and merge; canvas-editor.css styles it
+│   ├── canvas-media.js    Media rules shared by the browser and the Worker: type from the bytes, the file name from the SHA-256, size and count limits
 │   ├── canvas-embeds.js   Click-to-load players: a provider address to a frame address, and the frame-src list of both servers
 │   ├── canvas-table.js    CSV and TSV tables: rows, limits, and escaped markup
 │   ├── hosted-reader.js   Browser port of the Python GitHub reader, for hosted mode

@@ -254,8 +254,8 @@ and a check of the file references on save.
 | Option | Calls for one save | One commit for several files | Conflict check | Result |
 | --- | --- | --- | --- | --- |
 | **REST contents API** (`PUT /repos/{repo}/contents/{path}` with `sha`) | 3: the repository, the file, the `PUT` | No | GitHub refuses a `sha` that is not the current blob SHA. A head that moves during the call returns `409`. | **Chosen for slice 4a.** One file, the fewest calls, and the blob SHA is the conflict check that the design needs. Each `PUT` is one commit by the user, with the user token. |
-| GraphQL `createCommitOnBranch` | 3 or more: head, file, mutation | Yes | `expectedHeadOid`: each new commit on the branch fails it, also a commit that does not touch the file. | For slice 4b (media), when a save writes several files. |
-| Git data API (blob, tree, commit, ref) | 5 or more | Yes | The ref update fails when it is not a fast-forward. | Not used: more calls, and the commit is not signed. |
+| GraphQL `createCommitOnBranch` | 2: one query (permission, branch, head, and the canvas blob), then the mutation | Yes | `expectedHeadOid`: each new commit on the branch fails it, also a commit that does not touch the file. | **Chosen for slice 4b**, for a save with media. See [slice 4b as built](#slice-4b-as-built). |
+| Git data API (blob, tree, commit, ref) | 5 or more (a blob for each file) | Yes | The ref update fails when it is not a fast-forward. | Not used: more calls, a half-made tree when a call fails, and the commit is not signed. |
 
 Sources: [repository contents API](https://docs.github.com/en/rest/repos/contents)
 (the blob `sha` for an update; the default branch when no branch is given) and
@@ -265,6 +265,47 @@ give the cause of each `409` of the contents call. Thus the Worker reads the
 file again before it decides between "conflict" and "try again". The fake
 GitHub of the browser check follows this rule. The live check on a disposable
 repository confirms it on github.com before the first deploy with editing.
+
+### Slice 4b as built
+
+Slice 4b adds images, tables, links, and players to edit mode. The rules are
+in `web/canvas-media.js` (types, names, limits; shared by the browser and the
+Worker), `web/canvas-edit.js` (`addFile`, `addLink`), `web/canvas-editor.js`
+(drop, paste, the file picker, the public warning, and the save), and
+`worker/src/index.js` (`readMedia` and `commitWithMedia`).
+`tests/test_canvas_media.cjs`, `tests/test_canvas_edit.cjs`, and
+`worker/test/media.test.js` check them; `scripts/test_hosted_edit_e2e.py`
+checks the browser against a fake GitHub with GraphQL.
+
+| Item | Rule in the code |
+| --- | --- |
+| Input | Drop on the canvas, paste (Ctrl/Cmd + V, not in a field), **Add file** (a file picker), **Add link** (L). A dropped item goes where it is dropped; other items go in free space in the middle of the view. Outside edit mode, a dropped file does not replace the page. |
+| Types | PNG, JPEG, GIF, and WebP images, from their magic numbers; CSV and TSV tables, UTF-8 text without NUL that is not a Git LFS pointer. The type comes from the bytes; a table gets its type from the file name, or from the pasted text. SVG is refused (an SVG can hold script; see [Security and privacy](#security-and-privacy)). A video gets a message that offers a link card. XLSX and other types are refused. |
+| Pasted text | One `http` or `https` address of 2,048 characters or less: a link card, or a player for a provider of slice 2b (the player loads only after a click). Two lines or more with the same number of tabs, or of commas outside quotes: a TSV or CSV file. Other text: a note. |
+| Names | `<stem>-<first 8 hex of the SHA-256 of the bytes>.<png\|jpg\|gif\|webp\|csv\|tsv>`. The stem comes from the file name: lower case, letters and digits joined by `-`, 40 characters at most (`image` or `table` when nothing is left). The same bytes get the same name. |
+| Limits | 1 MiB a file. Four new files in a save; the fifth gets "A save holds 4 files at most." The request is 6 MiB at most (4a: 2 MiB). |
+| Cards | An image card takes the ratio of the image: 480 pixels wide at most, 640 high at most. The file node has `alt` from the file name. A table card is 480 by 320. A link card is 320 by 120; a player is 480 by 270. |
+| Draft | A new file shows from a `blob:` address (an image) or from memory (a table) until the next load of the project reads it from GitHub. The draft in `sessionStorage` keeps the files in base64 when they fit; if not, they stay in memory only, and the Worker refuses a save that names a file that is not in the save and not on GitHub. |
+| Public repositories | Before the first file of a tab goes to a public repository, a dialog says that anyone can see the file and that Git history keeps it. The save preview repeats the warning and lists each new file with its size. |
+| Worker checks | After the checks of slice 4a: `media`, when present, is a list of 1 to 4 items with exactly `name` and `data`; no name twice; each name in the fixed form; strict base64 with the size checked before decoding (`400`); a file over 1 MiB (`413`); bytes that are not the type, or a hash that is not the hash of the bytes (`422`, `media`). Each file must be on the canvas (`422`). A media reference that is new in this save must be in the save or on the canvas on GitHub (`422`), also for a save without media. |
+| Paths | The Worker builds `<root>/.horsemen/canvas/<canvas>.canvas` and `<root>/.horsemen/media/<name>`, and refuses a commit with any other path. A save never deletes. |
+| Commit | A save with media: one GraphQL query reads `viewerPermission`, the default branch, its head commit, and the canvas blob (SHA and text) at that commit. A blob that is not `base` is a conflict (`409`). Then `createCommitOnBranch` with `expectedHeadOid`, the message headline, and the additions (the canvas first). When GitHub refuses it, the Worker reads the head again: a new canvas blob is a conflict; the same blob means that another file moved the head, and the Worker tries again with the new head, three times at most (then `409`, `busy`). A save without media keeps the REST call of slice 4a. |
+| Errors | `READ` or `TRIAGE` permission: `no-push`. No repository, `403` or `404`, or a `FORBIDDEN` error: `editor-install`. `401`: `editor-signin`. GraphQL error text never goes to the browser. |
+
+Why GraphQL: it makes one commit for several files in two calls, and
+`expectedHeadOid` is the head check that the design needs. The Git data API
+needs a blob call for each file, a tree, a commit, and a ref update; a failure
+between the calls leaves objects without a commit, and the commit is not
+signed. The REST contents API writes one file in each commit. Source:
+[the `createCommitOnBranch` mutation](https://docs.github.com/en/graphql/reference/mutations#createcommitonbranch)
+(`expectedHeadOid`, `fileChanges.additions` with base64 `contents`).
+
+Not checked on github.com yet: a mutation with four files of 1 MiB (about
+5.6 MiB of base64 in one request) and the error that a moved head gives. The
+live check in the pull request covers both before the first deploy with media.
+
+Not in slice 4b: SVG upload, XLSX, resize, a media budget in the Worker (the
+`check` command warns at 20 MiB), deleting media files, and thumbnails.
 
 ### Connections between artifacts
 
@@ -390,7 +431,7 @@ test today.
 | --- | --- |
 | Folder for uploads | `<project root>/.horsemen/media/` |
 | File name | Lower case, `^[a-z0-9][a-z0-9._-]{0,99}$`. A browser upload gets `<name>-<8 hex of its SHA-256>.<ext>`, so the same file is stored once and a name never changes its content. |
-| Types | PNG, JPEG, GIF, WebP, SVG, CSV, TSV, XLSX. The content must match the extension. |
+| Types | PNG, JPEG, GIF, WebP, SVG, CSV, TSV, XLSX. The content must match the extension. The browser uploads PNG, JPEG, GIF, WebP, CSV, and TSV only (slice 4b). |
 | Size | 1 MiB for each file. This is the size that GitHub returns in one contents call, and the limit that the image reader already uses. |
 | Budget | `check` warns when `.horsemen/media/` is over 20 MiB. It does not block. |
 | Files elsewhere in the repository | A canvas can show them by path, with the same type and size rules. Uploads go to the media folder only. |
@@ -479,12 +520,11 @@ instance is a viewer, as today.
 | Commit | One commit for the canvas and its new media. The Worker reads the branch head and the current blob SHA of the canvas. A different SHA from `base` returns `409` with `code: "conflict"`. If the head moves between the read and the commit, the Worker tries again, three times at most. |
 | Reply | `{ "commit": "sha", "canvas_sha": "sha", "url": "…" }`. GitHub error text is not passed on. |
 
-GitHub call, as built in slice 4a: the REST contents API,
-`PUT /repos/{repo}/contents/{path}` with the blob `sha`. See
-[the choice of the GitHub call](#the-choice-of-the-github-call). Slice 4b
-writes media files too and needs one commit for several files; it moves to
-the GraphQL `createCommitOnBranch` mutation or the Git data API then, with the
-same contract.
+GitHub call: a save without media uses the REST contents API,
+`PUT /repos/{repo}/contents/{path}` with the blob `sha` (slice 4a). A save
+with media uses the GraphQL `createCommitOnBranch` mutation, one commit for
+all files, with the same contract (slice 4b). See
+[the choice of the GitHub call](#the-choice-of-the-github-call).
 
 ### Flow for a person
 
