@@ -388,6 +388,59 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 .card-links-toggle[aria-expanded=true] .icon{rotate:90deg}
 .card-links-toggle:hover:not(:disabled),.card-links-toggle[aria-expanded=true]{border-color:var(--line-strong);color:var(--ink)}
 
+/* Canvas files: the elements of .horsemen/canvas/<name>.canvas at their saved places and sizes.
+   A colour is a preset of the active theme (1 to 6) or a hex value from the file; it tints the border and the ground. */
+.canvas-node[data-tone="1"]{--tone:var(--vermilion)}.canvas-node[data-tone="2"]{--tone:color-mix(in srgb,var(--vermilion) 50%,var(--gilt))}.canvas-node[data-tone="3"]{--tone:var(--gilt)}
+.canvas-node[data-tone="4"]{--tone:var(--verdigris)}.canvas-node[data-tone="5"]{--tone:color-mix(in srgb,var(--verdigris) 50%,var(--indigo))}.canvas-node[data-tone="6"]{--tone:var(--indigo)}
+.canvas-node[data-tone]{border-color:color-mix(in srgb,var(--tone) 60%,var(--line));background:color-mix(in srgb,var(--tone) 7%,var(--surface))}
+/* Each theme draws its own card border and ground, so the colour also shows as a stripe that no theme changes. */
+.canvas-node[data-tone]:not(.group):before{content:'';position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--tone);pointer-events:none}
+.file-node{overflow:hidden;cursor:default;font:inherit}
+.file-node a{color:inherit;text-underline-offset:3px}
+.file-node .cardhead .icon{color:var(--tone,var(--accent))}
+.card-from{margin-left:auto;flex:none;font:400 var(--fs-s)/1.2 var(--ui);color:var(--ink-2);white-space:nowrap}
+.card-open{display:inline-flex;align-items:center;gap:5px;align-self:flex-start;margin-top:auto;font-size:.8125rem;color:var(--ink)}
+.card-open .icon{width:13px;height:13px;color:var(--ink-2)}
+.file-node .cardbody{flex:1}
+.file-node .card-line{font-family:var(--mono);font-size:var(--fs-s);overflow-wrap:anywhere}
+.file-node.link .card-line{font-family:var(--ui);font-size:.8125rem}
+.canvas-node.missing .cardhead b{color:var(--ink-2)}
+/* A note is working text: Markdown from the same safe renderer as the records, in a smaller size. */
+.canvas-node .note-body{height:100%;max-width:none;padding:12px 14px;overflow:hidden;font-size:.9375rem;line-height:1.5}
+.note-body>:first-child{margin-top:0}.note-body>:last-child{margin-bottom:0}
+.note-body :is(p,ul,ol,pre,blockquote){margin-block:.5em}
+.note-body :is(h1,h2,h3,h4){margin:.6em 0 .3em;font-size:1em}
+/* A group is a frame behind its elements, with its label at the top. */
+.canvas .file-node.group{z-index:0;border:var(--bw) dashed color-mix(in srgb,var(--tone,var(--ink-3)) 55%,var(--line));background:color-mix(in srgb,var(--tone,var(--ink)) 3%,transparent);box-shadow:none}
+.group-label{display:block;padding:9px 13px;font:600 var(--fs-s)/1.3 var(--label);letter-spacing:.02em;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* A repository image fills its element. It comes from a blob: address, never inline. */
+.file-node.image:not(.card){display:grid;place-items:center;padding:6px}
+.file-node.image:not(.card) .md-image{display:grid;place-items:center;width:100%;height:100%;min-height:0;font-size:.8125rem;text-align:center;overflow-wrap:anywhere}
+.file-node.image:not(.card) img{display:block;max-width:100%;max-height:100%;width:auto;height:auto;object-fit:contain}
+#map:not(.list) .file-node.image:not(.card) .md-image[data-state=shown]{position:absolute;inset:6px;width:auto;height:auto}
+#map:not(.list) .file-node.image:not(.card) img{position:absolute;inset:0;width:100%;height:100%}
+/* Connectors: a curve with an arrow and a label. The list view gives the same facts as text lines. */
+.wires .edge path{stroke:var(--tone,var(--ink-3));stroke-width:1.5;stroke-dasharray:none}
+.wires .edge polygon{fill:var(--tone,var(--ink-3))}
+.wires .edge text{font:500 12px/1 var(--ui);fill:var(--ink-2);text-anchor:middle;dominant-baseline:middle;paint-order:stroke;stroke:var(--ground);stroke-width:6px;stroke-linejoin:round}
+.wires .edge[data-tone="1"]{--tone:var(--vermilion)}.wires .edge[data-tone="2"]{--tone:color-mix(in srgb,var(--vermilion) 50%,var(--gilt))}.wires .edge[data-tone="3"]{--tone:var(--gilt)}
+.wires .edge[data-tone="4"]{--tone:var(--verdigris)}.wires .edge[data-tone="5"]{--tone:color-mix(in srgb,var(--verdigris) 50%,var(--indigo))}.wires .edge[data-tone="6"]{--tone:var(--indigo)}
+#map:not(.list) .card-links{display:none}
+.card-links{display:flex;flex-direction:column;gap:2px;padding:0 calc(16px*var(--d)) 12px}
+.card-links .card-line{font-family:var(--ui);font-size:var(--fs-s);color:var(--ink-2)}
+/* The message of a canvas file that is not valid: one quiet strip above the canvas. */
+.canvas-notice{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;padding:9px 24px;font-size:.8125rem;line-height:1.45;color:var(--ink);background:var(--surface-2);border-bottom:var(--bw) var(--bs) var(--line)}
+.canvas-notice[hidden]{display:none}
+.canvas-notice>.icon{flex:none;align-self:center;width:15px;height:15px;color:var(--ink-2)}
+.canvas-notice[data-level=error]>.icon{color:var(--vermilion)}
+.canvas-notice p{flex:1 1 280px;min-width:0;margin:0;overflow-wrap:anywhere}
+.canvas-notice a{flex:none;color:var(--ink)}
+.canvas-notice details{flex-basis:100%;color:var(--ink-2)}
+.canvas-notice summary{cursor:pointer;width:fit-content}
+.canvas-notice ul{margin:6px 0 2px;padding-left:20px;font-family:var(--mono);font-size:var(--fs-s);overflow-wrap:anywhere}
+.canvas-fault{width:13px;height:13px;margin-left:auto;color:var(--vermilion)}
+.canvases-nav .boards-label{margin:16px 10px 6px}
+
 /* List view */
 .canvas.list-mode{overflow:auto;touch-action:pan-y;cursor:default;padding:24px 20px 48px;background-image:none}
 .canvas.list-mode~.zoom{display:none}
@@ -395,6 +448,13 @@ body[data-state=error] #scan-status{color:var(--vermilion)}
 #map.list .supporters{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 #map.list .artifact{position:relative!important;left:auto!important;top:auto!important;width:100%!important;height:auto;min-height:0}
 #map.list .card-links-toggle{position:absolute!important}
+/* The list is the accessible form of a canvas: each element in reading order, a group as a heading before its elements. */
+#map.list .canvas-node.saved{height:auto!important}
+#map.list .note-body{height:auto}
+#map.list .file-node.group{border:0;background:none;box-shadow:none;border-radius:0;margin-top:10px}
+#map.list .group-label{padding:0 2px;font-size:.8125rem;white-space:normal}
+#map.list .file-node.image:not(.card) img{max-height:360px}
+#map.list .file-node .card-line{display:block;-webkit-line-clamp:unset}
 
 /* Zoom: one small control in the corner. */
 .zoom{position:absolute;right:16px;bottom:16px;z-index:5;display:flex;align-items:center;gap:2px;padding:3px;border:var(--bw) var(--bs) var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-card)}
@@ -753,6 +813,8 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
   .canvases-nav{grid-column:1/-1;grid-row:2;overflow:visible;margin:0;padding:0}
   #canvases{display:flex;gap:6px;overflow-x:auto;padding:2px}
   .canvas-link{width:auto;flex:none;margin:0;padding:6px 10px;white-space:nowrap}
+  .canvases-nav .boards-label{flex:none;align-self:center;margin:0 2px 0 8px}
+  .canvas-notice{padding-left:16px;padding-right:16px}
   .rail-bottom{grid-column:3;grid-row:1}
   .account{width:auto;max-width:36vw}
   #menu{left:auto;right:0;bottom:auto;top:calc(100% + 6px);width:min(300px,calc(100vw - 32px));max-height:70dvh}
