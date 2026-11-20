@@ -558,6 +558,20 @@ the reference for agents.
 | Receipts | `python3 -B scripts/agent_sessions.py --output DIR` starts a new Claude Code and Codex session in a temporary fictional project and checks that each calls both tools. The server is set for that run only. |
 | Not built here | The JavaScript reader, drawing in the browser, the SVG blob test, and the browser checks of slice 2a. |
 
+### Hooks as built
+
+Slice 3b is built as the Hooks table says, with these details. The
+[hook reference](../../horsemen/references/hooks.md#pointer-mode) has the
+full rules.
+
+| Item | As built |
+| --- | --- |
+| Opt-in | `hooks install --pointer` adds `--pointer` to the SessionStart command only. Without it, session start gives the same bytes as before; a scenario compares them with the output of the release before canvases. |
+| Pointer lines | Root and records; canvas names; next action; gates; one line for STRUCTURE's "Read before changing" list (an addition, because that list is required reading in the default mode); up to three health lines; the read line with the review request. |
+| Gates | In full at 300 characters or less; else "Read progress#Gates before you act". A gate is never cut. The root, the gates, and the read line always stay; other lines go first when the limit is near. |
+| Stop rules | Canvas errors in a file that the session changed; a card on an unchanged canvas that broke in the session, reported once; `.horsemen/canvas/` and `.horsemen/media/` files in the Publish rule. These rules run in both modes, and only in a project with files in `.horsemen/`. |
+| Not done here | The done condition of slice 3b: the owner's installed skill runs pointer mode in one real project for a week with no missed gate. No installed skill or hook setting was changed. |
+
 ## Security and privacy
 
 | Topic | Rule |

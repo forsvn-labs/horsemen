@@ -1221,45 +1221,45 @@ def scenario_legacy_mode(env):
 
 
 def scenario_pointer(env):
-    """P1-P9: pointer mode injects 700 characters or less and keeps the gates."""
+    """PT1-PT9: pointer mode injects 700 characters or less and keeps the gates."""
     root = healthy_project(env, env.base / "pointer")
     gate = "The phone and bank-app QR rehearsal must pass before a release."
     write(root, {"PROGRESS.md": progress(extra=f"\nGates: {gate}\n")})
     text = pointer(env, root)
-    record("P1 the pointer is 700 characters or less", 0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
-    record("P1 the pointer names the root, the records, and the next action",
+    record("PT1 the pointer is 700 characters or less", 0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
+    record("PT1 the pointer names the root, the records, and the next action",
            str(root) in text and all(name in text for name in ("VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md"))
            and "Next action: Hung finishes the editor." in text, text)
-    record("P1 the pointer names the read tool and the show command", "`read`" in text and "horsemen show" in text, text)
-    record("P1 the pointer does not inject the snapshot", "Consultants can write notes" not in text and "| Item | Evidence |" not in text, text)
-    record("P2 a short Gates line stays in full", "Gates: " + gate in text, text)
-    record("P4 no canvas line without canvases", "anvas" not in text, text)
-    record("P1 the pointer still asks for the review of the four records", "review" in text.lower(), text)
+    record("PT1 the pointer names the read tool and the show command", "`read`" in text and "horsemen show" in text, text)
+    record("PT1 the pointer does not inject the snapshot", "Consultants can write notes" not in text and "| Item | Evidence |" not in text, text)
+    record("PT2 a short Gates line stays in full", "Gates: " + gate in text, text)
+    record("PT4 no canvas line without canvases", "anvas" not in text, text)
+    record("PT1 the pointer still asks for the review of the four records", "review" in text.lower(), text)
     legacy = context(env.hook("SessionStart", root, session="pointer-legacy")[1])
-    record("P1 the pointer is shorter than the legacy text", 0 < len(text) < len(legacy) / 2, f"{len(text)} and {len(legacy)}")
+    record("PT1 the pointer is shorter than the legacy text", 0 < len(text) < len(legacy) / 2, f"{len(text)} and {len(legacy)}")
 
     write(root, {".horsemen/canvas/progress.canvas": CANVAS, ".horsemen/media/chart.svg": CHART, ".horsemen/canvas/launch-plan.canvas": EMPTY_CANVAS})
     text = pointer(env, root)
-    record("P4 canvases are named", "Canvases: launch-plan, progress." in text and len(text) <= POINTER_LIMIT, text)
+    record("PT4 canvases are named", "Canvases: launch-plan, progress." in text and len(text) <= POINTER_LIMIT, text)
 
     gates = "## Gates\n\n- No public walk before the insurer confirms cover.\n- Keep payment data out of the app.\n\n"
     write(root, {"PROGRESS.md": progress(rows=ROW_EDITOR + ROW_EXPORT + gates)})
     text = pointer(env, root)
-    record("P2 gates below a Gates heading stay in full",
+    record("PT2 gates below a Gates heading stay in full",
            "No public walk before the insurer confirms cover." in text and "Keep payment data out of the app." in text and len(text) <= POINTER_LIMIT, text)
 
     many = "## Gates\n\n" + "".join(f"- Gate {i}: " + "x" * 60 + f" END-{i}.\n" for i in range(8)) + "\n"
     write(root, {"PROGRESS.md": progress(rows=ROW_EDITOR + ROW_EXPORT + many)})
     text = pointer(env, root)
-    record("P3 long gates become an instruction to read them; no gate is cut",
+    record("PT3 long gates become an instruction to read them; no gate is cut",
            "progress#Gates before you act" in text and "END-" not in text and "xxxx" not in text and len(text) <= POINTER_LIMIT, text)
     write(root, {"PROGRESS.md": progress(extra="\nGates:\n\n- " + "y" * 320 + " FINAL-GATE\n")})
     text = pointer(env, root)
-    record("P3 a long Gates line becomes an instruction to read it",
+    record("PT3 a long Gates line becomes an instruction to read it",
            "Gates" in text and "before you act" in text and "FINAL-GATE" not in text and "yyyy" not in text and len(text) <= POINTER_LIMIT, text)
     write(root, {"PROGRESS.md": PROGRESS})
     text = pointer(env, root)
-    record("P2 a snapshot without gates says so", "Gates: none" in text, text)
+    record("PT2 a snapshot without gates says so", "Gates: none" in text, text)
 
     big = healthy_project(env, env.base / ("pointer-" + "d" * 90) / ("e" * 90))
     files = {f".horsemen/canvas/{'board-' + str(i).zfill(2) + '-' + 'n' * 50}.canvas": EMPTY_CANVAS for i in range(20)}
@@ -1271,32 +1271,32 @@ def scenario_pointer(env):
     files["VISION.md"] = VISION.replace("Confirmed: 2026-10-20", "Confirmed: unconfirmed")
     write(big, files)
     text = pointer(env, big)
-    record("P5 the pointer stays in 700 characters with a long path, 20 canvases, a long next action, and many problems",
+    record("PT5 the pointer stays in 700 characters with a long path, 20 canvases, a long next action, and many problems",
            0 < len(text) <= POINTER_LIMIT, f"{len(text)}: {text}")
-    record("P5 a full pointer keeps the gates, the read line, and all four record names",
+    record("PT5 a full pointer keeps the gates, the read line, and all four record names",
            "GATE-END." in text and "`read`" in text and "horsemen show" in text
            and all(name in text for name in ("VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md")), text)
-    record("P8 the pointer keeps the STRUCTURE reading list as one line", "Read before changing" in text, text)
-    record("P9 a full pointer has at most three health lines", text.count("\n- ") <= 3, text)
+    record("PT8 the pointer keeps the STRUCTURE reading list as one line", "Read before changing" in text, text)
+    record("PT9 a full pointer has at most three health lines", text.count("\n- ") <= 3, text)
     many = healthy_project(env, env.base / "pointer-many")
     write(many, {name: files[name] for name in ("STRUCTURE.md", "BRAIN.md", "VISION.md")})
     write(many, {".horsemen/canvas/progress.canvas": CANVAS.replace("#Up next", "#Renamed"), ".horsemen/media/chart.svg": CHART})
     text = pointer(env, many)
-    record("P9 five problems give three health lines, with the canvas problem first",
+    record("PT9 five problems give three health lines, with the canvas problem first",
            text.count("\n- ") == 3 and "\n- 1 canvas problem; run check." in text and len(text) <= POINTER_LIMIT, text)
-    record("P5 a next action that does not fit is not cut without a mark", "NEXT-END" in text or "…" in text or "next action" not in text.lower(), text)
+    record("PT5 a next action that does not fit is not cut without a mark", "NEXT-END" in text or "…" in text or "next action" not in text.lower(), text)
 
     old = healthy_project(env, env.base / "pointer-status")
     (old / "PROGRESS.md").unlink()
     write(old, {"STATUS.md": LEGACY_STATUS})
     text = pointer(env, old)
-    record("P7 a legacy STATUS file must be read before project work", "STATUS.md" in text and "before project work" in text and len(text) <= POINTER_LIMIT, text)
+    record("PT7 a legacy STATUS file must be read before project work", "STATUS.md" in text and "before project work" in text and len(text) <= POINTER_LIMIT, text)
     proc, _ = env.run(["hook", "session-start", "--pointer"], "not json", cwd=env.base / "home")
-    record("P6 pointer mode is silent outside a project", proc.returncode == 0 and not proc.stdout.strip(), proc.stdout + proc.stderr)
+    record("PT6 pointer mode is silent outside a project", proc.returncode == 0 and not proc.stdout.strip(), proc.stdout + proc.stderr)
 
 
 def scenario_pointer_install(env):
-    """P10: pointer mode is a choice at install time."""
+    """PT10: pointer mode is a choice at install time."""
     root = env.base / "mode-cfg"
     root.mkdir()
     claude, codex = root / "settings.json", root / "hooks.json"
@@ -1310,20 +1310,20 @@ def scenario_pointer_install(env):
     plain = commands(claude)
     proc, _ = env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT), "--pointer"])
     both = [commands(claude), commands(codex)]
-    record("P10 install --pointer changes the SessionStart command only",
+    record("PT10 install --pointer changes the SessionStart command only",
            proc.returncode == 0 and all(len(c["SessionStart"]) == 1 and "hook session-start --pointer" in c["SessionStart"][0]
                                         and c["Stop"] == plain["Stop"] for c in both), json.dumps(both))
     project = healthy_project(env, env.base / "mode-installed")
     run = subprocess.run(["/bin/sh", "-c", both[0]["SessionStart"][0]], input=json.dumps({"session_id": "pi", "cwd": str(project)}),
                          capture_output=True, text=True, cwd=project, env=env.env, timeout=10)
     text = context(json.loads(run.stdout)) if run.stdout.strip() else ""
-    record("P10 the installed pointer command injects the pointer", 0 < len(text) <= POINTER_LIMIT and "Consultants can write notes" not in text, run.stdout + run.stderr)
+    record("PT10 the installed pointer command injects the pointer", 0 < len(text) <= POINTER_LIMIT and "Consultants can write notes" not in text, run.stdout + run.stderr)
     proc, _ = env.run(["hooks", "status", *opts])
-    record("P10 status names pointer mode", proc.returncode == 0 and "pointer mode" in proc.stdout, proc.stdout)
+    record("PT10 status names pointer mode", proc.returncode == 0 and "pointer mode" in proc.stdout, proc.stdout)
     env.run(["hooks", "install", *opts, "--script-path", str(SCRIPT)])
-    record("P10 install without --pointer gives the same commands as before", commands(claude) == plain, json.dumps(commands(claude)))
+    record("PT10 install without --pointer gives the same commands as before", commands(claude) == plain, json.dumps(commands(claude)))
     proc, _ = env.run(["hooks", "status", *opts])
-    record("P10 status without pointer mode is unchanged", proc.returncode == 0 and "pointer" not in proc.stdout, proc.stdout)
+    record("PT10 status without pointer mode is unchanged", proc.returncode == 0 and "pointer" not in proc.stdout, proc.stdout)
 
 
 def scenario_canvas_stop(env):
@@ -1350,6 +1350,7 @@ def scenario_canvas_stop(env):
     reason = stop_reason(env, root, "cs")
     record("S22 an invalid canvas file that the session wrote is reported", "Canvas errors:" in reason and "progress.canvas" in reason and "whole number" in reason, reason)
     record("S24 an unpublished canvas file asks to commit and push", "Publish:" in reason and name in reason.split("Publish:")[-1], reason)
+    record("S16 the reminder with canvas notes stays under 1,200 characters", len(reason) < 1200, str(len(reason)))
     reason = stop_reason(env, root, "cs")
     record("S22 the same canvas error is reported once", "VISION" in reason and "Canvas errors:" not in reason and "Publish:" not in reason, reason)
     write(root, {name: CANVAS})
