@@ -132,7 +132,9 @@ python3 <this-skill>/scripts/horsemen.py canvas apply progress          # only r
 
 The tool does not commit. Commit and push `.horsemen/` with the record
 changes of the task, when the project's rules allow. The hosted viewer shows
-the default branch.
+the default branch. The Stop [hook](hooks.md) names `.horsemen/` files that
+are not on the remote default branch. It also reports a canvas error that the
+session made and a card that broke when the session changed a heading.
 
 A node has `id`, `type`, `x`, `y`, `width`, `height`, and an optional `color`
 (`"1"` to `"6"`, or `#RRGGBB`):

@@ -7,9 +7,11 @@ Updated: 2026-11-19 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Merge the hooks (pull request #34), then slices 2b (embeds and tables) and 4a (editing in the browser), which agents are building. The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
+Next action: Merge slices 2b (embeds and tables) and 4a (editing in the browser), which agents are building. The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
 
 ## Shipped
+
+- **Short session start for agents** (2026-11-20): A person can select a short start for agent sessions with `hooks install --pointer`. The agent then gets the next action and the gates in 700 characters or less and reads the rest when the task needs it. The Stop hook also tells the agent when it breaks a canvas, and when canvas files are not on GitHub yet. Off until a person selects it. Available from main; other installations get it after a refresh.
 
 - **Canvas tools for agents** (2026-11-19): Agents can read a project in a few short calls and add notes, proof, and connectors to a canvas. `horsemen show` prints an index, one section, or a canvas outline; `horsemen canvas apply` checks and writes a canvas file; `horsemen mcp` gives the same two tools, `read` and `canvas_edit`, to Claude Code and Codex through a small local server. Section cards that agents add get the same IDs as the cards on the live site. Available from main; other installations get it after a refresh, and a person runs `horsemen mcp install` before a host gets the tools.
 
@@ -29,8 +31,6 @@ Next action: Merge the hooks (pull request #34), then slices 2b (embeds and tabl
 
 - **Publish reminder** (2026-11-19): When an agent changes a record but the change has not reached the remote default branch, the Stop hook asks it to commit and push. Then the hosted viewer shows the update. Available from main; other installations get it after a refresh.
 
-- **Readable type and design audit** (2026-11-19): The workspace now has three type sets: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Small labels are larger, phones open in List view, and keyboard focus is easier to see. The audit lists the fixes and the larger ideas still open. Live on horsemen.forsvn.com.
-
 ## In progress
 
 - **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 (record canvases) shipped. Slice 2a (canvas files) shipped. The owner chose to build all slices now. Later slices add canvas files, editing by people and agents, and tools for agents.
@@ -45,7 +45,7 @@ Next action: Merge the hooks (pull request #34), then slices 2b (embeds and tabl
 | Publish reminder | Hook scenario S20 passes: uncommitted and unpushed record edits fire once, published edits and repositories without a remote do not. All 150 hook scenarios and full verification passed locally. Merged in [PR #14](https://github.com/hungv47/horsemen/pull/14) after CI passed. The owner's global skill now installs from this repository and matches main; the Claude Code and Codex hooks run it. |
 | Style themes | Theme tests check every theme and mode for contrast (4.5:1 for text, 7:1 in High contrast), the 12px floor, licensed fonts, and that each theme differs from the others in at least three style traits. The fixture browser check applies each theme, reloads it, checks its fonts, and checks for overflow at desktop and phone width. The hosted browser check, Worker tests, and full verification passed locally. Squash-merged in [PR #20](https://github.com/hungv47/horsemen/pull/20) after CI passed, with a fix for Terminal small-card titles; deployed from main, and the live files match main. |
 | Calm workspace | [Design audit, minimal pass](docs/product/design-audit.md#minimal-pass-2026-11-19) and [artifact views](docs/product/artifact-views.md). Impeccable critique went from 27/40 to 31/40; the rendered-page detector went from 2 findings to 0 at desktop, tablet, and phone width. View, preview, theme, canvas, Worker, fixture browser, and hosted browser checks passed locally, and full verification passed. Squash-merged in [PR #18](https://github.com/hungv47/horsemen/pull/18) after CI passed; deployed from main, and the live files match main. |
-| Readable type and design audit | [Design audit](docs/product/design-audit.md). Theme and type tests, canvas rule tests, Worker tests, the fixture browser check, and the hosted browser check passed locally. Squash-merged in [PR #10](https://github.com/hungv47/horsemen/pull/10) after CI passed; deployed from main, and the live files match main. |
+| Short session start for agents | [Hook reference](horsemen/references/hooks.md#pointer-mode) and the design's [hooks as built](docs/product/canvas-workspace.md#hooks-as-built). 204 hook scenarios passed from source and from the packaged skill; one compares the default mode byte for byte with the release before. CI passed on [PR #34](https://github.com/hungv47/horsemen/pull/34); merged to main in [PR #37](https://github.com/hungv47/horsemen/pull/37). Not done: the owner's one-week test of pointer mode on a real project. |
 | Canvas tools for agents | [Canvas guide](horsemen/references/canvas.md), [shared format cases](tests/fixtures/canvas/README.md), and the design's [agent section](docs/product/canvas-workspace.md#agent-access-tools-cli-and-hooks). The Python canvas format, four `check` rules, `horsemen show`, `horsemen canvas apply`, `horsemen mcp install` and `status`, and the skill text. Unit, server (through a subprocess), budget, and distribution tests pass; the browser and Python readers agree on all shared cases, including section card IDs. A new Claude Code session and a new Codex session in a temporary fictional project each called `read` and `canvas_edit`. Full verification passed. Merged in [PR #32](https://github.com/hungv47/horsemen/pull/32) after CI passed. On this project, `horsemen show` lists the records and the roadmap board, and `check` passes. |
 | Canvas files | Format, view, reader, and Worker tests; the browser reader passes the 73 shared cases. Browser checks, local and hosted, draw a hand-written canvas file, show a message for an invalid one, and cover hostile files (script text, `javascript:` addresses, CSS in a colour, `..` paths, 5,000 nodes, a 2 MiB file, an SVG with a script). Full verification passed. Merged in [PR #33](https://github.com/hungv47/horsemen/pull/33) after CI passed; deployed from main, and the live files match main. Live check: the first real canvas file, `.horsemen/canvas/roadmap.canvas` ([PR #35](https://github.com/hungv47/horsemen/pull/35)), opens at horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap in a signed-out browser with its 13 elements, groups, section cards, and connectors. |
 | Record canvases | Merged in [PR #30](https://github.com/hungv47/horsemen/pull/30) after CI passed; deployed from main, and the live files match main. Live check: a signed-out browser opened `hungv47/horsemen?canvas=progress&node=s-shipped` with the Shipped card selected, and the Vision canvas in List view at phone width. Tests: see the Canvas workspace row. |
@@ -55,7 +55,7 @@ Next action: Merge the hooks (pull request #34), then slices 2b (embeds and tabl
 
 Existing installations do not change until refreshed. The local workspace stays a source preview. The hosted viewer is read-only and stores no project data. Public view covers public repositories only; private repositories need sign-in.
 
-Canvas workspace: slices 1 and 2a are live and read-only, and slice 3a (agent tools) is on main: no canvas file, no new GitHub permission, and no writes. The owner chose to build all slices without waiting for the one-week test.
+Canvas workspace: slices 1 and 2a are live and read-only, and slices 3a and 3b (agent tools and hooks) are on main: no canvas file, no new GitHub permission, and no writes. The owner chose to build all slices without waiting for the one-week test.
 
 </details>
 
@@ -65,6 +65,8 @@ Canvas workspace: slices 1 and 2a are live and read-only, and slice 3a (agent to
 <summary>Historical ships</summary>
 
 ### 2026-11-19
+
+- **Readable type and design audit** (2026-11-19): The workspace now has three type sets: Engraved (default), Modern, and System. Choose one from the theme button or Ctrl/Cmd + K. Small labels are larger, phones open in List view, and keyboard focus is easier to see. The audit lists the fixes and the larger ideas still open. Live on horsemen.forsvn.com.
 
 - **Faster hosted loading** (2026-11-19): A reload shows your projects at once from a saved list of repository names and paths, then checks for changes in the background. A first visit reads more repositories at the same time. Live on horsemen.forsvn.com.
 
@@ -78,6 +80,7 @@ Canvas workspace: slices 1 and 2a are live and read-only, and slice 3a (agent to
 
 | Item | Evidence |
 | --- | --- |
+| Readable type and design audit | [Design audit](docs/product/design-audit.md). Theme and type tests, canvas rule tests, Worker tests, the fixture browser check, and the hosted browser check passed locally. Squash-merged in [PR #10](https://github.com/hungv47/horsemen/pull/10) after CI passed; deployed from main, and the live files match main. |
 | Faster hosted loading | Benchmark with 80 repositories and 150 ms GitHub delay (`scripts/bench_hosted.py`): first project on reload 2.1 s to 0.36 s; first visit 2.2 s to 1.9 s; discovery 8.9 s to 5.9 s. Reader, Worker, and browser checks pass. Merged in [PR #9](https://github.com/hungv47/horsemen/pull/9) after CI passed; deployed from main, and the live files match main. |
 | Hosted viewer | Merged in [PR #6](https://github.com/hungv47/horsemen/pull/6) and deployed from main; the live files match main, `/healthz` reports ok, and the live sign-in redirect was checked. Reader parity and Worker tests passed, and the hosted browser check passed against a fake GitHub: sign-in, project load, live update, and sign-out. Full verification passed locally. See [deploy and limits](worker/README.md). The owner signed in with a real account and saw the projects load on 2026-11-19. |
 | Views for each record type | [Artifact views](docs/product/artifact-views.md). View tests (`node tests/test_gui_views.cjs`) and the fixture browser check passed locally at desktop and phone width; full repository verification passed locally. Merged in [PR #7](https://github.com/hungv47/horsemen/pull/7) after CI passed on Linux and macOS; deployed from main, and the live files match main. |
