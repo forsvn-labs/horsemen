@@ -107,7 +107,7 @@ python3 <this-skill>/scripts/horsemen.py canvas apply progress          # only r
 
 | Op | Rule |
 | --- | --- |
-| `add` | Give `node` or `edge`. The tool makes the ID when there is none (`note-1`, `e-1`). A node takes its type from `text`, `url`, or `file`, and a default size. A `type` that you give must be `text`, `file`, `link`, or `group`. A kind name from the outline, such as `note` or `image`, is not a type |
+| `add` | Give `node` or `edge`. The tool makes the ID when there is none (`note-1`, `e-1`). A node takes its type from `text`, `url`, or `file`, and a default size. A `type` that you give must be `text`, `file`, `link`, or `group`. A kind name from the outline, such as `note` or `image`, is read as its type |
 | `near`, `side` | Puts a node in free space beside an element: `right` (default), `left`, `below`, `above`. You need no coordinates. Without `near`, `x`, and `y`, the node goes to the right of all elements |
 | `#Heading` | In `near` or as an edge end, on a record canvas. The tool saves the section card first, with its `s-` ID, when the canvas has none |
 | `update` | Give `id` and the keys to change in `node` or `edge`. `null` removes a key. An ID does not change. `near` moves a node |

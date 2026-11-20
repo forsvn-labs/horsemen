@@ -47,7 +47,7 @@ IMAGES = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')
 SHEETS = ('.csv', '.tsv', '.xlsx')
 NODE_FIRST = ('id', 'type', 'x', 'y', 'width', 'height')
 TYPES = ('text', 'file', 'link', 'group')
-# The outline names kinds. A kind is not a type; an edit op that sends one gets the type to use.
+# The outline names kinds. Agents send a kind as the type of a new node; an edit op reads it as its type.
 KIND_TYPES = {'note': 'text', 'section': 'file', 'record': 'file', 'canvas': 'file', 'image': 'file', 'sheet': 'file',
               'video': 'link', 'embed': 'link'}
 EDGE_FIRST = ('id', 'fromNode', 'toNode')
@@ -685,11 +685,14 @@ def _check_edge(doc, edge):
     _first([f"edge {edge['id']}: {key} {edge[key]} is not a node" for key in ('fromNode', 'toNode') if edge[key] not in nodes])
 
 
-def _check_type(value):
-    """An op can make only the four JSON Canvas types. A node of another tool keeps its own type."""
-    if isinstance(value, str) and value not in TYPES:
-        hint = f'; a {value} is type {KIND_TYPES[value]}' if value in KIND_TYPES else ''
-        raise EditError(f'type must be text, file, link, or group, not {_short(value, 32)}{hint}')
+def _op_type(value):
+    """The type that an op gives a node: one of the four JSON Canvas types. A kind name from the outline
+    (`note`, `image`) becomes its type. A node of another tool keeps its own type; an op cannot make one."""
+    if not isinstance(value, str) or value in TYPES:
+        return value
+    if value in KIND_TYPES:
+        return KIND_TYPES[value]
+    raise EditError(f'type must be text, file, link, or group, not {_short(value, 32)}')
 
 
 def _resolve_ends(doc, edge, record, added):
@@ -720,7 +723,7 @@ def _add(doc, op, record, lookup, summary):
             if len(guess) != 1:
                 raise EditError('node needs a type, or one of text, url, or file')
             item['type'] = guess[0]
-        _check_type(item['type'])
+        item['type'] = _op_type(item['type'])
         what = kind(item) if isinstance(item.get('type'), str) else 'unsupported'
         size = SIZES.get(what, SIZES['file'])
         item.setdefault('width', size[0])
@@ -763,8 +766,8 @@ def _update(doc, op, record, lookup, summary):
     item = node if node is not None else edge
     if patch and 'id' in patch and patch['id'] != target:
         raise EditError('an id does not change after it is made')
-    if node is not None and patch and patch.get('type') != node.get('type'):
-        _check_type(patch.get('type'))
+    if node is not None and patch and 'type' in patch and patch['type'] != node.get('type'):
+        patch = dict(patch, type=_op_type(patch['type']))
     for key, value in copy.deepcopy(patch or {}).items():
         if value is None:
             item.pop(key, None)

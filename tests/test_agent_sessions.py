@@ -57,7 +57,7 @@ print("not json")
 if mode != "silent":
     call("read", {{"target": ""}})
 if mode in ("ok", "refused", "dry"):
-    node = {{"text": mark}} if mode != "refused" else {{"type": "note", "text": mark}}
+    node = {{"text": mark}} if mode != "refused" else {{"type": "sticker", "text": mark}}
     call("canvas_edit", {{"canvas": "progress", "ops": [{{"op": "add", "node": node, "near": "s-shipped", "side": "below"}}], "dry_run": mode == "dry"}})
 server.stdin.close()
 server.wait()

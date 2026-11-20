@@ -553,7 +553,7 @@ the reference for agents.
 | --- | --- |
 | Read-only mark | The `read` definition has the MCP annotation `readOnlyHint`, so a host can run it with no approval question. The two definitions are 1,083 characters as compact JSON. `canvas_edit` writes and can remove elements, so it has no mark. |
 | Approval in Codex | Codex asks the person for each `canvas_edit` call. A run with no person (`codex exec`) waits for the answer. The person can allow the tool in the Codex settings; `mcp install` does not set this. |
-| Node types in an op | An op can make only `text`, `file`, `link`, and `group` nodes. A kind name from the outline, such as `note`, is refused with the type to use. A node of another tool keeps its own type. |
+| Node types in an op | An op can make only `text`, `file`, `link`, and `group` nodes. A kind name from the outline, such as `note` or `image`, is read as its type, because real agents send it. Another type is refused. A node of another tool keeps its own type. |
 | Placement | A place that is taken moves along the side of the anchor, in the direction where the free place is nearer. |
 | Receipts | `python3 -B scripts/agent_sessions.py --output DIR` starts a new Claude Code and Codex session in a temporary fictional project and checks that each calls both tools. The server is set for that run only. |
 | Not built here | The JavaScript reader, drawing in the browser, the SVG blob test, and the browser checks of slice 2a. |

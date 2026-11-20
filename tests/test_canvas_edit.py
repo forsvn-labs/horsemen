@@ -3,7 +3,8 @@
 Failure modes covered:
 - add: no id (one is made), a used id, a node without its content, an edge to a missing node,
   both `node` and `edge`, neither; a type that is a kind name from the outline (`note`), which
-  must not become an "unsupported" card without an error
+  becomes its JSON Canvas type; another unknown type, which must not become an "unsupported"
+  card without an error
 - update: unknown id, a new id, a value that breaks a rule, null removes a key
 - remove: unknown id; the edges of a removed node go with it
 - one bad op in a batch: nothing is written, and the reply names the op and the rule
@@ -108,13 +109,26 @@ class Edit(unittest.TestCase):
                 self.assertFalse(overlap(a, b), (a['id'], b['id']))
         self.assert_canonical('launch-plan')
 
+    def test_a_kind_name_from_the_outline_is_read_as_its_type(self):
+        # The outline shows kinds (note, image, video). Real agents send a kind as the type; the file gets the JSON Canvas type.
+        ops = [{'op': 'add', 'node': {'id': 'k-note', 'type': 'note', 'text': 'Receipt.'}},
+               {'op': 'add', 'node': {'id': 'k-image', 'type': 'image', 'file': '.horsemen/media/route-map.svg'}},
+               {'op': 'add', 'node': {'id': 'k-section', 'type': 'section', 'file': 'PROGRESS.md', 'subpath': '#Gates'}},
+               {'op': 'add', 'node': {'id': 'k-video', 'type': 'video', 'url': 'https://www.youtube.com/watch?v=EXAMPLE0000'}},
+               {'op': 'update', 'id': 'note-risk', 'node': {'type': 'note'}}]
+        reply = self.edit('progress', ops)
+        self.assertTrue(reply.ok, reply.text)
+        self.assertEqual([self.node('progress', i)['type'] for i in ('k-note', 'k-image', 'k-section', 'k-video', 'note-risk')],
+                         ['text', 'file', 'file', 'link', 'text'])
+        self.assert_canonical('progress')
+        # A kind does not excuse its content: the rule of the real type applies.
+        self.refused('progress', [{'op': 'add', 'node': {'type': 'image', 'text': 'Not a file.'}}], 'op 1 (add)', 'file must be a path')
+
     def test_add_with_a_type_that_is_not_a_json_canvas_type_is_refused(self):
-        # The outline shows kinds (note, section, image). An agent that sends a kind as the type must get the rule.
-        reply = self.refused('progress', [{'op': 'add', 'node': {'type': 'note', 'text': 'Receipt.'}}], 'op 1 (add)', 'type must be text, file, link, or group')
-        self.assertIn('note', reply.text)
-        self.refused('progress', [{'op': 'add', 'node': {'type': 'image', 'file': '.horsemen/media/route-map.svg'}}], 'op 1', 'type must be')
-        self.refused('progress', [{'op': 'add', 'node': {'type': 'sticker', 'x': 0, 'y': 0, 'width': 100, 'height': 100}}], 'op 1', 'type must be')
-        self.refused('progress', [{'op': 'update', 'id': 'note-risk', 'node': {'type': 'note'}}], 'op 1 (update)', 'type must be')
+        # An op must not make an "unsupported" card without an error.
+        self.refused('progress', [{'op': 'add', 'node': {'type': 'sticker', 'x': 0, 'y': 0, 'width': 100, 'height': 100}}],
+                     'op 1 (add)', 'type must be text, file, link, or group', 'sticker')
+        self.refused('progress', [{'op': 'update', 'id': 'note-risk', 'node': {'type': 'sticker'}}], 'op 1 (update)', 'type must be')
 
     def test_a_node_of_another_tool_with_an_unknown_type_can_still_change(self):
         self.path('board').write_bytes((FIXTURES / 'files/unknown-keys.canvas').read_bytes())
