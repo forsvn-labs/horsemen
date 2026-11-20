@@ -2,6 +2,8 @@
 
 ## 2026-11-19
 
+- The viewer shows canvas files (`.horsemen/canvas/*.canvas`): boards in the sidebar, and notes, images, link cards, groups, and connectors on the canvas of a record. A file that is not valid shows a message and the generated canvas. Read-only. See the [roadmap board of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). [PR #33](https://github.com/hungv47/horsemen/pull/33).
+
 - Each record now opens as a canvas. The sidebar has a project switcher and a list of canvases; each section of a record is a card, and a card opens the reading view at that section. Links such as `horsemen.forsvn.com/owner/repo?canvas=progress&node=s-shipped` open one canvas at one card. [Design](docs/product/canvas-workspace.md). [PR #30](https://github.com/hungv47/horsemen/pull/30).
 
 - Records now show Mermaid diagrams and charts in the colours of the active theme, with a View code toggle. A diagram that cannot be drawn shows its code and the reason. Images stored in the repository show in place when a record links to them; external images stay links. Works in the hosted viewer and the local app. [Hosted viewer](worker/README.md#how-it-works). [PR #27](https://github.com/hungv47/horsemen/pull/27).
