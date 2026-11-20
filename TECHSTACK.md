@@ -10,7 +10,7 @@
 | unittest and subprocess | Regression checks | Python standard library | Tests real command results and old hooks |
 | GitHub Actions | Cross-platform verification | Repository workflow | Tests Linux/macOS with Python 3.10/3.14 |
 | skills.sh CLI (`skills`) | Agent skill installation | Node.js and npm through `npx` | Downloads Horsemen and prompts for agent and scope |
-| Cloudflare Workers, Wrangler 4.165.0 | Host the viewer at horsemen.forsvn.com | A Cloudflare account with the domain; Bun to install Wrangler | Serves the app and a read-only GitHub proxy; no database, KV, or logs. The edge cache holds public repository data briefly for public views |
+| Cloudflare Workers, Wrangler 4.165.0 | Host the viewer at horsemen.forsvn.com | A Cloudflare account with the domain; Bun to install Wrangler | Serves the app and a read-only GitHub proxy; no database, KV, or logs. The edge cache holds public repository data briefly for public views. With the optional editor app, one write route commits canvas files with the person's own token |
 | GitHub App (user authorization) | Sign-in and repository access for the hosted viewer | The app settings as Worker secrets | Each user reads only repositories they can access and chose to install it on |
 | Mermaid 12.3.0 (MIT), vendored in `web/vendor/` | Diagrams and charts in records | No install; the browser loads it only when a record has a `mermaid` block | Draws flowcharts, sequence diagrams, and charts in the active theme |
 | Node.js 20+ | Hosted viewer and GUI tests | Node.js installation | Runs the reader parity, Worker, and view tests |
@@ -21,8 +21,9 @@ no build step. It runs two ways. Locally, a Python standard-library server
 bound to loopback reads GitHub through the GitHub CLI (`gh`) sign-in; see
 [local setup](web/README.md). Hosted, a Cloudflare Worker signs users in with
 a GitHub App and passes read-only GitHub calls through, and the browser parses
-the records; see [hosted viewer](worker/README.md). Neither stores project
-data on a server.
+the records; see [hosted viewer](worker/README.md). An optional second GitHub
+App lets a person save canvas edits as commits through one write route.
+Neither stores project data on a server.
 Provider helpers exist in the skill but have no live account connection by default.
 
 ## Runtime connections
@@ -38,6 +39,7 @@ flowchart LR
   Agent -->|commit and push| GitHub[GitHub repository]
   Browser[Browser viewer] --> Worker[Cloudflare Worker]
   Worker -->|read-only, user token| GitHub
+  Worker -.->|optional: one canvas commit, editor token| GitHub
 ```
 
 ## Development and release

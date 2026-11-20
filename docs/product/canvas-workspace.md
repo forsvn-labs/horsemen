@@ -3,9 +3,12 @@
 Status: the owner approved this design and all eleven proposed answers on
 2026-11-19. Slice 1 (the sidebar and generated canvases, read-only) is live.
 See [slice 1 as built](#slice-1-as-built). The browser half of slice 2a
-(canvas files shown in the browser, read-only) is built and waits for review;
-it is not deployed. See [slice 2a as built](#slice-2a-as-built). The Python
-half of slice 2a and the agent tools have their own pull request.
+(canvas files shown in the browser, read-only) is merged. See
+[slice 2a as built](#slice-2a-as-built). The Python half of slice 2a and the
+agent tools have their own pull request. Slice 4a (browser editing with the
+opt-in editor app) is built and waits for review; it is not deployed, and the
+editor app does not exist on the live site yet. See
+[slice 4a as built](#slice-4a-as-built).
 The owner gave the direction and three decisions on 2026-11-19; this page
 turns them into a design and a build plan.
 
@@ -191,6 +194,57 @@ either side fails it. An agent tool that saves a section card by its `s-` ID
 needs the same ID as the browser, so the owner must choose one rule for both
 sides.
 
+### Slice 4a as built
+
+Slice 4a has the editor app, its sign-in, the write route, and edit mode in
+the hosted app. The rules are in `worker/src/index.js` (sign-in and the
+route), `web/canvas-edit.js` (draft operations, the commit message, and the
+merge, shared by the browser and the Worker), and `web/canvas-editor.js`
+(edit mode). `worker/test/editor.test.js`, `worker/test/setup.test.js`, and
+`tests/test_canvas_edit.cjs` check them; `scripts/test_hosted_edit_e2e.py`
+checks the browser against a fake GitHub.
+
+| Item | Rule in the code |
+| --- | --- |
+| Editor app | `create-github-app.mjs --editor` makes "Horsemen Editor" with Contents: Read and write and Metadata: Read, the callback `/auth/edit/callback`, and no events. It stores `EDITOR_CLIENT_ID`, `EDITOR_CLIENT_SECRET`, and `EDITOR_APP_SLUG` and prints none of them. Without these three secrets, the site is a viewer: no editor sign-in, no write route, and the sign-in page keeps "This site never writes to your repositories." |
+| Editor sign-in | Needs a viewer session. It has its own state cookie (`__Host-horsemen-edit-state`), sealed for its own purpose, so the state of one flow cannot finish the other. The token goes into the field `w` of the session cookie. The GitHub login of the editor token must be the login of the viewer session; if not, the token is revoked and the session does not change. A viewer refresh keeps `w`. An expired editor token refreshes with the editor app during a write; a failed refresh removes `w` and asks for editor sign-in again (`403`, `editor-signin`). |
+| Tokens | Reads (`/gh/*`) use the viewer token only. `/write/*` uses the editor token only. The public view has no session, and its routes are GET only. Sign-out revokes both tokens, each with the credentials of its own app. |
+| Request checks | In this order: the editor app is configured (else `404`), a session (`401`), same origin and the CSRF token (`403`), POST (`405`), an `Origin` header that is this site (`403`), `Content-Type: application/json` (`415`), a declared `Content-Length` of 2 MiB or less when there is one (`413`), an editor token (`403`), a body of 2 MiB or less while it is read (`413`), JSON with exactly `repo`, `root`, `canvas`, `base`, and `text` (`400`), each name (`400`), and the canvas (`422`). |
+| Names | `repo`: `owner/name` with the characters that GitHub allows, not `.` or `..`. `root`: empty, or up to 16 folders of letters, digits, `_`, `.`, and `-`, with 200 characters at most; a folder cannot start with `.`. `canvas`: the canvas name rule, not `home`. `base`: a blob SHA (40 or 64 hex characters) or `null`. Media is not accepted in this slice. |
+| Canvas | `canvas-format.js` checks the text, as in the browser. Each error refuses the save, also an edge to a missing node. A file with a higher version is refused. The Worker writes the canonical text. It does not check that each `file` exists or that each `subpath` matches a heading. |
+| Commit | `GET /repos/{repo}` (default branch, push permission), `GET` the file at the default branch (blob SHA), then `PUT` the file. A SHA that is not `base` is a conflict (`409`, `conflict`, with the current SHA or `null`). The same text as on GitHub makes no commit (`unchanged`). A `409` or `422` from the `PUT` reads the file again: a new SHA is a conflict; the same SHA means that the head moved, and the `PUT` runs again, three times at most (then `409`, `busy`). `403` or `404` from GitHub is `editor-install`; a user without push access gets `no-push`. GitHub error text never goes to the browser. |
+| Message | `canvas(<name>): <counts> [skip ci]`. The counts come from the old and the new file: add (new nodes), move (only position or size changed), edit (other keys changed), connect (new edges), remove (nodes and edges). No text from the file goes into the message. A replayed request finds a new SHA and is a conflict. |
+| Edit mode | Hosted and signed in only; the Worker adds `canvas-edit.js`, `canvas-editor.js`, and `canvas-editor.css`. Edit opens on a record canvas or a board whose file is valid and of version 1. Move (drag, arrow keys), add a note (in free space in the middle of the view), edit a note (double-click, Enter), connect or disconnect two selected elements, delete, and save (Ctrl/Cmd + S) with a preview of the file, the message, the branch, the changed elements, and a warning for a public repository. A generated section card goes into the file with `file` and `subpath` when it moves or connects; a card whose heading is repeated or has `#` cannot. A generated card cannot be deleted. |
+| Draft | The canvas document in `sessionStorage`, with the SHA and the document that it started from. It comes back with Edit after a reload. If the file changed since, the draft merges with the new file first. The page warns before it closes with an unsaved draft. Sign-out removes drafts. Done asks: save, discard, or keep the draft. |
+| Merge | By element ID, from the conflict table. Changes to different elements, and to different keys of one element, are kept. Position and size: mine wins. The same content key, a delete against an edit, or the same new ID on both sides: the person chooses mine or theirs for each element (mine is the default). The edges of a node that is not in the result go. A merge that leaves no change of mine makes no commit. While a draft is open, the 60-second check shows "The canvas changed on GitHub." and **Merge now**. |
+
+The browser check found two faults, which this slice fixes: a share link with
+the path `/write/canvas` was read as the repository `write/canvas`, so
+`write` is now a reserved name; and when the background check of the saved
+index found a new commit of the open project first, the open project did not
+reload.
+
+Not in slice 4a: resize, media upload and drop (4b), links and groups,
+colour, undo, the choice of the target branch and protected branches (4c),
+and a check of the file references on save.
+
+#### The choice of the GitHub call
+
+| Option | Calls for one save | One commit for several files | Conflict check | Result |
+| --- | --- | --- | --- | --- |
+| **REST contents API** (`PUT /repos/{repo}/contents/{path}` with `sha`) | 3: the repository, the file, the `PUT` | No | GitHub refuses a `sha` that is not the current blob SHA. A head that moves during the call returns `409`. | **Chosen for slice 4a.** One file, the fewest calls, and the blob SHA is the conflict check that the design needs. Each `PUT` is one commit by the user, with the user token. |
+| GraphQL `createCommitOnBranch` | 3 or more: head, file, mutation | Yes | `expectedHeadOid`: each new commit on the branch fails it, also a commit that does not touch the file. | For slice 4b (media), when a save writes several files. |
+| Git data API (blob, tree, commit, ref) | 5 or more | Yes | The ref update fails when it is not a fast-forward. | Not used: more calls, and the commit is not signed. |
+
+Sources: [repository contents API](https://docs.github.com/en/rest/repos/contents)
+(the blob `sha` for an update; the default branch when no branch is given) and
+[the Git database guide](https://docs.github.com/en/rest/guides/using-the-rest-api-to-interact-with-your-git-database)
+(`409` for an empty or busy repository). The GitHub documentation does not
+give the cause of each `409` of the contents call. Thus the Worker reads the
+file again before it decides between "conflict" and "try again". The fake
+GitHub of the browser check follows this rule. The live check on a disposable
+repository confirms it on github.com before the first deploy with editing.
+
 ### Connections between artifacts
 
 | Connection | How it is stored | How it shows |
@@ -375,6 +429,8 @@ instance is a viewer, as today.
 | `/gh/*` | GET | Allowlisted reads with the viewer token | No change. Canvas files and media use the blob and contents routes that are already on the list. |
 | `/pub/*` | GET | Public reads, no user token | No change. Never writes. |
 | `/auth/edit/login`, `/auth/edit/callback` | GET | — | Sign-in for the editor app. The editor token goes into the same encrypted cookie, in its own field. |
+| `/auth/edit/logout` | POST | — | Stop editing: revoke the editor token only. Needs the CSRF token. |
+| `/write/access` | GET | — | Is the editor app installed on a repository, and can the person push? Reads only, with the editor token. |
 | `/write/canvas` | POST | — | The only write route. |
 
 `POST /write/canvas` request:
@@ -402,11 +458,12 @@ instance is a viewer, as today.
 | Commit | One commit for the canvas and its new media. The Worker reads the branch head and the current blob SHA of the canvas. A different SHA from `base` returns `409` with `code: "conflict"`. If the head moves between the read and the commit, the Worker tries again, three times at most. |
 | Reply | `{ "commit": "sha", "canvas_sha": "sha", "url": "…" }`. GitHub error text is not passed on. |
 
-GitHub call: the GraphQL `createCommitOnBranch` mutation. It makes one signed
-commit for several files, as the signed-in user, and it needs the expected
-head. A short test against a disposable repository comes first in the editing
-slice. If the test finds a problem (for example with the size of a request),
-the route uses the REST contents call for each file, with the same contract.
+GitHub call, as built in slice 4a: the REST contents API,
+`PUT /repos/{repo}/contents/{path}` with the blob `sha`. See
+[the choice of the GitHub call](#the-choice-of-the-github-call). Slice 4b
+writes media files too and needs one commit for several files; it moves to
+the GraphQL `createCommitOnBranch` mutation or the Git data API then, with the
+same contract.
 
 ### Flow for a person
 

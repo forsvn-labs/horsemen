@@ -36,7 +36,9 @@ Copy a link to a project or record, such as
 public repository without signing in, for example
 <https://horsemen.forsvn.com/hungv47/horsemen>. A link to a private repository
 opens for people with GitHub access to it. The viewer is read-only and stores no project
-data on the server. It shows the default branch, so agents commit and push
+data on the server. A site can also offer canvas editing through a second,
+optional GitHub App; only people who add that app can save, and each save is
+one commit by them. It shows the default branch, so agents commit and push
 record changes; the skill's Stop hook reminds them.
 
 Run your own copy: [hosted viewer](worker/README.md). Run it on your computer
