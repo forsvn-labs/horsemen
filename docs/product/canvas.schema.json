@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/hungv47/horsemen/main/docs/product/canvas.schema.json",
+  "$id": "https://raw.githubusercontent.com/forsvn-labs/horsemen/main/docs/product/canvas.schema.json",
   "title": "Horsemen canvas, profile version 1",
   "description": "A JSON Canvas 1.0 file (https://jsoncanvas.org/spec/1.0/) with limits and three optional keys: top-level `horsemen`, `alt` on file nodes, and `title` on link nodes. Unknown keys and unknown node types are allowed and must be kept on save. Proposal; see docs/product/canvas-workspace.md.",
   "type": "object",
