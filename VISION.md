@@ -70,3 +70,4 @@ A service that keeps copies of its users' project data.
   workspace tied to its repository, each artifact opens as its own canvas,
   and people and agents both edit it. Edits are commits in the repository.
   This replaces the view-only limit; the product still stores no project data.
+- 2026-11-21: Hung wants people and agents to discuss working artifacts on localhost, record decisions and delivery evidence, and keep links to issues and externally hosted media on the project canvas.
