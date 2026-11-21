@@ -120,4 +120,4 @@ CANVASES = {
 HEAVY_SIZE = 2 * 1024 * 1024
 BOARDS = ['constructor', 'crowd', 'heavy', 'launch-plan', 'proof', 'review']
 # The origins of the players. A browser check answers each of them with a fake player.
-PLAYER_ORIGINS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com']
+PLAYER_ORIGINS = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com', 'https://drive.google.com']

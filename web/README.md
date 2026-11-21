@@ -23,6 +23,23 @@ read-only, unless the site offers the optional editor app for canvas files
 (see [edit a canvas](#edit-a-canvas-hosted)).
 See [the hosted viewer](../worker/README.md).
 
+## Discuss a working copy
+
+Run `python3 scripts/serve_gui.py --project /path/to/project` from this source checkout.
+Open the loopback address printed by the server. The project needs a GitHub origin
+and at least two core records. This mode reads working files, including new
+artifacts. Use Refresh GitHub in the account menu after an agent changes a file.
+GitHub source links resolve after the file reaches the remote default branch.
+
+Open a record and select **Full document**. Use the page menu to jump to a section
+and select a heading to fold its contents. In canvas List view, follow a
+connector to its target. Paste a Drive file link or a direct HTTPS image or
+video address on the canvas to keep the original with its host. Select Load
+on its card to preview it. The host controls access and the browser must
+support the format. Tracker issue links work the same way as bookmarks.
+To read a Linear issue title and state locally, start the server with
+`LINEAR_API_KEY` in its environment, then select **Read Linear issue**.
+
 ## Reading and navigation
 
 The screen shows few controls. Everything else is in one of three places:

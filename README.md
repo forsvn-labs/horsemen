@@ -130,3 +130,5 @@ and links to private repositories open only for people with GitHub access.
 - [Skill and CLI differences](horsemen/references/cli.md)
 - [Develop and verify both interfaces](CONTRIBUTING.md)
 - [Current progress](PROGRESS.md) · [MIT license](LICENSE)
+
+Preview unpublished artifacts in a coding session with `python3 scripts/serve_gui.py --project .`. See the [local workspace guide](web/README.md#discuss-a-working-copy).

@@ -303,6 +303,7 @@ class Read(unittest.TestCase):
         edge = self.ok('progress.canvas#e-demo', SECTION)
         self.assertIn('edge s-shipped>vid-walkthrough', edge.split('\n')[0])
         self.assertIn('label: demo', edge)
+        self.assertIn('?canvas=progress&node=vid-walkthrough', edge)
         self.error('progress.canvas#ghost', 'ghost')
         self.error('progress.canvas#bad id', 'target')
 

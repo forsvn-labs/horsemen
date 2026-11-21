@@ -187,7 +187,12 @@ try:
     assert 'Help small teams' in browser('get','text','#peek-content')
     assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Vision', 'The record view names the record'
     assert value('JSON.stringify(!document.querySelector("#peek .detail-eyebrow,#peek .overview-seal,#peek .peek-tabs,#peek .peek-note,#peek .view-help"))') is True, 'No kicker, seal, tabs, hint line, or helper text'
-    browser('click','.more-bar [data-peek-mode="document"]');assert 'Actual source.' in browser('get','text','#peek-content'), 'The full document is one click away'
+    browser('click','.more-bar [data-peek-mode="document"]')
+    browser('click','#peek-content .reader-next')
+    assert value("document.querySelector('.reader-pages select').selectedIndex") == 1
+    browser('click','#peek-content .reader-page:not([hidden]) summary')
+    assert not value("document.querySelector('.reader-page:not([hidden]) details').open")
+    browser('click','#peek-content .reader-prev');assert 'Actual source.' in browser('get','text','#peek-content'), 'The full document is one click away'
     browser('click','#peek-more');browser('click','#show-source');assert '# Record' in browser('get','text','#source-content')
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="rich"]')
     assert value('JSON.stringify(Boolean(document.querySelector("#peek-content [data-layout=brief]")))') is True, 'The menu returns to the record layout'
@@ -303,7 +308,7 @@ try:
     browser('click','[data-record="progress"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Progress"')
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
     assert value('localStorage.getItem("horsemen-peek-views")')=={'vision':'rich','progress':'list'}, 'The browser saves one layout choice for each record type'
-    browser('click','#peek-more');browser('click','#show-document');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
+    browser('click','#peek-more');browser('click','#show-document');browser('click','.reader-next');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
     browser('click','#peek-more');browser('click','#show-source');assert '<summary>Latest day' in browser('get','text','#source-content'), 'Markdown source stays exact'
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
     browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Structure"')

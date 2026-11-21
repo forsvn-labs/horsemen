@@ -197,6 +197,14 @@ A file with conflict markers is invalid: keep both element lines and remove
 the markers. A canvas file or folder that is a link out of the project is not
 read.
 
+## Discuss and ship an artifact
+
+In the source checkout, run `python3 scripts/serve_gui.py --project /path/to/project`
+to show working files during a session. Add the draft or its original hosting URL
+to a canvas. Use link cards for issues and externally hosted binaries. Read an
+edge by ID to get links to its endpoints. Once the owner decides, update the
+relevant record. Add delivery evidence to Progress after the feature ships.
+
 ## Limits
 
 - The tools see the files on this computer. They do not see GitHub or

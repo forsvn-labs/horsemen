@@ -60,3 +60,5 @@ flowchart LR
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for reproduction and limits.
+
+The local viewer can read the title and state of a linked Linear issue on request. It uses the Linear GraphQL API with a local `LINEAR_API_KEY`. [Linear API](https://linear.app/developers/graphql)

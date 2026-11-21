@@ -52,6 +52,7 @@ One repository owns the agent skill, CLI, shared checks, and release verificatio
 ## Commands
 
 - Run local GUI: `python3 scripts/serve_gui.py`; see [setup and limits](web/README.md).
+- Preview a coding session: `python3 scripts/serve_gui.py --project /path/to/project`.
 - Hosted viewer tests: `node --test tests/test_hosted_reader.cjs worker/test/worker.test.js`.
 - Hosted browser check: `python3 scripts/test_hosted_e2e.py --output /tmp/horsemen-hosted-check`.
 - Canvas editing checks: `node --test worker/test/editor.test.js worker/test/setup.test.js worker/test/protected.test.js worker/test/media.test.js tests/test_canvas_edit.cjs tests/test_canvas_media.cjs`; browser check: `python3 scripts/test_hosted_edit_e2e.py --output /tmp/horsemen-edit-check`.

@@ -21,7 +21,11 @@ holds notes, images, recordings, tables, and links beside the record, and
 connectors show how they relate. People and agents both change a canvas, and
 each change is a commit in the project's repository. Agents read and update the workspace
 through a few small tools and hooks. Operators can also share a canvas
-publicly. The product remains open source and can be self-hosted.
+publicly. During a coding session, the team can open its working copy on
+localhost, discuss an artifact, and test it before it ships. Decisions and
+delivery evidence then become project records. A canvas keeps the links
+between artifacts, including the original addresses of large files and issues
+that the team keeps with another provider. The product remains open source and can be self-hosted.
 
 ## Who we build for
 
@@ -34,7 +38,7 @@ The records apply to software, business, research, and personal work.
 - Knowledge stays with its existing originals.
 - The same rules should support every interface.
 - A canvas shows how things connect. The records stay the source of truth.
-- Project data stays in the project's repository. Our servers keep none of it.
+- Records and canvas links stay in Git. Teams choose where to host their media. Our servers keep no project data.
 
 ## How we get there
 

@@ -10,7 +10,7 @@
   const SANDBOX = 'allow-scripts allow-same-origin allow-presentation';
   const MAX_URL = 2048;
   const YOUTUBE = 'https://www.youtube-nocookie.com', VIMEO = 'https://player.vimeo.com', LOOM = 'https://www.loom.com', FIGMA = 'https://www.figma.com', GOOGLE = 'https://docs.google.com';
-  const FRAME_ORIGINS = [YOUTUBE, VIMEO, LOOM, FIGMA, GOOGLE];
+  const FRAME_ORIGINS = [YOUTUBE, VIMEO, LOOM, FIGMA, GOOGLE, 'https://drive.google.com'];
 
   const YT_ID = /^[A-Za-z0-9_-]{11}$/, VIMEO_ID = /^[0-9]{1,12}$/, VIMEO_HASH = /^[0-9a-f]{6,20}$/, LOOM_ID = /^(?:[a-z0-9-]{1,200}-)?([0-9a-f]{32})$/;
   const FIGMA_KEY = /^[A-Za-z0-9]{10,128}$/, FIGMA_NODE = /^([0-9]{1,10})[-:]([0-9]{1,10})$/, FIGMA_TYPES = ['file', 'design', 'proto', 'board', 'slides', 'deck'];
@@ -28,6 +28,14 @@
 
   /* Each provider: the hosts of its addresses, and a rule from an address to a frame address (or null). */
   const PROVIDERS = [
+    { id: 'google-drive', name: 'Google Drive', kind: 'document', origin: 'https://drive.google.com', referrer: 'no-referrer',
+      hosts: ['drive.google.com'],
+      frame(url) {
+        const path = parts(url);
+        if (path[0] !== 'file' || path[1] !== 'd' || !GOOGLE_ID.test(path[2] || '') || path.length > 4 || (path[3] && !['view','preview','edit'].includes(path[3]))) return null;
+        const key = url.searchParams.get('resourcekey');
+        return 'https://drive.google.com/file/d/' + path[2] + '/preview' + (key && /^[A-Za-z0-9_-]{1,128}$/.test(key) ? '?resourcekey=' + key : '');
+      } },
     { id: 'youtube', name: 'YouTube', kind: 'video', origin: YOUTUBE, referrer: 'strict-origin-when-cross-origin',
       hosts: ['youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtu.be', 'youtube-nocookie.com', 'www.youtube-nocookie.com'],
       frame(url) {
@@ -99,6 +107,16 @@
   /* True for a frame address inside the frame-src list: one of the origins, then a path. */
   const frameAllowed = frame => typeof frame === 'string' && FRAME_ORIGINS.some(origin => frame.startsWith(origin + '/'));
 
-  const api = { SANDBOX, FRAME_ORIGINS, PROVIDERS: [...PROVIDERS.map(p => ({ id: p.id, name: p.name, hosts: p.hosts })), ...Object.values(GOOGLE_FILES).map(f => ({ id: f.id, name: f.name, hosts: ['docs.google.com'] }))], embed, frameAllowed };
+  function directMedia(address) {
+    let url;
+    try { url = new URL(address); } catch { return null; }
+    if (url.protocol !== 'https:' || url.username || url.password) return null;
+    const video = /\.(mp4|webm|ogv|mov)$/i.test(url.pathname);
+    if (!video && !/\.(png|jpe?g|gif|webp|avif)$/i.test(url.pathname)) return null;
+    return { native: true, kind: video ? 'video' : 'image', name: url.host,
+      action: video ? 'Load video' : 'Load image', ratio: '16 / 9' };
+  }
+
+  const api = { directMedia, SANDBOX, FRAME_ORIGINS, PROVIDERS: [...PROVIDERS.map(p => ({ id: p.id, name: p.name, hosts: p.hosts })), ...Object.values(GOOGLE_FILES).map(f => ({ id: f.id, name: f.name, hosts: ['docs.google.com'] }))], embed, frameAllowed };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else root.HorsemenEmbeds = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -41,7 +41,7 @@ function showSection(key,id){
     if(peekMode!=='document'){peekMode='document';renderPeek()}
     targets=[...$('#peek-content').querySelectorAll('.prose h2')];at=HorsemenSections.headingIndex(sections,id,targets.map(el=>el.textContent),{byOrder:true});
   }
-  const target=targets[at];if(!target)return;
+  const target=targets[at];if(!target)return;$('#peek-content').revealPage?.(target);
   for(let fold=target.closest('details');fold;fold=fold.parentElement?.closest('details'))fold.open=true;
   target.scrollIntoView({block:'start',behavior:'instant'});markOutline();sectionAnchor={el:target,until:performance.now()+2500};
 }
@@ -60,6 +60,65 @@ function factsLine(record){
   return facts.map(f=>{const m=f.value.match(/^(\d{4}-\d{2}-\d{2})\b\s*(.*)$/),r=m&&HorsemenViews.relative(m[1]);return {text:r?f.label+' '+r.text.toLocaleLowerCase()+(m[2]?' '+m[2]:''):f.label+': '+f.value,title:r?r.iso:''}});
 }
 const entryTitle=entry=>Object.hasOwn(titles,entry.key)?titles[entry.key]:entry.record?.name||entry.link?.title||'Document';
+/* Keep each Markdown heading with its content. Work on rendered blocks so
+   fenced code, tables, and author-written details keep their structure. */
+function installReaderPages(content) {
+  const doc = content.querySelector('.document.prose');
+  if (!doc) return;
+  const headings = 'h1,h2,h3,h4,h5,h6';
+  for (const heading of [...doc.querySelectorAll(headings)].reverse()) {
+    const fold = document.createElement('details');
+    fold.className = 'reader-fold';
+    fold.open = true;
+    const summary = document.createElement('summary');
+    heading.before(fold);
+    fold.append(summary);
+    summary.append(heading);
+    while (fold.nextElementSibling) {
+      const next = fold.nextElementSibling;
+      const peer = next.matches('.reader-fold') && next.firstElementChild.firstElementChild;
+      if (peer && peer.tagName <= heading.tagName) break;
+      fold.append(next);
+    }
+  }
+  const blocks = [...doc.children];
+  const pages = [];
+  let page, length = 0;
+  for (const block of blocks) {
+    if (!page || block.matches('.reader-fold') || length >= 3000) {
+      page = document.createElement('section');
+      page.className = 'reader-page';
+      doc.append(page);
+      pages.push(page);
+      length = 0;
+    }
+    page.append(block);
+    length += block.textContent.length;
+  }
+  if (pages.length < 2) return;
+  const nav = document.createElement('nav');
+  nav.className = 'reader-pages';
+  nav.setAttribute('aria-label', 'Document pages');
+  nav.innerHTML = '<button type="button" class="reader-prev">Previous</button><select aria-label="Document page"></select><button type="button" class="reader-next">Next</button>';
+  const [prev, select, next] = nav.children;
+  pages.forEach((el, i) => select.add(new Option((i + 1) + ' / ' + pages.length + ' · ' + (el.querySelector(headings)?.textContent || (i ? 'Continued' : 'Introduction')), i)));
+  function show(i) {
+    pages.forEach((el, n) => { el.hidden = n !== i; });
+    select.selectedIndex = i;
+    prev.disabled = !i;
+    next.disabled = i === pages.length - 1;
+  }
+  select.onchange = () => show(select.selectedIndex);
+  prev.onclick = () => show(select.selectedIndex - 1);
+  next.onclick = () => show(select.selectedIndex + 1);
+  content.revealPage = el => {
+    const index = pages.findIndex(page => page.contains(el));
+    if (index >= 0) show(index);
+  };
+  doc.before(nav);
+  show(0);
+}
+
 function renderPeek(){
   const entry=peekTrail.at(-1);if(!entry)return;sectionAnchor=null;
   const r=entry.record,core=Object.hasOwn(names,entry.key);$('#peek').dataset.kind=entry.key;$('#peek-kind').innerHTML=icon(core?entry.key:kindIcon(entry.link?.kind||'document'));$('#peek-title').textContent=entryTitle(entry);
@@ -74,7 +133,7 @@ function renderPeek(){
   if(href&&safeURL(href,location.href)){open.href=href;open.hidden=false;const label=entry.link?.kind==='external'?'Open link':'Open on GitHub';open.setAttribute('aria-label',label);open.title=label}else{open.removeAttribute('href');open.hidden=true}
   $('#source-content').textContent=r.content||r.error||'This external document has not been loaded.';
   $('#peek-content').hidden=peekMode==='source';$('#source-content').hidden=peekMode!=='source';
-  const content=$('#peek-content');content.replaceChildren();content.dataset.mode=peekMode;$('.peek-content').scrollTo({top:0,behavior:'instant'});
+  const content=$('#peek-content');delete content.revealPage;content.replaceChildren();content.dataset.mode=peekMode;$('.peek-content').scrollTo({top:0,behavior:'instant'});
   if(entry.link&&entry.link.kind!=='document'){
     const ref=HorsemenViews.proofKind(entry.link.href),pr=HorsemenViews.prRef(entry.link.href),kinds={pr:'Pull request',commit:'Commit',release:'Release',checks:'Checks',issue:'Issue'};
     content.innerHTML='<div class="external-document">'+(ref&&kinds[ref.kind]?'<p><span class="chip '+ref.kind+'">'+escapeHTML(ref.label)+'</span></p>':'')+'<p>'+escapeHTML(kinds[ref?.kind]||'A link')+' from '+escapeHTML(entry.link.source)+'. Horsemen does not load its contents.</p><p class="external-address">'+escapeHTML(entry.link.href)+'</p></div>';
@@ -99,6 +158,7 @@ function renderPeek(){
   HorsemenMedia.hydrate(content,{links:r.connections||[],loadImage:imageURL});
   /* The full document is one click away from an overview that is not already the document. */
   if(peekMode==='overview'&&!r.error&&!(entry.link&&entry.link.kind!=='document')&&!content.querySelector('[data-layout=document],[data-layout=guide]'))content.insertAdjacentHTML('beforeend','<p class="more-bar"><button type="button" class="link-btn" data-peek-mode="document">Read the full document</button></p>');
+  installReaderPages(content);
   renderPeekNav();
 }
 /* The ⋯ menu: the layouts for this record, the full document, and the Markdown source. */
@@ -141,7 +201,7 @@ function renderPeekNav(){
   outlineTargets=peekMode==='source'?[]:[...(marked.length?marked:content.querySelectorAll('.prose h2,.prose h3'))];
   outlineTargets.forEach((el,i)=>{
     el.id='peek-section-'+i;const b=document.createElement('button');b.textContent=el.dataset.outline||el.textContent;b.dataset.target=el.id;if(el.tagName==='H3'&&!el.dataset.outline)b.className='sub';
-    b.onclick=()=>{if(el.tagName==='DETAILS')el.open=true;el.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})};outline.append(b);
+    b.onclick=()=>{content.revealPage?.(el);for(let fold=el.closest('details');fold;fold=fold.parentElement?.closest('details'))fold.open=true;if(el.tagName==='DETAILS')el.open=true;el.scrollIntoView({block:'start',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})};outline.append(b);
   });
   sizeOutline();markOutline();
 }
@@ -206,7 +266,20 @@ function loadTables(){
    The frame address comes from the view rules (canvas-embeds.js), never from the page, and must be inside frame-src. */
 function loadEmbed(n,el){
   const stage=el.querySelector('.embed-stage'),E=HorsemenEmbeds;
-  if(!stage||n.kind!=='embed'||!E.frameAllowed(n.embed.frame))return;
+  if(!stage||n.kind!=='embed')return;
+  if(n.embed.native){
+    const source = E.directMedia(n.url);
+    if(!source)return;
+    const media = document.createElement(source.kind === 'video' ? 'video' : 'img');
+    media.className = 'embed-frame';
+    if(source.kind === 'video'){media.controls = true;media.playsInline = true}
+    else {media.alt = n.title;media.referrerPolicy = 'no-referrer'}
+    media.onerror = () => {stage.textContent = 'Preview unavailable. Open the original file below.'};
+    stage.replaceChildren(media);
+    media.src = n.url;
+    return;
+  }
+  if(!E.frameAllowed(n.embed.frame))return;
   const frame=document.createElement('iframe');
   frame.className='embed-frame';frame.src=n.embed.frame;frame.title=n.embed.name+': '+V.nodeTitle(n);
   frame.setAttribute('sandbox',E.SANDBOX);frame.referrerPolicy=n.embed.referrer;frame.allow='fullscreen; picture-in-picture; encrypted-media';frame.allowFullscreen=true;
@@ -229,9 +302,9 @@ function clearRecords(){request++;records={};canvasFiles=new Map();recordsLoaded
 /* The quiet line under the project name: where it lives, when Progress says it was updated, and the commit read. */
 function projectMeta(p){
   const updated=records.progress&&!records.progress.error?HorsemenPreview.facts(records.progress.content).find(f=>/^updated$/i.test(f.label)):null,r=updated&&HorsemenViews.relative(updated.value.slice(0,10));
-  return [p.repo+(p.root?' / '+p.root:''),r?'updated '+r.text.toLocaleLowerCase():'','commit '+p.revision.slice(0,7)].filter(Boolean).join(' · ');
+  return [p.repo+(p.root?' / '+p.root:''),r?'updated '+r.text.toLocaleLowerCase():'',p.working_copy?'Working copy':'commit '+p.revision.slice(0,7)].filter(Boolean).join(' · ');
 }
-function setPrivacy(p){$('#privacy').hidden=!p?.private;$('#privacy').title=p?.private?'Private repository':''}
+function setPrivacy(p){$('#privacy').hidden=!p?.private||p.working_copy;$('#privacy').title=p?.private?'Private repository':''}
 /* The canvases of the open project: Home, each record that is found, then the boards (canvas files with other names) in name order.
    Names come from files, so each lookup uses own keys only: a board can have a name such as "constructor". */
 const isRecordKey=key=>Object.hasOwn(names,key);
@@ -270,6 +343,34 @@ function nodeElement(n){
   el.className='artifact canvas-node '+(card?'card section-card '+(n.record||''):'file-node '+n.kind+(['note','group'].includes(n.kind)||(n.kind==='image'&&n.load)?'':' card'))+(n.saved?' saved':'')+(n.missing||n.exists===false?' missing':'');
   el.dataset.artifact=n.id;el.dataset.node=n.id;el.dataset.kind=n.kind;
   el.innerHTML=V.cardHTML(n)+V.linksHTML(n);el.setAttribute('aria-label',V.cardLabel(n));
+  for(const [i, line] of [...el.querySelectorAll('.card-links .card-line')].entries()){
+    const dest = n.destinations[i], project = projects[current];
+    const anchor = document.createElement('a');
+    anchor.href = hosted ? HorsemenHosted.shareURL(project, null, dest.canvas, dest.node)
+      : HorsemenSections.formatHash({p:project.id,c:dest.canvas,n:dest.node});
+    anchor.textContent = line.textContent;
+    anchor.onclick = event => {
+      event.stopPropagation();
+      if(event.metaKey || event.ctrlKey || event.shiftKey)return;
+      event.preventDefault();
+      showCanvas(dest.canvas,dest.node);
+    };
+    line.replaceChildren(anchor);
+  }
+  if(!hosted && n.kind === 'link' && /^https:\/\/linear\.app\/[\w-]+\/issue\//.test(n.url)){
+    const load = document.createElement('button');
+    load.className = 'btn embed-load';
+    load.textContent = 'Read Linear issue';
+    load.onclick = async event => {
+      event.stopPropagation();
+      load.disabled = true;
+      try {
+        const issue = await api('/api/issue?url=' + encodeURIComponent(n.url));
+        load.replaceWith(document.createTextNode(issue.identifier + ' · ' + issue.state + ' · ' + issue.title));
+      } catch(error){showToast(error.message);load.disabled = false}
+    };
+    el.querySelector('.cardbody').append(load);
+  }
   if(n.saved){el.style.width=n.width+'px';el.style.height=n.height+'px'}
   if(n.kind==='embed'){el.style.setProperty('--ratio',n.embed.ratio);el.querySelector('.embed-load').addEventListener('click',e=>{e.stopPropagation();loadEmbed(n,el)})}
   setTone(el,n.color);bindArtifact(el,open);
