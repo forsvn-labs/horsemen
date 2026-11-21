@@ -2,6 +2,14 @@
 
 ## 2026-11-20
 
+- When the default branch is protected, a canvas save goes to the branch `horsemen/canvas`, and the edit bar links a pull request. Before, the save failed. [PR #44](https://github.com/hungv47/horsemen/pull/44).
+
+- In canvas edit mode, drop or paste an image, a CSV or TSV table, or a web address. One save is one commit with the canvas file and its new files in `.horsemen/media/`; a public repository asks for confirmation first. [PR #45](https://github.com/hungv47/horsemen/pull/45).
+
+- New app icon and favicon, Junction: four connected tiles for the core records. [PR #43](https://github.com/hungv47/horsemen/pull/43).
+
+- People can edit canvases on horsemen.forsvn.com and save each change as one commit by them, through a second, optional GitHub App, Horsemen Editor. Reading still needs only the viewer app. [Hosted viewer](worker/README.md). [PR #41](https://github.com/hungv47/horsemen/pull/41).
+
 - Canvas link cards for YouTube, Vimeo, Loom, Figma, and Google Docs, Sheets, and Slides load a sandboxed player after a click; nothing loads before. CSV and TSV files on a canvas show as tables. The content security policy allows frames from these five player origins only. [PR #39](https://github.com/hungv47/horsemen/pull/39).
 
 - The Stop hook blocks only when it finds new record drift, and then asks the agent to end with its full task report again. Before, it blocked at every stop, and hosts that show only the last turn hid the task report. [PR #38](https://github.com/hungv47/horsemen/pull/38).
