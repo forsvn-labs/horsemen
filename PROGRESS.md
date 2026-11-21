@@ -31,8 +31,6 @@ Next action: Use the canvas editor and the hosted viewer on real projects and no
 
 - **Canvas tools for agents** (2026-11-19): Agents can read a project in a few short calls and add notes, proof, and connectors to a canvas. `horsemen show` prints an index, one section, or a canvas outline; `horsemen canvas apply` checks and writes a canvas file; `horsemen mcp` gives the same two tools, `read` and `canvas_edit`, to Claude Code and Codex through a small local server. Section cards that agents add get the same IDs as the cards on the live site. Available from main; other installations get it after a refresh, and a person runs `horsemen mcp install` before a host gets the tools.
 
-- **Canvas files** (2026-11-19): The sidebar now lists boards after the records. A canvas file in `.horsemen/canvas/` adds notes, images, link cards, groups, and labelled connectors to the canvas of a record, or makes a board, such as the [roadmap of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). A section card opens the reading view at its section. A file that is not valid shows a message and the generated canvas. Read-only. Live on horsemen.forsvn.com and in the local app from main.
-
 ## In progress
 
 - **Canvas workspace** (started 2026-11-19): All slices are on main and live: record canvases, canvas files, players and tables, agent tools and hooks, editing in the browser, media, and protected branches. Still open: the owner's use on real projects, and the one-week test of pointer mode.
@@ -73,6 +71,8 @@ Canvas workspace: all slices are live. Saves write only canvas files and `.horse
 <summary>Historical ships</summary>
 
 ### 2026-11-19
+
+- **Canvas files** (2026-11-19): The sidebar now lists boards after the records. A canvas file in `.horsemen/canvas/` adds notes, images, link cards, groups, and labelled connectors to the canvas of a record, or makes a board, such as the [roadmap of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). A section card opens the reading view at its section. A file that is not valid shows a message and the generated canvas. Read-only. Live on horsemen.forsvn.com and in the local app from main.
 
 - **Record canvases** (2026-11-19): The sidebar now has a project switcher and a list of canvases. Each record opens as a canvas with one card for each section, and a card opens the reading view at that section. A link such as `?canvas=progress&node=s-shipped` opens one canvas at one card. Read-only. Live on horsemen.forsvn.com and in the local app from main.
 
