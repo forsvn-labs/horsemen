@@ -1,27 +1,29 @@
 {
 "horsemen":{"version":1},
 "nodes":[
-{"id":"g-building","type":"group","x":780,"y":-60,"width":760,"height":460,"label":"Building"},
-{"id":"g-live","type":"group","x":-40,"y":-60,"width":760,"height":460,"label":"Live"},
-{"id":"g-next","type":"group","x":1600,"y":-60,"width":400,"height":460,"label":"Next"},
-{"id":"design","type":"file","x":820,"y":200,"width":320,"height":160,"file":"docs/product/canvas-workspace.md"},
-{"id":"in-progress","type":"file","x":1180,"y":0,"width":320,"height":160,"file":"PROGRESS.md","subpath":"#In progress"},
-{"id":"pr-tools","type":"link","x":1180,"y":200,"width":320,"height":160,"title":"Agent tools pull request","url":"https://github.com/forsvn-labs/horsemen/pull/32"},
+{"id":"g-building","type":"group","x":1500,"y":-60,"width":400,"height":460,"label":"Plan and proof"},
+{"id":"g-live","type":"group","x":-40,"y":-60,"width":1480,"height":460,"label":"Live"},
+{"id":"g-next","type":"group","x":1960,"y":-60,"width":760,"height":460,"label":"Next"},
+{"id":"design","type":"file","x":1540,"y":0,"width":320,"height":160,"file":"docs/product/canvas-workspace.md"},
+{"id":"in-progress","type":"file","x":2000,"y":0,"width":320,"height":160,"file":"PROGRESS.md","subpath":"#In progress"},
+{"id":"next-use","type":"text","x":2360,"y":0,"width":320,"height":160,"color":"6","text":"**Next:** use the canvas editor on real projects, and note what to improve."},
+{"id":"pr-tools","type":"link","x":1540,"y":200,"width":320,"height":160,"title":"Agent tools pull request","url":"https://github.com/forsvn-labs/horsemen/pull/32"},
 {"id":"shipped","type":"file","x":0,"y":200,"width":320,"height":160,"file":"PROGRESS.md","subpath":"#Shipped"},
 {"id":"slice-1","type":"text","x":360,"y":0,"width":320,"height":160,"color":"4","text":"**Slice 1: record canvases.** Each record opens as a canvas with a card for each section."},
 {"id":"slice-2a","type":"text","x":360,"y":200,"width":320,"height":160,"color":"4","text":"**Slice 2a: canvas files.** Boards like this one, drawn from `.horsemen/canvas/`."},
-{"id":"slice-2b","type":"text","x":1640,"y":0,"width":320,"height":160,"color":"6","text":"**Slice 2b:** video embeds that load on click, and CSV tables."},
-{"id":"slice-3","type":"text","x":820,"y":0,"width":320,"height":160,"color":"3","text":"**Slice 3: agent tools.** A local MCP server with `read` and `canvas_edit`, and a short hook pointer."},
-{"id":"slice-4","type":"text","x":1640,"y":200,"width":320,"height":160,"color":"6","text":"**Slice 4:** edit in the browser. Each save is one commit."},
+{"id":"slice-2b","type":"text","x":720,"y":0,"width":320,"height":160,"color":"4","text":"**Slice 2b: players and tables.** Video and document players that load on click, and CSV tables."},
+{"id":"slice-3","type":"text","x":720,"y":200,"width":320,"height":160,"color":"4","text":"**Slice 3: agent tools.** A local MCP server with `read` and `canvas_edit`, and a short hook pointer."},
+{"id":"slice-4","type":"text","x":1080,"y":0,"width":320,"height":360,"color":"4","text":"**Slice 4: edit in the browser.** Each save is one commit by the person who saves.\n\n- 4a: add, move, connect, and remove cards.\n- 4b: drop or paste images, tables, and links.\n- 4c: a protected branch saves to `horsemen/canvas` with a pull request link."},
 {"id":"why","type":"file","x":0,"y":0,"width":320,"height":160,"file":"VISION.md","subpath":"#The world we are building"}
 ],
 "edges":[
 {"id":"e-1-2a","fromNode":"slice-1","toNode":"slice-2a","label":"then"},
-{"id":"e-2a-2b","fromNode":"in-progress","toNode":"slice-2b","label":"then"},
+{"id":"e-2a-2b","fromNode":"slice-2a","toNode":"slice-2b","label":"then"},
 {"id":"e-2a-3","fromNode":"slice-2a","toNode":"slice-3","label":"rules shared with"},
 {"id":"e-2b-4","fromNode":"slice-2b","toNode":"slice-4","label":"then"},
 {"id":"e-3-pr","fromNode":"slice-3","toNode":"pr-tools"},
 {"id":"e-design","fromNode":"design","toNode":"slice-3","label":"plan"},
+{"id":"e-next","fromNode":"in-progress","toNode":"next-use","label":"then"},
 {"id":"e-why","fromNode":"why","toNode":"slice-1"}
 ]
 }
