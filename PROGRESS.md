@@ -7,11 +7,13 @@ Updated: 2026-11-21 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Review the session workspace in [PR #51](https://github.com/forsvn-labs/horsemen/pull/51). Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
+Next action: Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
 
 The single GitHub App migration in [PR #50](https://github.com/forsvn-labs/horsemen/pull/50) needs a live canvas save after the installation owner approves Contents read and write access.
 
 ## Shipped
+
+- **Session workspace** (2026-11-21): Open a record one page at a time and follow links between canvas cards on the live site. From a coding session, preview unpublished project files with `python3 scripts/serve_gui.py --project .`.
 
 - **Shorter project updates** (2026-11-21): Horsemen now tells agents to lead with what changed for people and what needs a decision. Refresh the skill to get the new rules.
 
@@ -31,11 +33,7 @@ The single GitHub App migration in [PR #50](https://github.com/forsvn-labs/horse
 
 - **Canvas tools for agents** (2026-11-19): Agents can read a project in a few short calls and add notes, proof, and connectors to a canvas. `horsemen show` prints an index, one section, or a canvas outline; `horsemen canvas apply` checks and writes a canvas file; `horsemen mcp` gives the same two tools, `read` and `canvas_edit`, to Claude Code and Codex through a small local server. Section cards that agents add get the same IDs as the cards on the live site. Available from main; other installations get it after a refresh, and a person runs `horsemen mcp install` before a host gets the tools.
 
-- **Canvas files** (2026-11-19): The sidebar now lists boards after the records. A canvas file in `.horsemen/canvas/` adds notes, images, link cards, groups, and labelled connectors to the canvas of a record, or makes a board, such as the [roadmap of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). A section card opens the reading view at its section. A file that is not valid shows a message and the generated canvas. Read-only. Live on horsemen.forsvn.com and in the local app from main.
-
 ## In progress
-
-- **Session workspace** (2026-11-21): In development. Local working files, paged Markdown, media previews, Linear issue reads, and a new sign-in cover are ready for review. Hosted account connections for issue trackers and direct uploads to external storage remain open.
 
 - **Canvas workspace** (started 2026-11-19): All slices are on main and live: record canvases, canvas files, players and tables, agent tools and hooks, editing in the browser, media, and protected branches. Still open: the owner's use on real projects, and the one-week test of pointer mode.
 
@@ -43,7 +41,7 @@ The single GitHub App migration in [PR #50](https://github.com/forsvn-labs/horse
 
 | Item | Evidence |
 | --- | --- |
-| Session workspace | [Local session instructions](web/README.md#discuss-a-working-copy). Full verification and the local and hosted browser checks passed. Fresh Claude Code and Codex sessions each read and edited a fictional canvas through MCP. Linear tests used mock issue data. Deployment is pending. |
+| Session workspace | [Local session instructions](web/README.md#discuss-a-working-copy). Full verification and the local and hosted browser checks passed. Fresh Claude Code and Codex sessions each read and edited a fictional canvas through MCP. Linear tests used mock issue data. Merged in [PR #51](https://github.com/forsvn-labs/horsemen/pull/51). Deployed commit `c803c9c` as Worker version `5c09b4ce-662a-4505-8f09-1dc5e265d8c4`. Production checks covered both covers, the GitHub handoff, public records, page and heading controls, roadmap connectors, CSV and the YouTube frame. Hosted tracker accounts and direct uploads to external storage remain open. |
 | Shorter project updates | [Writing rules in the installable skill](https://github.com/forsvn-labs/horsemen/blob/main/horsemen/SKILL.md#before-every-prose-write). Existing installations receive them on refresh. |
 | Saves to protected branches | Worker tests (`worker/test/protected.test.js`) cover classic protection, ruleset rules that block or do not block, a refused commit, the side branch missing, ahead, behind, diverged, in conflict, or deleted during the save, and a check that each write goes only to the default branch or `horsemen/canvas`, never forced or deleted. The browser check ends at the pull request link. Merged in [PR #44](https://github.com/hungv47/horsemen/pull/44) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in the fictional test repository hungv47/horsemen-canvas-test with `main` protected: the save made one commit on `horsemen/canvas` with the `main` head as parent, `main` did not move, and the compare page opens. The protection is off again. |
 | Images, tables, and links in the canvas editor | Media rule tests (magic bytes, SVG refusal, sizes, names), edit tests, and Worker tests (`worker/test/media.test.js`): one GraphQL commit with paths that the Worker builds, size limits, path escapes, and a protected branch. The browser check drops an image, confirms the public warning, pastes a YouTube address and a CSV, and saves one commit with all files, byte for byte. Merged in [PR #45](https://github.com/hungv47/horsemen/pull/45) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in hungv47/horsemen-canvas-test: one commit by the owner with the canvas file and `.horsemen/media/poster-78544f2b.jpg` (116 KB); the canvas refers to the image by that path. |
@@ -75,6 +73,8 @@ Canvas workspace: all slices are live. Saves write only canvas files and `.horse
 <summary>Historical ships</summary>
 
 ### 2026-11-19
+
+- **Canvas files** (2026-11-19): The sidebar now lists boards after the records. A canvas file in `.horsemen/canvas/` adds notes, images, link cards, groups, and labelled connectors to the canvas of a record, or makes a board, such as the [roadmap of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). A section card opens the reading view at its section. A file that is not valid shows a message and the generated canvas. Read-only. Live on horsemen.forsvn.com and in the local app from main.
 
 - **Record canvases** (2026-11-19): The sidebar now has a project switcher and a list of canvases. Each record opens as a canvas with one card for each section, and a card opens the reading view at that section. A link such as `?canvas=progress&node=s-shipped` opens one canvas at one card. Read-only. Live on horsemen.forsvn.com and in the local app from main.
 
