@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-21
+
+- Fixed the Editorial theme: the paper grain behind the canvas now loads on horsemen.forsvn.com. It was an inline image that the content security policy blocked. [PR #47](https://github.com/hungv47/horsemen/pull/47).
+
 ## 2026-11-20
 
 - When the default branch is protected, a canvas save goes to the branch `horsemen/canvas`, and the edit bar links a pull request. Before, the save failed. [PR #44](https://github.com/hungv47/horsemen/pull/44).

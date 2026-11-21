@@ -7,7 +7,7 @@ Updated: 2026-11-21 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view. Fix the Editorial theme texture that the content security policy blocks (`web/style.css`, near line 750).
+Next action: Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
 
 ## Shipped
 
