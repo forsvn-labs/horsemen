@@ -30,10 +30,16 @@ function syncHash(){
   if(location.hash!==hash)try{history.replaceState(null,'',hash||location.pathname)}catch{}
 }
 function initialReaderMode(key){
+  if(key==='changelog')return 'overview';
   try {return localStorage.getItem('horsemen-reader-start') === 'overview' || Object.hasOwn(viewChoices(),key) ? 'overview' : 'document'}
   catch {return 'document'}
 }
 function setPeekMode(mode){if(mode==='overview'){try{localStorage.setItem('horsemen-reader-start','overview')}catch{}}peekMode=mode;renderPeek();$('.peek-content').focus({preventScroll:true})}
+function openDailyChanges(button){
+  if(viewMode('changelog')!=='rich')setViewMode('changelog','rich');
+  openPeek('changelog',button);
+}
+$('#daily-changes').onclick=()=>openDailyChanges($('#daily-changes'));
 function openPeek(key,button,section=null){const r=records[key];if(!r)return;opener=button;peekRequest++;peekTrail=[{key,record:r,nodeId:key}];peekMode=initialReaderMode(key);renderPeek();if(!$('#peek').open)$('#peek').showModal();markOutline();$('.peek-content').focus({preventScroll:true});if(section)showSection(key,section);syncHash()}
 /* A section card opens the reading view at its section: in the layout of the record when the layout names the section, else in the full document.
    Diagrams and images load after the text, so the section holds its place for a moment unless the reader moves. */
@@ -57,7 +63,7 @@ const viewMode=key=>['rich','list'].includes(viewChoices()[key])?viewChoices()[k
 function setViewMode(key,mode){const saved=viewChoices();saved[key]=mode==='list'?'list':'rich';try{localStorage.setItem('horsemen-peek-views',JSON.stringify(saved))}catch{}}
 /* A record that does not follow its template reads as its own document. */
 const documentHTML=record=>{const text=HorsemenViews.withoutTitle(record.content||'');return '<div class="view view-document" data-layout="document">'+(text.trim()?'<div class="prose document">'+renderMarkdown(text,record.url)+'</div>':'<p class="empty-note">This record is empty.</p>')+'</div>'};
-function overviewHTML(key,record){return HorsemenViews.render(key,record,{mode:viewMode(key),now:Date.now(),links:record.connections?.length||0})||documentHTML(record)}
+function overviewHTML(key,record){return HorsemenViews.render(key,record,{mode:viewMode(key),progressRecord:records.progress,now:Date.now(),links:record.connections?.length||0})||documentHTML(record)}
 /* Stated facts ("Updated: 2026-11-18 · Stage: pilot") form the quiet line under the record name. Dates show as relative time. */
 function factsLine(record){
   const facts=HorsemenPreview.facts(record.content||'');
@@ -103,7 +109,7 @@ function installReaderPages(content) {
   const nav = document.createElement('nav');
   nav.className = 'reader-pages';
   nav.setAttribute('aria-label', 'Document pages');
-  nav.innerHTML = '<button type="button" class="reader-prev">Previous</button><select aria-label="Document page"></select><button type="button" class="reader-next">Next</button>';
+  nav.innerHTML = '<button type="button" class="reader-prev">Previous page</button><select aria-label="Document page"></select><button type="button" class="reader-next">Next page</button>';
   const [prev, select, next] = nav.children;
   pages.forEach((el, i) => select.add(new Option((i + 1) + ' / ' + pages.length + ' · ' + (el.querySelector(headings)?.textContent || (i ? 'Continued' : 'Introduction')), i)));
   function show(i) {
@@ -162,8 +168,40 @@ function renderPeek(){
   HorsemenMedia.hydrate(content,{links:r.connections||[],loadImage:imageURL});
   /* The full document is one click away from an overview that is not already the document. */
   if(peekMode==='overview'&&!r.error&&!(entry.link&&entry.link.kind!=='document')&&!content.querySelector('[data-layout=document],[data-layout=guide]'))content.insertAdjacentHTML('beforeend','<p class="more-bar"><button type="button" class="link-btn" data-peek-mode="document">Read the full document</button></p>');
+  if(content.querySelector('.daily-bullets'))markNewChanges(content);
   installReaderPages(content);
   renderPeekNav();
+}
+// Keep a snapshot for this visit so changing reader modes does not clear its markers.
+let dailyVisit=null;
+$('#peek').addEventListener('close',()=>{dailyVisit=null});
+function markNewChanges(content){
+  const project=projects[current];
+  const key='horsemen-daily-seen:'+JSON.stringify([project.repo||project.id,project.root||'']);
+  const items=[...content.querySelectorAll('[data-change-day]')];
+  try{
+    if(dailyVisit?.key!==key){
+      const saved=JSON.parse(localStorage.getItem(key)||'null');
+      dailyVisit={key,previous:Array.isArray(saved)?new Set(saved):null};
+    }
+    const ids=items.map(item=>{
+      // Store fingerprints only. Source links can change whenever the repository revision changes.
+      const copy=item.cloneNode(true);
+      copy.querySelectorAll('.item-meta').forEach(el=>el.remove());
+      let hash=2166136261;
+      for(const char of copy.textContent)hash=Math.imul(hash^char.codePointAt(0),16777619);
+      return item.dataset.changeDay+':'+(hash>>>0);
+    });
+    items.forEach((item,i)=>{
+      if(!dailyVisit.previous||dailyVisit.previous.has(ids[i]))return;
+      const marker=document.createElement('small');
+      marker.className='daily-new';marker.textContent='New';
+      item.prepend(marker,' ');
+      const row=item.closest('details');
+      if(row&&!row.querySelector('summary .daily-new'))row.querySelector('summary').append(' ',marker.cloneNode(true));
+    });
+    localStorage.setItem(key,JSON.stringify(ids));
+  }catch{/* The daily view also works with browser storage disabled. */}
 }
 /* The ⋯ menu: the layouts for this record, the full document, and the Markdown source. */
 function renderPeekMenu(entry){
@@ -199,7 +237,7 @@ function renderPeekNav(){
     b.onclick=()=>openPeek(key,recordOpener(key));list.append(b);
   }
   const order=readable(),at=order.indexOf(root);
-  for(const [id,delta] of [['#peek-prev',-1],['#peek-next',1]]){const b=$(id);b.hidden=order.length<2||peekTrail.length>1;if(!b.hidden)b.querySelector('span').textContent=titles[order[(Math.max(at,0)+delta+order.length)%order.length]]}
+  for(const [id,delta] of [['#peek-prev',-1],['#peek-next',1]]){const b=$(id);b.hidden=order.length<2||peekTrail.length>1;if(!b.hidden)b.querySelector('span').textContent=(delta<0?'Previous record · ':'Next record · ')+titles[order[(Math.max(at,0)+delta+order.length)%order.length]]}
   const outline=$('#peek-outline');outline.replaceChildren();
   const content=$('#peek-content'),marked=content.querySelectorAll('[data-outline]');
   outlineTargets=peekMode==='source'?[]:[...(marked.length?marked:content.querySelectorAll('.prose h2,.prose h3'))];
@@ -222,7 +260,11 @@ new ResizeObserver(()=>sizeOutline()).observe($('.peek-content'));
 $('#peek-prev').onclick=()=>stepRecord(-1);$('#peek-next').onclick=()=>stepRecord(1);
 $('#peek').addEventListener('keydown',e=>{
   if(e.altKey||e.ctrlKey||e.metaKey||e.shiftKey||!['ArrowLeft','ArrowRight'].includes(e.key)||e.target.closest('input,textarea,select,.table-wrap,pre,[role=menu]'))return;
-  e.preventDefault();stepRecord(e.key==='ArrowLeft'?-1:1);
+  const prev=e.key==='ArrowLeft';
+  e.preventDefault();
+  const pageButton=$('#peek-content .reader-'+(prev?'prev':'next'));
+  if(pageButton&&peekMode==='document'){pageButton.click();return}
+  if(peekTrail.length===1)stepRecord(prev?-1:1);
 });
 async function openConnection(link,parentId){
   const nodeId=ensureConnectionNode(parentId,link,false),existing=Object.entries(records).find(([,r])=>r.path===link.path);
@@ -302,7 +344,7 @@ $('#close-peek').onclick=()=>$('#peek').close();$('#peek').addEventListener('clo
 $('#peek-more').onclick=()=>toggleMenu($('#peek-menu'));
 const recordCards=$$('[data-artifact]');for(const b of recordCards){b.disabled=true;bindArtifact(b)}
 const waiting='<span class="waiting">Waiting for source…</span>';
-function clearRecords(){request++;records={};canvasFiles=new Map();recordsLoaded=false;releaseImages();tableCache=new Map();clearConnections();buildCanvas();renderRail();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-sub','#peek-meta','#peek-content','#source-content','#peek-records','#peek-outline','#peek-menu'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML=waiting}}
+function clearRecords(){$('#daily-changes').hidden=true;request++;records={};canvasFiles=new Map();recordsLoaded=false;releaseImages();tableCache=new Map();clearConnections();buildCanvas();renderRail();if($('#peek').open)$('#peek').close();for(const id of ['#peek-title','#peek-sub','#peek-meta','#peek-content','#source-content','#peek-records','#peek-outline','#peek-menu'])$(id).replaceChildren();for(const b of $$('[data-artifact]')){b.disabled=true;const body=b.querySelector('.cardbody');if(body)body.innerHTML=waiting}}
 /* The quiet line under the project name: where it lives, when Progress says it was updated, and the commit read. */
 function projectMeta(p){
   const updated=records.progress&&!records.progress.error?HorsemenPreview.facts(records.progress.content).find(f=>/^updated$/i.test(f.label)):null,r=updated&&HorsemenViews.relative(updated.value.slice(0,10));
@@ -430,6 +472,7 @@ async function selectProject(index){
   syncHash();document.body.dataset.state='loading';loadCanvas();
   try{
     const data=await api('/api/project?id='+p.id);if(version!==request)return;records=data.records;recordsLoaded=true;
+    $('#daily-changes').hidden=!records.changelog||!!records.changelog.error;
     /* Canvas files: the reader gives the text; the format reader checks it once. A file that was not read keeps its error. */
     canvasFiles=new Map();
     for(const [name,file] of Object.entries(data.canvases||{}))if(F.validName(name)&&file)canvasFiles.set(name,{name,path:file.path,url:file.url,blob:typeof file.blob==='string'?file.blob:null,error:typeof file.content==='string'?null:String(file.error||'The canvas file could not be read.'),parsed:typeof file.content==='string'?F.parse(file.content):null,links:Array.isArray(file.connections)?file.connections:[]});
@@ -906,6 +949,7 @@ window.addEventListener('keydown',e=>{if(e.key==='?'&&!e.ctrlKey&&!e.metaKey&&!e
 const palette=$('#palette');let paletteShown=[],paletteAt=0;
 function paletteItems(){
   const items=[],leave=()=>{if($('#peek').open)$('#peek').close()},list=world.classList.contains('list'),one=selected.size===1?[...selected][0]:null;
+  if(records.changelog&&!records.changelog.error)items.push({group:'Views',icon:'changelog',label:'Daily changes',hint:'Changelog',run:()=>openDailyChanges(recordOpener('changelog'))});
   for(const key of readable())items.push({group:'Records',icon:key,label:titles[key],hint:names[key],run:()=>openPeek(key,recordOpener(key))});
   for(const key of canvasKeys())if(key!==canvasKey){const board=key!=='home'&&!isRecordKey(key);items.push({group:'Canvases',icon:board?'canvas':key,label:canvasTitle(key)+' canvas',hint:key==='home'?'Records':board?'Board':'Sections',run:()=>{leave();showCanvas(key)}})}
   for(const node of connectionNodes.values())if(node.element&&!node.element.hidden)items.push({group:'Linked documents',icon:kindIcon(node.link.kind),label:node.link.title,hint:node.link.path||node.link.href,run:()=>openArtifact(node.id,node.element)});

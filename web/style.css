@@ -875,3 +875,28 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 .prose .reader-fold>summary>:is(h1,h2,h3,h4,h5,h6){display:inline;font-size:1.05em;line-height:1.4;margin:0}
 
 .embed-stage :is(img,video).embed-frame{object-fit:contain;background:#171613}
+
+/* Reading a daily update and browsing earlier days. */
+.daily-date{font-size:.875rem;color:var(--ink-2)}
+.daily-bullets{padding-inline-start:1.35rem;margin:.65rem 0;line-height:1.5}
+.daily-bullets li+li{margin-top:.55rem}
+.daily-history{width:100%;border-collapse:collapse;text-align:start}
+.daily-history :is(th,td){border-bottom:1px solid var(--line);padding:.65rem .4rem;vertical-align:top;text-align:start}
+.daily-history th[scope=row]{white-space:nowrap;font-size:.875rem;font-weight:500;font-variant-numeric:tabular-nums}
+.daily-history summary{cursor:pointer;overflow-wrap:anywhere}
+.daily-new{color:var(--ink);font-weight:700;text-decoration:underline}
+#peek-outline-nav{border-inline-start:2px solid var(--line);padding-inline-start:.5rem}
+@media(max-width:600px){
+  .daily-history :is(tbody,tr,td,th[scope=row]){display:block}
+  .daily-history thead{position:absolute;clip-path:inset(50%);height:1px;width:1px;overflow:hidden}
+  .daily-history th[scope=row]{border:0;padding-bottom:0}
+  .reader-pages{flex-wrap:wrap}
+  .reader-pages select{order:-1;flex-basis:100%}
+}
+
+.daily-bullets .item-meta{display:inline-flex;margin-inline-start:.45rem}
+.reader-pages{padding-block:.6rem;border-block:1px solid var(--line)}
+.reader-pages :is(button,select){background:var(--surface-2);border-color:var(--line)}
+@media(max-width:800px){
+  #daily-changes{grid-column:1/-1;grid-row:3;justify-self:start}
+}

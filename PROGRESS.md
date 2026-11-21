@@ -33,6 +33,8 @@ Next action: Review the session workspace in [PR #51](https://github.com/forsvn-
 
 ## In progress
 
+- **Daily changes** (2026-11-21): In review. Readers can scan the latest changes, expand an earlier date, and see which controls open another record.
+
 - **Session workspace** (2026-11-21): In development. Local working files, paged Markdown, media previews, Linear issue reads, and a new sign-in cover are ready for review. Hosted account connections for issue trackers and direct uploads to external storage remain open.
 
 - **Canvas workspace** (started 2026-11-19): All slices are on main and live: record canvases, canvas files, players and tables, agent tools and hooks, editing in the browser, media, and protected branches. Still open: the owner's use on real projects, and the one-week test of pointer mode.
@@ -41,6 +43,7 @@ Next action: Review the session workspace in [PR #51](https://github.com/forsvn-
 
 | Item | Evidence |
 | --- | --- |
+| Daily changes | [Reader guide](web/README.md). Open Daily changes, expand an earlier date, then return after an update. |
 | Session workspace | [Local session instructions](web/README.md#discuss-a-working-copy). Full verification and the local and hosted browser checks passed. Fresh Claude Code and Codex sessions each read and edited a fictional canvas through MCP. Linear tests used mock issue data. Deployment is pending. |
 | Shorter project updates | [Writing rules in the installable skill](https://github.com/forsvn-labs/horsemen/blob/main/horsemen/SKILL.md#before-every-prose-write). Existing installations receive them on refresh. |
 | Saves to protected branches | Worker tests (`worker/test/protected.test.js`) cover classic protection, ruleset rules that block or do not block, a refused commit, the side branch missing, ahead, behind, diverged, in conflict, or deleted during the save, and a check that each write goes only to the default branch or `horsemen/canvas`, never forced or deleted. The browser check ends at the pull request link. Merged in [PR #44](https://github.com/hungv47/horsemen/pull/44) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in the fictional test repository hungv47/horsemen-canvas-test with `main` protected: the save made one commit on `horsemen/canvas` with the `main` head as parent, `main` did not move, and the compare page opens. The protection is off again. |
