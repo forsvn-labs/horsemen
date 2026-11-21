@@ -148,6 +148,17 @@ for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) for (const size of m[2].m
 }
 for (const m of css.matchAll(/--fs-[\w-]+:\s*([0-9.]+)(px|rem)/g)) if (Number(m[1]) * (m[2] === 'rem' ? 16 : 1) < 12) small.push(m[0]);
 assert.deepEqual(small, [], 'Text meets the 12px floor, including the type scale tokens');
+// The hosted CSP allows images from 'self' and blob: only, so CSS must load no data: URL, and each url() is a file in web/.
+for (const file of ['style.css', 'canvas-editor.css']) {
+  const text = fs.readFileSync(path.join(__dirname, '../web', file), 'utf8');
+  for (const m of text.matchAll(/url\(\s*['"]?([^'")]+)/g)) {
+    const ref = m[1].trim();
+    assert(!/^data:/i.test(ref), file + ' loads a data: URL, which the hosted CSP blocks: ' + ref.slice(0, 40));
+    if (ref.startsWith('#')) continue;
+    assert(ref.startsWith('/'), file + ' uses a root path for ' + ref);
+    assert(fs.existsSync(path.join(__dirname, '../web', ref)), file + ' refers to a missing file: ' + ref);
+  }
+}
 // Motion stops when the device asks for reduced motion.
 assert.match(css, /@media\(prefers-reduced-motion:reduce\)\{\*,\*:before,\*:after\{animation:none!important;transition:none!important/);
 console.log('PASS: ' + styles.length + ' themes, ' + variants.length + ' theme and mode variants: every token, a distinct style, readable contrast, and licensed fonts');

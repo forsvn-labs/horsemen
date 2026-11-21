@@ -747,7 +747,7 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 :root:is([data-style=editorial],[data-style=swiss],[data-style=blueprint]) :is(.navlabel,.menu-label,.item-group,.lane-title,.extra-title,:is(.prose,.view) th){font-family:var(--label);text-transform:uppercase;letter-spacing:.07em;font-size:var(--fs-s)}
 
 /* Editorial: paper grain, double rules over sections and cards, a black hairline under the masthead. */
-:root[data-style=editorial] .canvas::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.5;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23g)'/%3E%3C/svg%3E")}
+:root[data-style=editorial] .canvas::before{content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.5;background-image:url(/assets/textures/editorial-grain.svg)}
 :root[data-style=editorial] :is(.topbar,.peek-head,.shortcuts-head){border-bottom-color:var(--ink)}
 :root[data-style=editorial] .heading h1{font-size:1.75rem;font-weight:500}
 :root[data-style=editorial] :is(.part-title,.connections-heading){padding:10px 0 0;border-bottom:0;border-top:3px double var(--ink)}

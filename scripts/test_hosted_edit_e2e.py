@@ -530,7 +530,7 @@ try:
     until("document.querySelector('#edit-bar').hidden && document.querySelector('#toast').textContent.includes('until the pull request merges')", 10)
     # Known and not from this slice: the paper texture of the editorial theme is a data: image, which the hosted CSP blocks.
     errors, csp = value("JSON.stringify([window.__errors, window.__csp])")
-    assert errors == [] and set(csp) <= {'img-src data'}, (errors, csp)
+    assert errors == [] and csp == [], (errors, csp)
 
     # Sign-out revokes both tokens and removes drafts; a viewer-only sign-in asks for no write permission.
     browser('click', '#menu-toggle'); browser('click', '#sign-out')
