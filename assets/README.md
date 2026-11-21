@@ -15,3 +15,5 @@ The project README displays it through the relative path `assets/cover.png`.
 
 The generation prompt previously recorded here described the rejected
 replacement, not this original. It has been removed to avoid false attribution.
+
+The sign-in screen uses an AI-generated film still of four riders crossing a ridge at dusk. The desktop and mobile crops are in `web/assets/horsemen-ridge*.webp`.

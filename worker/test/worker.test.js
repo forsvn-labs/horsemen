@@ -65,7 +65,7 @@ test('missing configuration returns a clear 503, not a crash', async () => {
 test('signed-out visitors get the sign-in page with security headers', async () => {
   const res = await call('/');
   assert.equal(res.status, 200); const html = await res.text();
-  assert.match(html, /Sign in with GitHub/); assert.match(html, /stores none of your project data/i);
+  assert.match(html, /horsemen-ridge.webp/); assert.match(html, /Sign in with GitHub/); assert.match(html, /stores none of your project data/i);
   assert.match(res.headers.get('content-security-policy'), /default-src 'self'/);
   assert.equal(res.headers.get('cache-control'), 'no-store');
   assert.equal(res.headers.get('x-frame-options'), 'DENY');
@@ -293,7 +293,7 @@ test('the Mermaid file is a static file, and the CSP allows blob images only', a
   const res = await call('/vendor/mermaid.min.js');
   assert.equal(res.status, 200); assert.equal(await res.text(), '/*mermaid*/');
   const csp = res.headers.get('content-security-policy');
-  assert.match(csp, /img-src 'self' blob:;/); assert.match(csp, /script-src 'self';/); assert.doesNotMatch(csp, /unsafe-eval|data:/);
+  assert.match(csp, /img-src 'self' blob: https:;/); assert.match(csp, /script-src 'self';/); assert.doesNotMatch(csp, /unsafe-eval|data:/);
   for (const p of ['/vendor/README.md', '/vendor/mermaid.LICENSE.txt', '/vendor/mermaid.min.js.map', '/vendor/a/b.js', '/vendor/.hidden.js']) {
     const r = await call(p); assert.equal(r.status, 404, p); assert.doesNotMatch(await r.text(), /Sign in to open/, p);
   }
@@ -390,7 +390,7 @@ test('the sign-in page links to a public example', async () => {
    a wildcard, a scheme, or 'self' in frame-src; a host that is not a provider; another site can frame Horsemen;
    one kind of response (app, public view, sign-in, static file, error) has another policy. */
 test('every response allows frames from the five player origins only, and no site can frame Horsemen', async () => {
-  const FRAMES = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com'];
+  const FRAMES = ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com', 'https://drive.google.com'];
   const directive = (csp, name) => (csp.split(';').map(p => p.trim()).find(p => p.startsWith(name + ' ')) || '').split(/\s+/).slice(1);
   const { headers } = await signIn();
   publicGitHub(); const pub = await call('/example/open?canvas=pilot', {}, env({ CACHE: memoryCache() }));
@@ -401,7 +401,7 @@ test('every response allows frames from the five player origins only, and no sit
     assert.deepEqual(directive(csp, 'frame-ancestors'), ["'none'"], name);
     assert.equal(res.headers.get('x-frame-options'), 'DENY', name);
     assert.equal(res.headers.get('referrer-policy'), 'no-referrer', name + ': the page keeps no-referrer; only the YouTube frame sends the origin');
-    assert.deepEqual(directive(csp, 'img-src'), ["'self'", 'blob:'], name + ': no provider thumbnail loads before a click');
+    assert.deepEqual(directive(csp, 'img-src'), ["'self'", 'blob:', 'https:'], name + ': images may be loaded over HTTPS');
     assert.deepEqual(directive(csp, 'connect-src'), ["'self'"], name);
   }
 });

@@ -2,6 +2,8 @@
 
 ## 2026-11-21
 
+- Refresh the Horsemen skill for shorter updates. Progress starts with the next action. Each changelog bullet says what people can now do or what works again.
+
 - Fixed the Editorial theme: the paper grain behind the canvas now loads on horsemen.forsvn.com. It was an inline image that the content security policy blocked. [PR #47](https://github.com/hungv47/horsemen/pull/47).
 
 ## 2026-11-20

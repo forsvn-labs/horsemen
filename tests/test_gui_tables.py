@@ -131,7 +131,7 @@ class HTTPTests(unittest.TestCase):
     def test_page_allows_frames_from_the_player_origins_only(self):
         r=urlopen(self.base+'/');csp=r.headers['Content-Security-Policy'];r.read()
         directive=lambda name:next((p.strip().split()[1:] for p in csp.split(';') if p.strip().startswith(name+' ')),None)
-        self.assertEqual(directive('frame-src'),['https://www.youtube-nocookie.com','https://player.vimeo.com','https://www.loom.com','https://www.figma.com','https://docs.google.com'])
+        self.assertEqual(directive('frame-src'),['https://www.youtube-nocookie.com','https://player.vimeo.com','https://www.loom.com','https://www.figma.com','https://docs.google.com', 'https://drive.google.com'])
         self.assertEqual(directive('frame-ancestors'),["'none'"]);self.assertEqual(r.headers['Referrer-Policy'],'no-referrer')
 
 if __name__=='__main__':unittest.main()

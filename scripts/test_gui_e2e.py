@@ -184,10 +184,17 @@ try:
     browser('focus','#workspace-toggle');browser('press','Escape')
     assert value('JSON.stringify([document.querySelector("#workspace-pop").hidden,document.activeElement.id])')==[True,'workspace-toggle'], 'Escape closes the project list and keeps focus on the switcher'
     browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
+    assert value('document.querySelector("#peek-content").dataset.mode === "document"'), 'New readers open a paged document'
+    browser('click','.mode-bar [data-peek-mode="overview"]')
     assert 'Help small teams' in browser('get','text','#peek-content')
     assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Vision', 'The record view names the record'
     assert value('JSON.stringify(!document.querySelector("#peek .detail-eyebrow,#peek .overview-seal,#peek .peek-tabs,#peek .peek-note,#peek .view-help"))') is True, 'No kicker, seal, tabs, hint line, or helper text'
-    browser('click','.more-bar [data-peek-mode="document"]');assert 'Actual source.' in browser('get','text','#peek-content'), 'The full document is one click away'
+    browser('click','.more-bar [data-peek-mode="document"]')
+    browser('click','#peek-content .reader-next')
+    assert value("document.querySelector('.reader-pages select').selectedIndex") == 1
+    browser('click','#peek-content .reader-page:not([hidden]) summary')
+    assert not value("document.querySelector('.reader-page:not([hidden]) details').open")
+    browser('click','#peek-content .reader-prev');assert 'Actual source.' in browser('get','text','#peek-content'), 'The full document is one click away'
     browser('click','#peek-more');browser('click','#show-source');assert '# Record' in browser('get','text','#source-content')
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="rich"]')
     assert value('JSON.stringify(Boolean(document.querySelector("#peek-content [data-layout=brief]")))') is True, 'The menu returns to the record layout'
@@ -303,7 +310,7 @@ try:
     browser('click','[data-record="progress"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Progress"')
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
     assert value('localStorage.getItem("horsemen-peek-views")')=={'vision':'rich','progress':'list'}, 'The browser saves one layout choice for each record type'
-    browser('click','#peek-more');browser('click','#show-document');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
+    browser('click','#peek-more');browser('click','#show-document');browser('click','.reader-next');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
     browser('click','#peek-more');browser('click','#show-source');assert '<summary>Latest day' in browser('get','text','#source-content'), 'Markdown source stays exact'
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
     browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Structure"')
@@ -444,8 +451,9 @@ try:
     assert value('JSON.stringify([...document.querySelectorAll(".canvas-node")].every(e=>{const r=e.getBoundingClientRect(),c=document.querySelector(".canvas").getBoundingClientRect();return r.left>=c.left&&r.right<=c.right&&r.top>=c.top&&r.bottom<=c.bottom}))') is True, 'A canvas with a file fits the screen'
     assert value('JSON.stringify((g=>[getComputedStyle(g).zIndex,g.querySelector(".group-label").textContent,[...document.querySelectorAll(".canvas-node:not(.group)")].every(e=>getComputedStyle(e).zIndex!=="0")])(document.querySelector("[data-node=g-proof]")))')==['0','Proof for the pilot',True], 'A group is a frame behind the other elements'
     # Hostile text in a note is text. A relative link goes to GitHub at the loaded commit; a script address is not a link.
-    note=value('JSON.stringify((n=>[n.querySelector("strong").textContent,n.innerText.includes("<script>window.pwned=1</script>"),n.querySelectorAll("script,img,[onerror]").length,[...n.querySelectorAll("a")].map(a=>[a.textContent,a.href,a.target,a.rel]),n.dataset.tone])(document.querySelector("[data-node=note-risk]")))')
+    note=value('JSON.stringify((n=>[n.querySelector("strong").textContent,n.innerText.includes("<script>window.pwned=1</script>"),n.querySelectorAll("script,img,[onerror]").length,[...n.querySelectorAll(".note-body a")].map(a=>[a.textContent,a.href,a.target,a.rel]),n.dataset.tone])(document.querySelector("[data-node=note-risk]")))')
     assert note==['Risk:',True,0,[['Research','https://github.com/example/alpha/blob/'+'a'*40+'/docs/research.md','_blank','noopener noreferrer']],'1'], 'A note shows Markdown from the safe renderer'
+    assert value('document.querySelector("[data-node=note-risk] .card-links a").hash.endsWith("&c=structure&n=s-map")')
     # Images come from blob: addresses through the reader. The SVG has a script; nothing runs.
     browser('wait','--fn','document.querySelectorAll(".file-node.image .md-image[data-state=shown] img").length === 2')
     assert value('JSON.stringify([...document.querySelectorAll(".file-node.image img")].map(i=>[i.alt,i.src.startsWith("blob:"),i.naturalWidth>0,i.closest("[data-node]").dataset.node]))')==[['Pilot board',True,True,'img-board'],['Pilot logo',True,True,'img-logo']], 'Repository images load as blob: images with their alternative text'

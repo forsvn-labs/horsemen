@@ -17,7 +17,7 @@ const enc = new TextEncoder();
 const dec = new TextDecoder();
 
 /* frame-src: the players that a canvas link card loads after a click (web/canvas-embeds.js has the same list). */
-const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: https:; media-src https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com https://drive.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 const SECURITY = {
   'content-security-policy': CSP, 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer',
   'x-frame-options': 'DENY', 'strict-transport-security': 'max-age=31536000', 'permissions-policy': 'camera=(), microphone=(), geolocation=()',
@@ -152,6 +152,10 @@ ul{margin:18px 0 26px;padding:0;list-style:none;border-top:1px solid var(--rule)
 ::selection{background:color-mix(in srgb,var(--gilt) 30%,transparent)}
 @media (max-width:480px){main{padding:28px 20px}}
 .share-target{margin:20px 0 0;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;font:15px/1.5 var(--ui);color:var(--muted)}.share-target b{color:var(--ink);font-weight:600}
+body:has(.sign-in-cover){position:relative;isolation:isolate;place-items:center start;padding:clamp(16px,4vh,40px) clamp(24px,7vw,120px);background:#181713}
+.sign-in-cover,.sign-in-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
+body:has(.sign-in-cover) main{background:#181713e8;color:#fff5df;--muted:#d8ccbb;--rule:#6a6051;--ink:#fff5df;--paper:#211c16;border:0;border-radius:3px}
+@media(max-width:600px){body:has(.sign-in-cover){padding:32vh 12px 12px}.sign-in-cover img{height:50vh;object-position:center}}
 </style></head><body><main><div class="brand"><img src="/assets/icons/app-icon.svg" width="36" height="36" alt="">Horsemen</div>${body}</main></body></html>`;
   return respond(html, status, { 'content-type': 'text/html; charset=utf-8', ...headers });
 }
@@ -162,13 +166,15 @@ const writePromise = env => singleApp(env)
   ? '<li><b>Read-only by default.</b> Sign-in asks for read access only. Canvas editing is a separate, optional editor app; each save is one commit by you.</li>'
   : '<li><b>Read-only.</b> This site never writes to your repositories.</li>';
 const signInPage = (env, headers = {}, target = null, next = null) => page('Horsemen · Sign in', `
+<picture class="sign-in-cover"><source media="(max-width:600px)" srcset="/assets/horsemen-ridge-mobile.webp"><img src="/assets/horsemen-ridge.webp" alt="" fetchpriority="high"></picture>
 ${target ? `<p class="share-target">Sign in to open <b>${escapeHTML(target)}</b>. You need GitHub access to this repository.</p>` : ''}
 <h1>Your project records, in plain sight.</h1>
 <p>Open each Horsemen project as a canvas of its Vision, Progress, Brain, and Structure. Agents keep the records current; you read them here.</p>
+<a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
 <ul>${writePromise(env)}
 <li><b>Stores none of your project data.</b> Records go from GitHub to this browser when you open them.</li>
 <li><b>You choose the repositories.</b> Install the GitHub App on only the ones you want to see.</li></ul>
-<a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
+
 <small><a href="/hungv47/horsemen">See this project without signing in</a> · Open source: <a href="https://github.com/hungv47/horsemen">github.com/hungv47/horsemen</a></small>`, 200, headers);
 const errorPage = (status, message, headers = {}) => page('Horsemen', `<h1>${escapeHTML(message)}</h1><p><a class="btn" href="/auth/login">Sign in again</a></p>`, status, headers);
 
@@ -321,7 +327,7 @@ async function appPage(env, request, session, mode = 'hosted') {
   return respond(html, 200, { 'content-type': 'text/html; charset=utf-8' });
 }
 
-const STATIC = /^\/(?:[A-Za-z0-9_-]+\.(?:js|css)|vendor\/[A-Za-z0-9][A-Za-z0-9._-]*\.js|assets\/(?:[A-Za-z0-9][A-Za-z0-9_-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*\.(?:svg|png|woff2|txt))$/;
+const STATIC = /^\/(?:[A-Za-z0-9_-]+\.(?:js|css)|vendor\/[A-Za-z0-9][A-Za-z0-9._-]*\.js|assets\/(?:[A-Za-z0-9][A-Za-z0-9_-]*\/)*[A-Za-z0-9][A-Za-z0-9._-]*\.(?:svg|png|webp|woff2|txt))$/;
 async function staticFile(env, request, path) {
   if (!STATIC.test(path) || path.includes('..')) return respond('Not found.', 404);
   const res = await env.ASSETS.fetch(new Request(new URL(path, request.url)));

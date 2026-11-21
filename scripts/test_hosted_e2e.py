@@ -203,17 +203,21 @@ try:
     browser('dblclick', '[data-artifact="brain"]')
     until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Research notebook')")
     # Diagrams and images in a linked document: Mermaid comes from /vendor through the Worker, images through the proxy.
+    browser('click', '.mode-bar [data-peek-mode="overview"]')
     browser('click', '.connection-card')
     until("document.querySelectorAll('figure.diagram[data-state=drawn]').length===2 && document.querySelectorAll('figure.diagram[data-state=error]').length===1", 30)
     assert value("JSON.stringify([...document.querySelectorAll('figure.diagram[data-state=drawn] .diagram-canvas')].map(c=>c.getAttribute('aria-label')))") == ['Flowchart', 'Pie chart: Interviews']
     assert value("document.querySelector('figure.diagram[data-state=error] .diagram-error').textContent.startsWith('This diagram could not be drawn.')")
+    browser('select', '.reader-pages select', '4')
     browser('eval', 'document.querySelector(".md-image").scrollIntoView({block:"center"})')
     until("document.querySelectorAll('.md-image[data-state=shown]').length===2 && document.querySelectorAll('.md-image[data-state=error]').length===1", 20)
     assert value("JSON.stringify([...document.querySelectorAll('.md-image[data-state=shown] img')].map(i=>[i.alt,i.src.startsWith('blob:'),i.naturalWidth>0]))") == [['Pilot board', True, True], ['Pilot logo', True, True]]
     assert value("JSON.stringify(document.querySelector('.md-image[data-state=error] .md-image-note').textContent)") == 'Image not shown: The image is not in the repository at this commit.'
     assert value("JSON.stringify([window.pwned ?? null, window.__csp])") == [None, []], 'no script ran from diagram or SVG source, and nothing broke the CSP'
+    browser('select', '.reader-pages select', '1')
     browser('eval', 'document.querySelector("figure.diagram").scrollIntoView({block:"start"})')
     browser('screenshot', str(args.output / '02b-diagrams.png'))
+    browser('select', '.reader-pages select', '4')
     browser('eval', 'document.querySelector(".md-image").scrollIntoView({block:"center"})')
     browser('screenshot', str(args.output / '02c-images.png'))
     browser('press', 'Escape')

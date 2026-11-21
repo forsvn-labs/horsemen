@@ -131,6 +131,22 @@ only the concrete consequence for the task, not the skill's internal steps.
 
 ## Before every prose write
 
+Write for a person catching up and the next agent doing the work.
+
+- Use one short bullet per update. Lead with what changed for people or the
+  business. Claim more users, higher revenue, or time saved only when measured.
+- Use everyday words. Keep exact names, commands, and limits when readers need
+  them to act. Put test results and implementation details in a link or the
+  Technical details section. Preserve the owner's voice in VISION.
+- In PROGRESS, put the next action first. Say what people can use and where.
+  If work is blocked, name what must happen and who can unblock it. Describe
+  a local test as a local test. Call a change live only after delivery.
+- In CHANGELOG, write one bullet per change people received, under the
+  release date. Say what they can now do or what works again. Include any step
+  they must take, such as refreshing an installation.
+- At handoff, use the same PROGRESS for people and agents. Keep the next action,
+  open decisions, and limits visible. Link the source an agent needs to continue.
+
 Before saving any prose Horsemen drafts or changes, local or in a provider,
 run the [pre-save edit](references/sync.md#pre-save-edit). Use `no-ai-slop`
 when installed; otherwise use the bundled checklist. Edit only the changed

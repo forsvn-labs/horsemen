@@ -11,6 +11,7 @@ import re
 import secrets
 from collections import namedtuple
 from pathlib import Path
+from urllib.parse import urlencode
 
 from . import canvas, legacy
 
@@ -353,6 +354,23 @@ def _element(root, name, element):
     if edge is None:
         return f'{element} is not on {name}.canvas; read "{name}.canvas" for its elements'
     lines = [f'{clip(flat(key), 40)}: {_value(edge[key])}' for key in sorted(edge) if key not in canvas.EDGE_FIRST]
+    top = legacy.git_top(root)
+    remote = (legacy.git(root, 'remote', 'get-url', 'origin') or '').strip() if top else ''
+    repo = re.fullmatch(r'(?:https://github\.com/|git@github\.com:|ssh://git@github\.com/)([\w.-]+/[\w.-]+)', remote)
+    prefix = 'https://horsemen.forsvn.com/' + repo[1].removesuffix('.git') if repo else ''
+    params = {'root': root.relative_to(top).as_posix()} if top and root != top else {}
+    by_id = {node['id']:node for node in doc.get('nodes', [])}
+    for endpoint in ('fromNode', 'toNode'):
+        target = edge[endpoint]
+        node = by_id.get(target, {})
+        board = Path(node.get('file', '')).stem if canvas.kind(node) == 'canvas' else None
+        if not prefix:
+            lines.append('read: ' + (f'{board}.canvas' if board else f'{name}.canvas#{target}'))
+            continue
+        query = dict(params, canvas=board or name)
+        if not board:
+            query['node'] = target
+        lines.append(f"[{target}]({prefix}?{urlencode(query)})")
     return stamp, f"{name}.canvas#{element} rev={stamp} edge {edge['fromNode']}>{edge['toNode']}", '\n'.join(lines)
 
 
