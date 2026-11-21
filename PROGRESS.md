@@ -7,7 +7,7 @@ Updated: 2026-11-21 · Stage: live · Health: On track
 <details open>
 <summary>Latest day</summary>
 
-Next action: Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
+Next action: Review the session workspace in [PR #51](https://github.com/forsvn-labs/horsemen/pull/51). Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
 
 ## Shipped
 
@@ -33,12 +33,15 @@ Next action: Use the canvas editor and the hosted viewer on real projects and no
 
 ## In progress
 
+- **Session workspace** (2026-11-21): In development. Local working files, paged Markdown, media previews, Linear issue reads, and a new sign-in cover are ready for review. Hosted account connections for issue trackers and direct uploads to external storage remain open.
+
 - **Canvas workspace** (started 2026-11-19): All slices are on main and live: record canvases, canvas files, players and tables, agent tools and hooks, editing in the browser, media, and protected branches. Still open: the owner's use on real projects, and the one-week test of pointer mode.
 
 ### Technical details
 
 | Item | Evidence |
 | --- | --- |
+| Session workspace | [Local session instructions](web/README.md#discuss-a-working-copy). Full verification and the local and hosted browser checks passed. Fresh Claude Code and Codex sessions each read and edited a fictional canvas through MCP. Linear tests used mock issue data. Deployment is pending. |
 | Shorter project updates | [Writing rules in the installable skill](https://github.com/forsvn-labs/horsemen/blob/main/horsemen/SKILL.md#before-every-prose-write). Existing installations receive them on refresh. |
 | Saves to protected branches | Worker tests (`worker/test/protected.test.js`) cover classic protection, ruleset rules that block or do not block, a refused commit, the side branch missing, ahead, behind, diverged, in conflict, or deleted during the save, and a check that each write goes only to the default branch or `horsemen/canvas`, never forced or deleted. The browser check ends at the pull request link. Merged in [PR #44](https://github.com/hungv47/horsemen/pull/44) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in the fictional test repository hungv47/horsemen-canvas-test with `main` protected: the save made one commit on `horsemen/canvas` with the `main` head as parent, `main` did not move, and the compare page opens. The protection is off again. |
 | Images, tables, and links in the canvas editor | Media rule tests (magic bytes, SVG refusal, sizes, names), edit tests, and Worker tests (`worker/test/media.test.js`): one GraphQL commit with paths that the Worker builds, size limits, path escapes, and a protected branch. The browser check drops an image, confirms the public warning, pastes a YouTube address and a CSV, and saves one commit with all files, byte for byte. Merged in [PR #45](https://github.com/hungv47/horsemen/pull/45) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in hungv47/horsemen-canvas-test: one commit by the owner with the canvas file and `.horsemen/media/poster-78544f2b.jpg` (116 KB); the canvas refers to the image by that path. |

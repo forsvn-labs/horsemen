@@ -88,7 +88,7 @@
       if (kind === 'group') return { ...out, label: typeof n.label === 'string' ? n.label : '' };
       if (kind === 'link') {
         let host = ''; try { host = new URL(n.url).hostname; } catch { /* The reader checked the address; an empty host is safe. */ }
-        const embed = E.embed(n.url);
+        const embed = E.embed(n.url) || E.directMedia(n.url);
         return { ...out, kind: embed ? 'embed' : 'link', url: n.url, title: n.title || host || n.url, host, embed };
       }
       if (kind === 'unknown') return { ...out, type: String(n.type) };
@@ -131,7 +131,11 @@
     const byId = new Map(view.nodes.map(n => [n.id, n]));
     view.edges = usable.edges.filter(e => byId.has(e.fromNode) && byId.has(e.toNode)).map(e => ({ id: e.id, from: e.fromNode, to: e.toNode, label: typeof e.label === 'string' ? e.label : '',
       fromSide: e.fromSide || null, toSide: e.toSide || null, fromEnd: e.fromEnd || 'none', toEnd: e.toEnd || 'arrow', color: F.safeColor(e.color) ? e.color : null }));
-    for (const e of view.edges) byId.get(e.from).links.push((e.label ? e.label + ' ' : '') + '→ ' + nodeTitle(byId.get(e.to)));
+    for (const edge of view.edges) {
+      const source = byId.get(edge.from), target = byId.get(edge.to);
+      source.links.push((edge.label ? edge.label + ' ' : '') + '→ ' + nodeTitle(target));
+      (source.destinations ||= []).push({canvas: target.target || key, node: target.target ? null : target.id});
+    }
     return view;
   }
 

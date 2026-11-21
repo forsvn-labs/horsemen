@@ -408,7 +408,7 @@ ASSET_TYPES={'.svg':'image/svg+xml','.png':'image/png','.woff2':'font/woff2','.t
 
 # Repository images show as blob: URLs. Script stays same-origin only, with no eval.
 # frame-src: the players that a canvas link card loads after a click (web/canvas-embeds.js has the same list).
-PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
+PAGE_CSP="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: https:; media-src https:; connect-src 'self'; frame-src https://www.youtube-nocookie.com https://player.vimeo.com https://www.loom.com https://www.figma.com https://docs.google.com https://drive.google.com; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"
 # Image bytes never run as a document, even an SVG opened on its own.
 IMAGE_CSP="default-src 'none'; style-src 'unsafe-inline'; sandbox"
 
@@ -442,6 +442,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(200,image['bytes'],image['type'],IMAGE_CSP)
             if path=='/api/table':
                 return self.respond(200,self.server.state.load_table(query.get('id',[''])[0],query.get('link',[''])[0]))
+            if path=='/api/issue':
+                from .issue_preview import issue_preview
+                return self.respond(200, issue_preview(query.get('url', [''])[0]))
             if path=='/api/pr':
                 project=self.server.state.project(query.get('project',[''])[0])
                 generation=self.server.state.generation

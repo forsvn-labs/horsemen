@@ -23,6 +23,22 @@ read-only, unless the site offers the optional editor app for canvas files
 (see [edit a canvas](#edit-a-canvas-hosted)).
 See [the hosted viewer](../worker/README.md).
 
+## Discuss a working copy
+
+Run `python3 scripts/serve_gui.py --project /path/to/project` from this source checkout.
+Open the loopback address printed by the server. The project needs a GitHub origin
+and at least two core records. This mode reads working files, including new
+artifacts. Use Refresh GitHub in the account menu after an agent changes a file.
+GitHub source links resolve after the file reaches the remote default branch.
+
+New readers open records in **Full document**. Choose **Show overview** to use the record summaries. Use the page menu to jump to a section
+and select a heading to fold its contents. In canvas List view, follow a
+connector to its target. To add an external file, paste its Drive link or HTTPS media address in the hosted canvas editor. In a local session, ask the agent to add the link card to the canvas file and refresh the viewer. Select Load
+on its card to preview it. The host controls access and the browser must
+support the format. Tracker issue links work the same way as bookmarks.
+To read a Linear issue title and state locally, start the server with
+`LINEAR_API_KEY` in its environment, then select **Read Linear issue**.
+
 ## Reading and navigation
 
 The screen shows few controls. Everything else is in one of three places:
@@ -175,6 +191,7 @@ table. The rules are in `web/canvas-embeds.js` and `web/canvas-table.js`.
   | Provider | Addresses | Frame |
   | --- | --- | --- |
   | YouTube | `youtube.com/watch?v=`, `youtu.be/`, `/embed/`, `/shorts/`, `/live/`; a `t` or `start` time | `www.youtube-nocookie.com/embed/<ID>` |
+  | Google Drive | `drive.google.com/file/d/<ID>/view` | `drive.google.com/file/d/<ID>/preview` |
   | Vimeo | `vimeo.com/<ID>`, `vimeo.com/<ID>/<hash>`, `vimeo.com/channels/<name>/<ID>`, `player.vimeo.com/video/<ID>` | `player.vimeo.com/video/<ID>?dnt=1` |
   | Loom | `loom.com/share/<ID>`, `loom.com/embed/<ID>` | `www.loom.com/embed/<ID>` |
   | Figma | `figma.com/file`, `/design`, `/proto`, `/board`, `/slides`, or `/deck` with a file key; a `node-id` | `www.figma.com/embed?embed_host=horsemen&url=…` |
@@ -403,7 +420,7 @@ than 512 KiB is not requested. An SVG image shows only as an image from a
 address as a page. The app reads only the files that a loaded canvas names.
 A table cell is always text. A player frame loads only after a click, from an
 address that the app builds, and the content security policy allows frames
-from five origins only (see [players and tables](#players-and-tables)).
+from six origins only (see [players and tables](#players-and-tables)).
 
 Discovery reads default branches, including archived repositories. A project
 needs at least two core records and either VISION or PROGRESS (legacy STATUS

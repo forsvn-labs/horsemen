@@ -22,11 +22,12 @@ const frame = url => E.embed(url)?.frame ?? null;
 const YT = 'aqz-KE-bpKQ', LOOM = 'e5b8c04bca094dd8a5507925ab887002', DOC = '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms', FIGMA = 'Ab3dEfGh1JkLmN0pQrStUv';
 
 /* The frame origins: exactly the providers of the design, in one list. */
-assert.deepEqual(E.FRAME_ORIGINS, ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com']);
+assert.deepEqual(E.FRAME_ORIGINS, ['https://www.youtube-nocookie.com', 'https://player.vimeo.com', 'https://www.loom.com', 'https://www.figma.com', 'https://docs.google.com', 'https://drive.google.com']);
 assert.equal(E.SANDBOX, 'allow-scripts allow-same-origin allow-presentation');
 
 /* Each provider's address to its frame address. */
 const cases = [
+  [`https://drive.google.com/file/d/${DOC}/view`, `https://drive.google.com/file/d/${DOC}/preview`, "google-drive"],
   // YouTube: watch, short links, embed, shorts, live, the mobile host, the music host is not a player host.
   [`https://www.youtube.com/watch?v=${YT}`, `https://www.youtube-nocookie.com/embed/${YT}`, 'youtube'],
   [`https://youtube.com/watch?v=${YT}&list=PL123&index=2`, `https://www.youtube-nocookie.com/embed/${YT}`, 'youtube'],
@@ -88,7 +89,7 @@ for (const url of [
   'https://www.youtube.com/', 'https://www.youtube.com/@channel', 'https://www.youtube.com/playlist?list=PL123', 'https://www.youtube.com/results?search_query=x',
   'https://music.youtube.com/watch?v=' + YT, 'https://vimeo.com/', 'https://vimeo.com/channels/staffpicks', 'https://www.loom.com/', 'https://www.loom.com/looms/videos',
   'https://www.figma.com/', 'https://www.figma.com/community/file/123', 'https://www.figma.com/files/recent', 'https://docs.google.com/', 'https://docs.google.com/forms/d/' + DOC + '/viewform',
-  'https://drive.google.com/file/d/' + DOC + '/view', 'https://sheets.google.com/', 'https://www.google.com/search?q=' + YT,
+  'https://drive.google.com/drive/folders/' + DOC, 'https://sheets.google.com/', 'https://www.google.com/search?q=' + YT,
 ]) assert.equal(E.embed(url), null, url);
 
 /* Hostile addresses: never a player, and nothing of the address reaches a frame. */
@@ -125,3 +126,11 @@ for (const [name, csp] of [['worker', worker], ['local', local]]) {
 }
 
 console.log('canvas embeds: ok');
+
+for (const [url, kind] of [
+  ['https://media.example.org/demo.mp4?version=2', 'video'],
+  ['https://media.example.org/diagram.png', 'image'],
+  ['https://media.example.org/diagram.svg', null],
+  ['https://media.example.org/watch?name=demo.mp4', null],
+  ['http://media.example.org/demo.mp4', null],
+]) assert.equal(E.directMedia(url)?.kind || null, kind);
