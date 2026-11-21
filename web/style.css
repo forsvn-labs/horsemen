@@ -897,6 +897,9 @@ time[title]{text-decoration:underline dotted var(--line-strong);text-underline-o
 .daily-bullets .item-meta{display:inline-flex;margin-inline-start:.45rem}
 .reader-pages{padding-block:.6rem;border-block:1px solid var(--line)}
 .reader-pages :is(button,select){background:var(--surface-2);border-color:var(--line)}
-@media(max-width:800px){
-  #daily-changes{grid-column:1/-1;grid-row:3;justify-self:start}
+#daily-changes{margin-bottom:.6rem}
+@media(max-width:640px){
+  .canvases-nav{display:flex;align-items:center;gap:.5rem}
+  #daily-changes{flex:none;margin:0}
+  #canvases{min-width:0}
 }
