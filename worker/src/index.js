@@ -166,7 +166,7 @@ ${target ? `<p class="share-target">Sign in to open <b>${escapeHTML(target)}</b>
 <li><b>Stores none of your project data.</b> Records go from GitHub to this browser when you open them.</li>
 <li><b>You choose the repositories.</b> Install the GitHub App on only the ones you want to see.</li></ul>
 <a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
-<small><a href="/hungv47/horsemen">See this project without signing in</a> · Open source: <a href="https://github.com/hungv47/horsemen">github.com/hungv47/horsemen</a></small>`, 200, headers);
+<small><a href="/forsvn-labs/horsemen">See this project without signing in</a> · Open source: <a href="https://github.com/forsvn-labs/horsemen">github.com/forsvn-labs/horsemen</a></small>`, 200, headers);
 const errorPage = (status, message, headers = {}) => page('Horsemen', `<h1>${escapeHTML(message)}</h1><p><a class="btn" href="/auth/login">Sign in again</a></p>`, status, headers);
 
 /* ---------------------------------------------------------------- GitHub proxy */

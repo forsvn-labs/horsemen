@@ -34,7 +34,7 @@ themes from the account menu.
 Copy a link to a project or record, such as
 `horsemen.forsvn.com/owner/repo?record=progress`. Anyone can open a link to a
 public repository without signing in, for example
-<https://horsemen.forsvn.com/hungv47/horsemen>. A link to a private repository
+<https://horsemen.forsvn.com/forsvn-labs/horsemen>. A link to a private repository
 opens for people with GitHub access to it. The viewer stores no project data on the server. A site can also offer canvas
 editing through a second, optional GitHub App; only people who add that app can
 save, and each save is one commit by them. When the default branch is
@@ -51,7 +51,7 @@ Install with the [skills.sh CLI](https://skills.sh/docs/cli). You need Node.js
 and npm; no repository clone is required:
 
 ```sh
-npx skills add hungv47/horsemen --skill horsemen
+npx skills add forsvn-labs/horsemen --skill horsemen
 ```
 
 Choose your agent and installation scope when prompted. This installs the
@@ -70,7 +70,7 @@ It must not invent them. [Skill instructions](horsemen/SKILL.md).
 For the standalone CLI, clone the repository and install into an isolated environment:
 
 ```sh
-git clone https://github.com/hungv47/horsemen.git
+git clone https://github.com/forsvn-labs/horsemen.git
 cd horsemen
 python3 -m venv .venv
 .venv/bin/python -m pip install .

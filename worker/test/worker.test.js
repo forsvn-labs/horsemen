@@ -383,7 +383,7 @@ test('a signed-in visitor can open the public view of a public repository', asyn
 });
 
 test('the sign-in page links to a public example', async () => {
-  assert.match(await (await call('/')).text(), /<a href="\/hungv47\/horsemen">See this project without signing in<\/a>/);
+  assert.match(await (await call('/')).text(), /<a href="\/forsvn-labs\/horsemen">See this project without signing in<\/a>/);
 });
 
 /* Click-to-load players (canvas slice 2b). Failure modes: a page without the frame list (players stay blank);

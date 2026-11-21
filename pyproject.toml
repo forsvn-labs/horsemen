@@ -14,8 +14,8 @@ license-files = ["LICENSE"]
 classifiers = ["Development Status :: 3 - Alpha", "Programming Language :: Python :: 3"]
 
 [project.urls]
-Repository = "https://github.com/hungv47/horsemen"
-Issues = "https://github.com/hungv47/horsemen/issues"
+Repository = "https://github.com/forsvn-labs/horsemen"
+Issues = "https://github.com/forsvn-labs/horsemen/issues"
 
 [project.scripts]
 horsemen = "horsemen_core.cli:main"
