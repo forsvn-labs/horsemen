@@ -192,6 +192,7 @@ table. The rules are in `web/canvas-embeds.js` and `web/canvas-table.js`.
   | Provider | Addresses | Frame |
   | --- | --- | --- |
   | YouTube | `youtube.com/watch?v=`, `youtu.be/`, `/embed/`, `/shorts/`, `/live/`; a `t` or `start` time | `www.youtube-nocookie.com/embed/<ID>` |
+  | Google Drive | `drive.google.com/file/d/<ID>/view` | `drive.google.com/file/d/<ID>/preview` |
   | Vimeo | `vimeo.com/<ID>`, `vimeo.com/<ID>/<hash>`, `vimeo.com/channels/<name>/<ID>`, `player.vimeo.com/video/<ID>` | `player.vimeo.com/video/<ID>?dnt=1` |
   | Loom | `loom.com/share/<ID>`, `loom.com/embed/<ID>` | `www.loom.com/embed/<ID>` |
   | Figma | `figma.com/file`, `/design`, `/proto`, `/board`, `/slides`, or `/deck` with a file key; a `node-id` | `www.figma.com/embed?embed_host=horsemen&url=…` |
@@ -420,7 +421,7 @@ than 512 KiB is not requested. An SVG image shows only as an image from a
 address as a page. The app reads only the files that a loaded canvas names.
 A table cell is always text. A player frame loads only after a click, from an
 address that the app builds, and the content security policy allows frames
-from five origins only (see [players and tables](#players-and-tables)).
+from six origins only (see [players and tables](#players-and-tables)).
 
 Discovery reads default branches, including archived repositories. A project
 needs at least two core records and either VISION or PROGRESS (legacy STATUS
