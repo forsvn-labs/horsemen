@@ -1,15 +1,23 @@
 # Progress
 
-Updated: 2026-11-20 · Stage: live · Health: On track
+Updated: 2026-11-21 · Stage: live · Health: On track
 
 ## Latest day
 
 <details open>
 <summary>Latest day</summary>
 
-Next action: Merge slice 4a (editing in the browser), create the Horsemen Editor app with the owner, and check a save on the live site in hungv47/horsemen-canvas-test; then build slices 4b and 4c. The owner chose on 2026-11-19 to build all slices now, without the one-week test; still note which you open first on real projects: the canvas of a record or its reading view. Keep using the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md.
+Next action: Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view. Fix the Editorial theme texture that the content security policy blocks (`web/style.css`, near line 750).
 
 ## Shipped
+
+- **Saves to protected branches** (2026-11-20): When GitHub does not allow a direct commit on the default branch, a canvas save goes to the branch `horsemen/canvas`, and the edit bar shows a link to open a pull request. Before, the save failed. Horsemen never opens the pull request and never writes another branch. Live on horsemen.forsvn.com.
+
+- **Images, tables, and links in the canvas editor** (2026-11-20): In edit mode, a person can drop or paste an image (PNG, JPEG, GIF, WebP, 1 MiB or less), a CSV or TSV table, or a web address. One save is one commit with the canvas file and its new files in `.horsemen/media/`. Before the first file goes to a public repository, a dialog asks for confirmation. Live on horsemen.forsvn.com.
+
+- **Junction logo** (2026-11-20): The owner asked for a more modern logo. The new app icon and favicon show four connected tiles for Vision, Progress, Brain, and Structure, and stay clear at 16 px. Live on horsemen.forsvn.com and in the local app from main.
+
+- **Canvas editing in the browser** (2026-11-20): A person can add, move, connect, and remove cards on a canvas at horsemen.forsvn.com and save. Each save is one commit by that person, through a second, optional GitHub App, Horsemen Editor. People who only read see no new permission request; the public view and the local app stay read-only. Live on horsemen.forsvn.com.
 
 - **Players and tables on canvases** (2026-11-20): A canvas link to YouTube, Vimeo, Loom, Figma, or a Google document, sheet, or slides shows a player that loads only after a click; nothing loads from the provider before. A CSV or TSV file on a canvas shows as a table. Live on horsemen.forsvn.com and in the local app from main.
 
@@ -23,22 +31,18 @@ Next action: Merge slice 4a (editing in the browser), create the Horsemen Editor
 
 - **Record canvases** (2026-11-19): The sidebar now has a project switcher and a list of canvases. Each record opens as a canvas with one card for each section, and a card opens the reading view at that section. A link such as `?canvas=progress&node=s-shipped` opens one canvas at one card. Read-only. Live on horsemen.forsvn.com and in the local app from main.
 
-- **Diagrams and images** (2026-11-19): Records now show Mermaid diagrams and charts, such as flowcharts, sequence diagrams, and pie and XY charts, in the colours of the active theme. Each one has a View code toggle. Images stored in the repository show in place when a record links to them. Live on horsemen.forsvn.com and in the local app from main.
-
-- **Public view** (2026-11-19): Anyone can open the canvas of a public repository without signing in, for example horsemen.forsvn.com/hungv47/horsemen. Private repositories still need sign-in, and nothing is stored. Live on horsemen.forsvn.com.
-
-- **Style themes** (2026-11-19): The owner asked for several themes that each look different. The account menu and Jump now show a gallery of eight themes: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, borders, shadows, spacing, canvas, and focus. Modern and High contrast replace the type sets for readable text. Live on horsemen.forsvn.com.
-
-- **Calm workspace** (2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Live on horsemen.forsvn.com.
-
 ## In progress
 
-- **Canvas workspace** (started 2026-11-19): The owner approved the design and all its proposed answers on 2026-11-19. Slice 1 (record canvases) shipped. Slice 2a (canvas files) shipped. The owner chose to build all slices now. Later slices add canvas files, editing by people and agents, and tools for agents.
+- **Canvas workspace** (started 2026-11-19): All slices are on main and live: record canvases, canvas files, players and tables, agent tools and hooks, editing in the browser, media, and protected branches. Still open: the owner's use on real projects, and the one-week test of pointer mode.
 
 ### Technical details
 
 | Item | Evidence |
 | --- | --- |
+| Saves to protected branches | Worker tests (`worker/test/protected.test.js`) cover classic protection, ruleset rules that block or do not block, a refused commit, the side branch missing, ahead, behind, diverged, in conflict, or deleted during the save, and a check that each write goes only to the default branch or `horsemen/canvas`, never forced or deleted. The browser check ends at the pull request link. Merged in [PR #44](https://github.com/hungv47/horsemen/pull/44) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in the fictional test repository hungv47/horsemen-canvas-test with `main` protected: the save made one commit on `horsemen/canvas` with the `main` head as parent, `main` did not move, and the compare page opens. The protection is off again. |
+| Images, tables, and links in the canvas editor | Media rule tests (magic bytes, SVG refusal, sizes, names), edit tests, and Worker tests (`worker/test/media.test.js`): one GraphQL commit with paths that the Worker builds, size limits, path escapes, and a protected branch. The browser check drops an image, confirms the public warning, pastes a YouTube address and a CSV, and saves one commit with all files, byte for byte. Merged in [PR #45](https://github.com/hungv47/horsemen/pull/45) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in hungv47/horsemen-canvas-test: one commit by the owner with the canvas file and `.horsemen/media/poster-78544f2b.jpg` (116 KB); the canvas refers to the image by that path. |
+| Junction logo | A logo study compared Junction, Fan, and Compass on light and dark backgrounds from 16 to 512 px; the owner chose Junction. The full verification command and the GUI check in all eight themes passed. Merged in [PR #43](https://github.com/hungv47/horsemen/pull/43) after CI passed; deployed from main. |
+| Canvas editing in the browser | Worker tests (`worker/test/editor.test.js`, `worker/test/setup.test.js`) cover the editor sign-in, separate tokens, the write route gate (origin, CSRF, content type, size), invalid canvases, conflicts, and that the viewer app stays read-only. Edit tests (`tests/test_canvas_edit.cjs`) cover each draft operation and the conflict table. The browser check (`scripts/test_hosted_edit_e2e.py`) moves, adds, connects, saves, merges, resolves a conflict, and checks eight themes and phone width. Merged in [PR #41](https://github.com/hungv47/horsemen/pull/41) after CI passed; deployed from main. Live check on 2026-11-20 in hungv47/horsemen-canvas-test: the owner's save made commit `e711c6b` (`canvas(progress): add 1 [skip ci]`), authored by the owner, with only the canvas file changed, and started no Actions run. |
 | Public view | Worker tests cover public and private repositories, no user token on public reads, repository routes only, cross-site requests, and the edge cache; the hosted browser check opens a public repository without sign-in. Merged in [PR #25](https://github.com/hungv47/horsemen/pull/25) and [PR #26](https://github.com/hungv47/horsemen/pull/26) after CI passed; deployed from main. GitHub refused anonymous reads from the shared Cloudflare IP (rate limit used up), so the Worker now reads public repositories with a read-only public token (5,000 requests an hour). Live checks: horsemen.forsvn.com/hungv47/horsemen opens in public mode and shows all seven records in a signed-out browser; a private repository still asks for sign-in; `/pub/user` returns 404 and cross-site requests return 403. |
 | Diagrams and images | Markdown, media, reader parity, and Worker tests cover Mermaid figures, parse errors, theme colours, image links, path traversal, non-image files, SVG checks, the 1 MiB limit, and the CSP (`blob:` images only, no `eval`). The fixture and hosted browser checks draw diagrams in three themes and load repository images; full verification passed locally. Merged in [PR #27](https://github.com/hungv47/horsemen/pull/27) after CI passed; deployed from main, and the live files match main. Live check: the Tech stack record of hungv47/horsemen draws both of its diagrams in the public view. |
 | Quiet Stop hook | Merged in [PR #38](https://github.com/hungv47/horsemen/pull/38) after CI passed. Hook scenarios (205), unit tests, and full verification passed. The owner's global skill was refreshed with `npx skills update horsemen -g -y` and matches main; a live check of the installed hook printed nothing for a clean stop and blocked for new folders. |
@@ -54,9 +58,9 @@ Next action: Merge slice 4a (editing in the browser), create the Horsemen Editor
 
 ### Gates
 
-Existing installations do not change until refreshed. The local workspace stays a source preview. The hosted viewer is read-only and stores no project data. Public view covers public repositories only; private repositories need sign-in.
+Existing installations do not change until refreshed. The local workspace stays a source preview and read-only. The hosted viewer stores no project data. Reading needs only the viewer app; saving needs the optional Horsemen Editor app, and each save is one commit by the person who saves. Public view covers public repositories only, read-only; private repositories need sign-in.
 
-Canvas workspace: slices 1 and 2a are live and read-only, slices 3a and 3b (agent tools and hooks) are on main, and slice 2b (players and tables) is live: no canvas file, no new GitHub permission, and no writes. The owner chose to build all slices without waiting for the one-week test.
+Canvas workspace: all slices are live. Saves write only canvas files and `.horsemen/media/` files, to the default branch or to `horsemen/canvas` when the default branch is protected; Horsemen never opens a pull request, forces, or deletes a branch.
 
 </details>
 
@@ -66,6 +70,14 @@ Canvas workspace: slices 1 and 2a are live and read-only, slices 3a and 3b (agen
 <summary>Historical ships</summary>
 
 ### 2026-11-19
+
+- **Diagrams and images** (2026-11-19): Records now show Mermaid diagrams and charts, such as flowcharts, sequence diagrams, and pie and XY charts, in the colours of the active theme. Each one has a View code toggle. Images stored in the repository show in place when a record links to them. Live on horsemen.forsvn.com and in the local app from main.
+
+- **Public view** (2026-11-19): Anyone can open the canvas of a public repository without signing in, for example horsemen.forsvn.com/hungv47/horsemen. Private repositories still need sign-in, and nothing is stored. Live on horsemen.forsvn.com.
+
+- **Style themes** (2026-11-19): The owner asked for several themes that each look different. The account menu and Jump now show a gallery of eight themes: Engraved (default, with its six palettes), Modern, Editorial, Terminal, Swiss, Blueprint, Soft, and High contrast. Each theme has its own fonts, shapes, borders, shadows, spacing, canvas, and focus. Modern and High contrast replace the type sets for readable text. Live on horsemen.forsvn.com.
+
+- **Calm workspace** (2026-11-19): The owner asked for a simpler screen and better record views. The workspace now shows few controls: the project list, one account menu, Jump, and Canvas or List. Cards show the record name and a few key lines. A record opens as one reading column; Progress starts with the next action, then the work now, then shipped work by day. Live on horsemen.forsvn.com.
 
 - **Share links** (2026-11-19): Each project and record on horsemen.forsvn.com has a readable link, such as `/owner/repo?record=progress`, and a Copy link button. People with GitHub access to the repository open the same record after sign-in. Live on horsemen.forsvn.com.
 
