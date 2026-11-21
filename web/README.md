@@ -31,7 +31,7 @@ and at least two core records. This mode reads working files, including new
 artifacts. Use Refresh GitHub in the account menu after an agent changes a file.
 GitHub source links resolve after the file reaches the remote default branch.
 
-Open a record and select **Full document**. Use the page menu to jump to a section
+New readers open records in **Full document**. Choose **Show overview** to use the record summaries. Use the page menu to jump to a section
 and select a heading to fold its contents. In canvas List view, follow a
 connector to its target. Paste a Drive file link or a direct HTTPS image or
 video address on the canvas to keep the original with its host. Select Load

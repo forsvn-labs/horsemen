@@ -29,8 +29,12 @@ function syncHash(){
   const hash=p?HorsemenSections.formatHash({p:p.id,c:view.canvas,n:view.node,r:record}):'';
   if(location.hash!==hash)try{history.replaceState(null,'',hash||location.pathname)}catch{}
 }
-function setPeekMode(mode){peekMode=mode;renderPeek();$('.peek-content').focus({preventScroll:true})}
-function openPeek(key,button,section=null){const r=records[key];if(!r)return;opener=button;peekRequest++;peekTrail=[{key,record:r,nodeId:key}];peekMode='overview';renderPeek();if(!$('#peek').open)$('#peek').showModal();markOutline();$('.peek-content').focus({preventScroll:true});if(section)showSection(key,section);syncHash()}
+function initialReaderMode(key){
+  try {return localStorage.getItem('horsemen-reader-start') === 'overview' || Object.hasOwn(viewChoices(),key) ? 'overview' : 'document'}
+  catch {return 'document'}
+}
+function setPeekMode(mode){if(mode==='overview'){try{localStorage.setItem('horsemen-reader-start','overview')}catch{}}peekMode=mode;renderPeek();$('.peek-content').focus({preventScroll:true})}
+function openPeek(key,button,section=null){const r=records[key];if(!r)return;opener=button;peekRequest++;peekTrail=[{key,record:r,nodeId:key}];peekMode=initialReaderMode(key);renderPeek();if(!$('#peek').open)$('#peek').showModal();markOutline();$('.peek-content').focus({preventScroll:true});if(section)showSection(key,section);syncHash()}
 /* A section card opens the reading view at its section: in the layout of the record when the layout names the section, else in the full document.
    Diagrams and images load after the text, so the section holds its place for a moment unless the reader moves. */
 let sectionAnchor=null;

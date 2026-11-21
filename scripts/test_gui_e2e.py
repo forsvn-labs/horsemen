@@ -184,6 +184,8 @@ try:
     browser('focus','#workspace-toggle');browser('press','Escape')
     assert value('JSON.stringify([document.querySelector("#workspace-pop").hidden,document.activeElement.id])')==[True,'workspace-toggle'], 'Escape closes the project list and keeps focus on the switcher'
     browser('dblclick','[data-artifact="vision"]');browser('wait','#peek[open]')
+    assert value('document.querySelector("#peek-content").dataset.mode === "document"'), 'New readers open a paged document'
+    browser('click','.mode-bar [data-peek-mode="overview"]')
     assert 'Help small teams' in browser('get','text','#peek-content')
     assert value('JSON.stringify(document.querySelector("#peek-title").textContent)')=='Vision', 'The record view names the record'
     assert value('JSON.stringify(!document.querySelector("#peek .detail-eyebrow,#peek .overview-seal,#peek .peek-tabs,#peek .peek-note,#peek .view-help"))') is True, 'No kicker, seal, tabs, hint line, or helper text'

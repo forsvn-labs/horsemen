@@ -151,7 +151,7 @@ ul{margin:18px 0 26px;padding:0;list-style:none;border-top:1px solid var(--rule)
 ::selection{background:color-mix(in srgb,var(--gilt) 30%,transparent)}
 @media (max-width:480px){main{padding:28px 20px}}
 .share-target{margin:20px 0 0;padding:12px 14px;border:1px solid var(--rule);border-radius:10px;font:15px/1.5 var(--ui);color:var(--muted)}.share-target b{color:var(--ink);font-weight:600}
-body:has(.sign-in-cover){position:relative;isolation:isolate;place-items:center start;padding:clamp(24px,7vw,120px);background:#181713}
+body:has(.sign-in-cover){position:relative;isolation:isolate;place-items:center start;padding:clamp(16px,4vh,40px) clamp(24px,7vw,120px);background:#181713}
 .sign-in-cover,.sign-in-cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
 body:has(.sign-in-cover) main{background:#181713e8;color:#fff5df;--muted:#d8ccbb;--rule:#6a6051;--ink:#fff5df;--paper:#211c16;border:0;border-radius:3px}
 @media(max-width:600px){body:has(.sign-in-cover){padding:32vh 12px 12px}.sign-in-cover img{height:50vh;object-position:center}}
@@ -167,10 +167,11 @@ const signInPage = (env, headers = {}, target = null, next = null) => page('Hors
 ${target ? `<p class="share-target">Sign in to open <b>${escapeHTML(target)}</b>. You need GitHub access to this repository.</p>` : ''}
 <h1>Your project records, in plain sight.</h1>
 <p>Open each Horsemen project as a canvas of its Vision, Progress, Brain, and Structure. Agents keep the records current; you read them here.</p>
+<a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
 <ul>${writePromise(env)}
 <li><b>Stores none of your project data.</b> Records go from GitHub to this browser when you open them.</li>
 <li><b>You choose the repositories.</b> Install the GitHub App on only the ones you want to see.</li></ul>
-<a class="btn" href="/auth/login${next ? '?next=' + encodeURIComponent(next) : ''}">Sign in with GitHub</a>
+
 <small><a href="/hungv47/horsemen">See this project without signing in</a> · Open source: <a href="https://github.com/hungv47/horsemen">github.com/hungv47/horsemen</a></small>`, 200, headers);
 const errorPage = (status, message, headers = {}) => page('Horsemen', `<h1>${escapeHTML(message)}</h1><p><a class="btn" href="/auth/login">Sign in again</a></p>`, status, headers);
 

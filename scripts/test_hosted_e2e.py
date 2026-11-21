@@ -203,6 +203,7 @@ try:
     browser('dblclick', '[data-artifact="brain"]')
     until("document.querySelector('#peek').open && document.querySelector('#peek').innerText.includes('Research notebook')")
     # Diagrams and images in a linked document: Mermaid comes from /vendor through the Worker, images through the proxy.
+    browser('click', '.mode-bar [data-peek-mode="overview"]')
     browser('click', '.connection-card')
     until("document.querySelectorAll('figure.diagram[data-state=drawn]').length===2 && document.querySelectorAll('figure.diagram[data-state=error]').length===1", 30)
     assert value("JSON.stringify([...document.querySelectorAll('figure.diagram[data-state=drawn] .diagram-canvas')].map(c=>c.getAttribute('aria-label')))") == ['Flowchart', 'Pie chart: Interviews']
