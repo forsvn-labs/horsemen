@@ -111,6 +111,8 @@ function installReaderPages(content) {
     select.selectedIndex = i;
     prev.disabled = !i;
     next.disabled = i === pages.length - 1;
+    sizeOutline();
+    markOutline();
   }
   select.onchange = () => show(select.selectedIndex);
   prev.onclick = () => show(select.selectedIndex - 1);
@@ -210,11 +212,11 @@ function renderPeekNav(){
   sizeOutline();markOutline();
 }
 /* "On this page" appears only for long records: four or more sections on a page about twice the visible height. */
-function sizeOutline(){const area=$('.peek-content');$('#peek-outline-nav').hidden=!(outlineTargets.length>=4&&area.clientHeight&&area.scrollHeight>area.clientHeight*1.8)}
+function sizeOutline(){const area=$('.peek-content');$('#peek-outline-nav').hidden=!(outlineTargets.filter(el=>el.getClientRects().length).length>=4&&area.clientHeight&&area.scrollHeight>area.clientHeight*1.8)}
 function markOutline(){
-  const area=$('.peek-content'),top=area.getBoundingClientRect().top;let active=outlineTargets[0];
+  const area=$('.peek-content'),top=area.getBoundingClientRect().top;const visible=outlineTargets.filter(el=>el.getClientRects().length);let active=visible[0];
   /* Before the sheet is shown nothing has a position, so the first section stays marked. */
-  if(area.clientHeight)for(const el of outlineTargets)if(el.getBoundingClientRect().top-top<=120)active=el;
+  if(area.clientHeight)for(const el of visible)if(el.getBoundingClientRect().top-top<=120)active=el;
   for(const b of $('#peek-outline').children){const on=b.dataset.target===active?.id;if(on)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current')}
 }
 let outlineFrame=0;$('.peek-content').addEventListener('scroll',()=>{cancelAnimationFrame(outlineFrame);outlineFrame=requestAnimationFrame(markOutline)},{passive:true});
@@ -741,6 +743,7 @@ function cancelGesture(){
 canvas.addEventListener('pointerdown',e=>{
   if(e.target.closest('[data-card-toggle]'))return;
   if(world.classList.contains('list')||![0,1,2].includes(e.button))return;
+  if(e.target.closest('.canvas-node video'))return;
   if(e.button===0&&tool!=='hand'&&!spaceDown&&e.target.closest('.canvas-node a[href],.canvas-node .embed-load,.canvas-node .sheet-scroll'))return;  // A link, a player button, and a table stay controls.
   const node=e.target.closest('[data-artifact]');if(node?.disabled)return;
   const pt=localPoint(e);pointers.set(e.pointerId,pt);suppressClick=null;
@@ -801,6 +804,7 @@ canvas.addEventListener('wheel',e=>{
 },{passive:false});
 window.addEventListener('keydown',e=>{
   if(e.target.closest('dialog,input,textarea,select,[contenteditable=true]')||world.classList.contains('list'))return;
+  if(e.target.closest('video'))return;
   if(e.code==='Space'){if(e.target.closest('button,a')&&(!canvas.contains(e.target)||e.target.closest('.embed-load')))return;/* Space presses a control outside the canvas, and a player button. */e.preventDefault();spaceDown=true;canvas.classList.add('pan-ready');return}
   if(e.key.toLowerCase()==='h'&&!e.ctrlKey&&!e.metaKey){setTool('hand');return}
   if((e.key.toLowerCase()==='v'||e.key==='1')&&!e.ctrlKey&&!e.metaKey&&!e.shiftKey){setTool('select');return}

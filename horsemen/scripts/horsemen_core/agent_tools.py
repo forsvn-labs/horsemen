@@ -364,6 +364,9 @@ def _element(root, name, element):
         target = edge[endpoint]
         node = by_id.get(target, {})
         board = Path(node.get('file', '')).stem if canvas.kind(node) == 'canvas' else None
+        if not prefix:
+            lines.append('read: ' + (f'{board}.canvas' if board else f'{name}.canvas#{target}'))
+            continue
         query = dict(params, canvas=board or name)
         if not board:
             query['node'] = target

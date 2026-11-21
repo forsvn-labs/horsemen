@@ -17,3 +17,12 @@ class LinearPreviewTest(unittest.TestCase):
             for bad in [url.replace('demo','other'), url.replace('linear.app','example.com'), url.replace('OPS-42','invalid')]:
                 with self.assertRaises(ProviderError):
                     issue_preview(bad)
+
+    def test_moved_issue_and_incomplete_responses(self):
+        old = 'https://linear.app/demo/issue/OPS-42'
+        issue = {'identifier':'ENG-7', 'url':old.replace('OPS-42','ENG-7'), 'title':'Review', 'state':{'name':'Done'}}
+        with patch.dict('os.environ', {'LINEAR_API_KEY':'fictional'}), patch('horsemen_core.issue_preview.fetch_issue', return_value=issue):
+            self.assertEqual(issue_preview(old)['identifier'], 'ENG-7')
+            for key in ('url', 'identifier', 'state', 'title'):
+                with patch.dict(issue, {key:None}), self.assertRaises(ProviderError):
+                    issue_preview(old)

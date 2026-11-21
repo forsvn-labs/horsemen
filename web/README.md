@@ -33,8 +33,7 @@ GitHub source links resolve after the file reaches the remote default branch.
 
 New readers open records in **Full document**. Choose **Show overview** to use the record summaries. Use the page menu to jump to a section
 and select a heading to fold its contents. In canvas List view, follow a
-connector to its target. Paste a Drive file link or a direct HTTPS image or
-video address on the canvas to keep the original with its host. Select Load
+connector to its target. To add an external file, paste its Drive link or HTTPS media address in the hosted canvas editor. In a local session, ask the agent to add the link card to the canvas file and refresh the viewer. Select Load
 on its card to preview it. The host controls access and the browser must
 support the format. Tracker issue links work the same way as bookmarks.
 To read a Linear issue title and state locally, start the server with

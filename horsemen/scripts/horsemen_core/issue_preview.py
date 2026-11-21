@@ -33,7 +33,15 @@ def issue_preview(url):
     if not token:
         raise ProviderError('Set LINEAR_API_KEY for the local server to preview this issue.', 422)
     issue = fetch_issue(match[2].upper(), token)
-    actual = ISSUE.fullmatch(issue.get('url', '')) if isinstance(issue, dict) else None
-    if not actual or actual[1].lower() != match[1].lower() or actual[2].upper() != match[2].upper():
+    address = issue.get('url') if isinstance(issue, dict) else None
+    actual = ISSUE.fullmatch(address) if isinstance(address, str) else None
+    if not actual or actual[1].lower() != match[1].lower():
         raise ProviderError('The linked issue is unavailable in this workspace.', 404)
-    return {'title':issue['title'], 'state':issue['state']['name'], 'identifier':issue['identifier']}
+    state = issue.get('state')
+    fields = {'title':issue.get('title'), 'identifier':issue.get('identifier'),
+              'state':state.get('name') if isinstance(state, dict) else None}
+    if not all(isinstance(value, str) and value.strip() for value in fields.values()):
+        raise ProviderError('Linear returned incomplete issue details.', 422)
+    if fields['identifier'].upper() != actual[2].upper():
+        raise ProviderError('Linear returned inconsistent issue details.', 422)
+    return fields
