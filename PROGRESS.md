@@ -9,6 +9,8 @@ Updated: 2026-11-24 · Stage: live · Health: On track
 
 Next action: Use Daily changes and the canvas editor on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
 
+The single GitHub App migration in [PR #50](https://github.com/forsvn-labs/horsemen/pull/50) needs a live canvas save after the installation owner approves Contents read and write access.
+
 ## Shipped
 
 - **Daily changes** (2026-11-24): Open Daily changes to see the next action and what shipped. Expand an earlier date for details. In the reader, use Next page within a record or Next record to switch records.
