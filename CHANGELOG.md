@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-24
+
+- Open Daily changes for the next action and the latest project update. Expand a date to read older changes. In the reader, Next page stays in the current record and Next record opens the following record.
+
 ## 2026-11-21
 
 - Read records by page, fold headings, and follow canvas connectors. Preview working files from localhost or paste a Drive or media link into the hosted editor. [Session workspace release](https://github.com/forsvn-labs/horsemen/pull/51).

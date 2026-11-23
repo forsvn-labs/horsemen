@@ -1,15 +1,17 @@
 # Progress
 
-Updated: 2026-11-21 · Stage: live · Health: On track
+Updated: 2026-11-24 · Stage: live · Health: On track
 
 ## Latest day
 
 <details open>
 <summary>Latest day</summary>
 
-Next action: Use the canvas editor and the hosted viewer on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
+Next action: Use Daily changes and the canvas editor on real projects and note what to improve; the open audit items are in docs/product/design-audit.md. Still note which you open first: the canvas of a record or its reading view.
 
 ## Shipped
+
+- **Daily changes** (2026-11-24): Open Daily changes to see the next action and what shipped. Expand an earlier date for details. In the reader, use Next page within a record or Next record to switch records.
 
 - **Session workspace** (2026-11-21): Open a record one page at a time and follow links between canvas cards on the live site. From a coding session, preview unpublished project files with `python3 scripts/serve_gui.py --project .`.
 
@@ -29,8 +31,6 @@ Next action: Use the canvas editor and the hosted viewer on real projects and no
 
 - **Short session start for agents** (2026-11-20): A person can select a short start for agent sessions with `hooks install --pointer`. The agent then gets the next action and the gates in 700 characters or less and reads the rest when the task needs it. The Stop hook also tells the agent when it breaks a canvas, and when canvas files are not on GitHub yet. Off until a person selects it. Available from main; other installations get it after a refresh.
 
-- **Canvas tools for agents** (2026-11-19): Agents can read a project in a few short calls and add notes, proof, and connectors to a canvas. `horsemen show` prints an index, one section, or a canvas outline; `horsemen canvas apply` checks and writes a canvas file; `horsemen mcp` gives the same two tools, `read` and `canvas_edit`, to Claude Code and Codex through a small local server. Section cards that agents add get the same IDs as the cards on the live site. Available from main; other installations get it after a refresh, and a person runs `horsemen mcp install` before a host gets the tools.
-
 ## In progress
 
 - **Canvas workspace** (started 2026-11-19): All slices are on main and live: record canvases, canvas files, players and tables, agent tools and hooks, editing in the browser, media, and protected branches. Still open: the owner's use on real projects, and the one-week test of pointer mode.
@@ -39,6 +39,7 @@ Next action: Use the canvas editor and the hosted viewer on real projects and no
 
 | Item | Evidence |
 | --- | --- |
+| Daily changes | [Release commit](https://github.com/forsvn-labs/horsemen/commit/4852e66). Local and hosted browser suites passed. The live desktop and phone checks covered the daily update, history, and reader navigation. |
 | Session workspace | [Local session instructions](web/README.md#discuss-a-working-copy). Full verification and the local and hosted browser checks passed. Fresh Claude Code and Codex sessions each read and edited a fictional canvas through MCP. Linear tests used mock issue data. Merged in [PR #51](https://github.com/forsvn-labs/horsemen/pull/51). Deployed commit `c803c9c` as Worker version `5c09b4ce-662a-4505-8f09-1dc5e265d8c4`. Production checks covered both covers, the GitHub handoff, public records, page and heading controls, roadmap connectors, CSV and the YouTube frame. Hosted tracker accounts and direct uploads to external storage remain open. |
 | Shorter project updates | [Writing rules in the installable skill](https://github.com/forsvn-labs/horsemen/blob/main/horsemen/SKILL.md#before-every-prose-write). Existing installations receive them on refresh. |
 | Saves to protected branches | Worker tests (`worker/test/protected.test.js`) cover classic protection, ruleset rules that block or do not block, a refused commit, the side branch missing, ahead, behind, diverged, in conflict, or deleted during the save, and a check that each write goes only to the default branch or `horsemen/canvas`, never forced or deleted. The browser check ends at the pull request link. Merged in [PR #44](https://github.com/hungv47/horsemen/pull/44) after CI passed; deployed from main, and the live files match main. Live check on 2026-11-21 in the fictional test repository hungv47/horsemen-canvas-test with `main` protected: the save made one commit on `horsemen/canvas` with the `main` head as parent, `main` did not move, and the compare page opens. The protection is off again. |
@@ -71,6 +72,8 @@ Canvas workspace: all slices are live. Saves write only canvas files and `.horse
 <summary>Historical ships</summary>
 
 ### 2026-11-19
+
+- **Canvas tools for agents** (2026-11-19): Agents can read a project in a few short calls and add notes, proof, and connectors to a canvas. `horsemen show` prints an index, one section, or a canvas outline; `horsemen canvas apply` checks and writes a canvas file; `horsemen mcp` gives the same two tools, `read` and `canvas_edit`, to Claude Code and Codex through a small local server. Section cards that agents add get the same IDs as the cards on the live site. Available from main; other installations get it after a refresh, and a person runs `horsemen mcp install` before a host gets the tools.
 
 - **Canvas files** (2026-11-19): The sidebar now lists boards after the records. A canvas file in `.horsemen/canvas/` adds notes, images, link cards, groups, and labelled connectors to the canvas of a record, or makes a board, such as the [roadmap of this project](https://horsemen.forsvn.com/hungv47/horsemen?canvas=roadmap). A section card opens the reading view at its section. A file that is not valid shows a message and the generated canvas. Read-only. Live on horsemen.forsvn.com and in the local app from main.
 
