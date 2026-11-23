@@ -543,7 +543,7 @@
     const src=(ctx,line)=>{const u=sourceLink(ctx.url,line);return u?A(u,'src','L'+line,'Open line '+line+' in the source'):''};
     const when=(i,now)=>i.date?'<span class="when">'+(i.dateLabel?esc(i.dateLabel)+' ':'')+time(i.date,now)+'</span>':i.when?'<span class="when">'+esc(i.when)+'</span>':'';
     /* Two layouts for each type: the first is the default. Progress reads best as a list; the board is the option. */
-    const LAYOUTS={progress:{list:'List',rich:'Board',first:'list'},vision:{rich:'Brief',list:'List',first:'rich'},brain:{rich:'Sources',list:'List',first:'rich'},structure:{rich:'Map',list:'List',first:'rich'},changelog:{rich:'Releases',list:'List',first:'rich'},techstack:{rich:'Table',list:'List',first:'rich'},readme:{rich:'Document',list:'List',first:'rich'}};
+    const LAYOUTS={progress:{list:'List',rich:'Board',first:'list'},vision:{rich:'Brief',list:'List',first:'rich'},brain:{rich:'Sources',list:'List',first:'rich'},structure:{rich:'Map',list:'List',first:'rich'},changelog:{rich:'Daily changes',list:'List',first:'rich'},techstack:{rich:'Table',list:'List',first:'rich'},readme:{rich:'Document',list:'List',first:'rich'}};
     const LAYOUT={vision:'brief',progress:'board',brain:'library',structure:'map',changelog:'timeline',techstack:'tools',readme:'guide'};
     const layouts=key=>LAYOUTS[key]||{rich:'Sections',list:'List',first:'rich'};
     const open=(key,mode,layout)=>{const l=layout||LAYOUT[key]||'document';return '<div class="view view-'+l+'" data-layout="'+l+'" data-density="'+mode+'">'};
@@ -625,12 +625,46 @@
     function changelogView(record,ctx){
       const m=changelog(record.content,ctx.url);if(m.empty)return null;
       let html=open('changelog','rich')+(m.lede?'<div class="intro prose">'+block(m.lede.text,ctx.url)+'</div>':'');
-      for(const r of m.releases){
-        let group=null,list='';
-        for(const e of r.entries){if(!take(ctx))continue;if(e.group!==group){group=e.group;if(group)list+='<li class="item-group">'+esc(group)+'</li>'}list+='<li class="item"><span class="item-line"><span class="item-text">'+inline(e.text,ctx.url)+'</span></span>'+(e.body?'<div class="item-body">'+block(e.body,ctx.url)+'</div>':'')+meta(chips(e.proof),src(ctx,e.line))+'</li>'}
-        const name=r.date?r.title.replace(r.version||'\u0000','').replace(r.date,'').replace(/^[\s\-–—·:]+|[\s\-–—·:]+$/g,''):r.title;
-        html+='<section class="part release" data-outline="'+esc(r.title)+'"><h3 class="part-title">'+(r.version?'<span class="version">'+esc(r.version)+'</span>':'')+(name?'<span>'+esc(name)+'</span>':'')+(r.date?'<small>'+time(r.date,ctx.now)+' · '+r.date+'</small>':'')+src(ctx,r.line)+'</h3>'+(list?'<ul class="items">'+list+'</ul>':'<p class="empty-note">No entries under this heading.</p>')+'</section>';
+      const days=new Map(),undated=[];
+      for(const release of m.releases){
+        if(!release.entries.length)continue;
+        if(!release.date){undated.push(release);continue}
+        if(!days.has(release.date))days.set(release.date,[]);
+        days.get(release.date).push(release);
       }
+      function entries(releases,date){
+        const rows=[];
+        for(const release of releases)for(const entry of release.entries){
+          if(!take(ctx))continue;
+          const label=[release.version,entry.group].filter(Boolean).join(' · ');
+          rows.push('<li data-change-day="'+esc(date)+'">'+(label?'<small>'+esc(label)+'</small> ':'')+
+            inline(entry.text,ctx.url)+(entry.body?block(entry.body,ctx.url):'')+meta(src(ctx,entry.line))+'</li>');
+        }
+        return '<ul class="daily-bullets">'+rows.join('')+'</ul>';
+      }
+      const dates=[...days.keys()].sort().reverse();
+      const latest=dates.shift();
+      const progressRecord=ctx.progressRecord;
+      if(progressRecord?.content&&!progressRecord.error){
+        const snapshot=progress(progressRecord.content,progressRecord.url);
+        const source={...ctx,url:progressRecord.url};
+        if(snapshot.next)html+=lead('Next action',inline(snapshot.next.text,source.url),source,snapshot.next.line);
+        const attention=snapshot.days.find(day=>day.latest)?.lanes.attention||[];
+        if(attention.length)html+='<details class="daily-attention"><summary>Needs attention ('+attention.length+')</summary>'+items(attention,source)+'</details>';
+      }
+      if(latest)html+='<section class="part release" data-outline="Daily changes"><h3 class="part-title">Daily changes</h3><p class="daily-date">'+time(latest,ctx.now)+' · '+esc(latest)+'</p>'+entries(days.get(latest),latest)+'</section>';
+      if(dates.length){
+        const rows=dates.map(date=>{
+          const releases=days.get(date);
+          const first=releases[0].entries[0];
+          const count=releases.reduce((sum,r)=>sum+r.entries.length,0);
+          const summary=esc(excerpt(first.text))+(count>1?' (+'+(count-1)+')':'');
+          return '<tr><th scope="row">'+esc(date)+'</th><td><details><summary>'+summary+'</summary>'+entries(releases,date)+'</details></td></tr>';
+        });
+        html+=part('History','<table class="daily-history"><thead><tr><th scope="col">Date</th><th scope="col">What changed</th></tr></thead><tbody>'+rows.join('')+'</tbody></table>',ctx);
+      }
+      for(const release of undated)html+=part(release.title,entries([release],''),ctx,release.line);
+      if(!latest&&!undated.length)html+='<p>No changes recorded yet.</p>';
       return html+capNote(ctx)+'</div>';
     }
     function visionView(record,ctx){
@@ -718,7 +752,7 @@
        Progress: "list" is the reading list (default) and "rich" is the board. Other types: "rich" is their own layout. */
     function render(key,record,opts={}){
       if(!record||record.error||typeof record.content!=='string')return null;
-      const mode=opts.mode==='list'||opts.mode==='rich'?opts.mode:defaultMode(key),ctx={url:record.url,now:opts.now??Date.now(),mode,links:opts.links||0,budget:RICH_LIMIT,skipped:0};
+      const mode=opts.mode==='list'||opts.mode==='rich'?opts.mode:defaultMode(key),ctx={progressRecord:opts.progressRecord,url:record.url,now:opts.now??Date.now(),mode,links:opts.links||0,budget:RICH_LIMIT,skipped:0};
       if(key==='progress'&&mode==='list')return progressList(record,ctx);
       if(mode==='list')return listView(key,record,ctx);
       return VIEWS[key]?VIEWS[key](record,ctx):null;

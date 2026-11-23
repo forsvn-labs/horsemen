@@ -246,6 +246,18 @@ try:
         browser('screenshot',str(args.output/(key+'-peek.png')))
         if key=='techstack':assert browser('eval','document.querySelectorAll(".tool-row").length').strip()=='2', 'Tech stack is a compact table'
         browser('press','Escape')
+    browser('click','#daily-changes')
+    assert 'Invite three operators' in browser('get','text','#peek-content .lead')
+    assert 'Search reached' in browser('get','text','.daily-bullets')
+    browser('click','.daily-history summary')
+    assert 'First walkthrough delivered' in browser('get','text','.daily-history details[open]')
+    assert 'record' in browser('get','text','#peek-next')
+    browser('press','Escape')
+    browser('eval',"""records.changelog.content=records.changelog.content.replace('## 2026-11-18','## 2026-11-18\\n- Second update today.')""")
+    browser('click','#daily-changes')
+    assert value('document.querySelectorAll(".daily-bullets .daily-new").length')==1
+    assert 'Second update today' in browser('get','text','.daily-bullets li:has(.daily-new)')
+    browser('press','Escape')
     # Diagrams and images: Mermaid loads only for a page with a diagram, draws under the CSP, and falls back to code.
     browser('eval','applyTheme({style:"engraved",theme:"bone"})')
     browser('dblclick','[data-artifact="techstack"]');browser('wait','#peek[open]')

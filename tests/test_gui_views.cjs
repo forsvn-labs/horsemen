@@ -229,6 +229,15 @@ const clHTML = render('changelog', {content: '# Changelog\n## 2026-11-18\n- Sear
 assert(clHTML.includes('data-layout="timeline"') && clHTML.includes('class="part release"') && clHTML.includes('PR #7') && clHTML.includes('Yesterday'));
 assert.equal(changelog('# Changelog\nNothing yet.', URL_).empty, true);
 
+// Daily view groups same-day releases, skips empty dates, and keeps undated notes distinct.
+const daily = render('changelog', {content: '# Changes\n## 2026-11-22\n## 2026-11-10\n- Older fix\n## v2 · 2026-11-18\n- First update\n## v3 · 2026-11-18\n- Second update\n## Notes\n- Undated note', url: URL_}, {progressRecord:{content:'Next action: Call the pilot.',url:URL_},now:NOW});
+assert(daily.includes('Call the pilot.') && daily.includes('Daily changes'));
+assert(daily.includes('<th scope="col">What changed</th>'));
+assert(daily.indexOf('Second update') < daily.indexOf('<table'));
+assert(daily.indexOf('Older fix') > daily.indexOf('<table'));
+assert(!daily.includes('2026-11-22') && daily.includes('Undated note'));
+assert(!render('changelog', {content:'# Changes\n## 2026-11-01\n- Only update',url:URL_}).includes('<table'));
+
 // VISION: direction brief with path, beliefs, open questions, and dated decisions.
 const v = vision('# Vision\n\nOwner: Ada · Confirmed: 2026-11-01\n\nWe help teams see their work.\n\n## Why we exist\nTeams lose context.\n\n## What we believe\n- Records beat memory.\n- Owners decide.\n\n## How we get there\n- Now: Prove the pilot.\n- Next: Teams.\n- Later: Everyone.\n\n## What we will never become\n- A tracker.\n\n## Open questions\n- Pricing? The owner decides.\n\n## Direction changes\n- 2026-10-01: Narrowed to operators. Previous: everyone.\n\n## Extra thoughts\nSomething else.');
 assert.equal(v.declaration.text, 'We help teams see their work.');

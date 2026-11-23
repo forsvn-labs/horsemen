@@ -31,7 +31,7 @@ and at least two core records. This mode reads working files, including new
 artifacts. Use Refresh GitHub in the account menu after an agent changes a file.
 GitHub source links resolve after the file reaches the remote default branch.
 
-New readers open records in **Full document**. Choose **Show overview** to use the record summaries. Use the page menu to jump to a section
+Changelog opens in **Daily changes**. Other records start in **Full document**. Choose **Show overview** to use the record summaries. Use the page menu to jump to a section
 and select a heading to fold its contents. In canvas List view, follow a
 connector to its target. To add an external file, paste its Drive link or HTTPS media address in the hosted canvas editor. In a local session, ask the agent to add the link card to the canvas file and refresh the viewer. Select Load
 on its card to preview it. The host controls access and the browser must
@@ -333,15 +333,16 @@ branch.
   need attention), Up next, and shipped work by day, newest first. Proof
   links are small chips. The board is the second layout. Vision: the purpose
   sentence, then simple sections. Brain: the sources, each with its access
-  line. Structure: the tree, with Copy buttons for commands. Changelog: a
-  dated list. Tech stack: a compact table. README and linked documents: the
+  line. Structure: the tree, with Copy buttons for commands. Changelog shows the latest day as bullets and earlier dates in a table.
+  Open a date for details. New entries are marked after the first visit on this browser. Tech stack: a compact table. README and linked documents: the
   rendered document.
 - Dates show as relative time, such as "2 days ago". Hover shows the exact
   date. Each item has a small link to its source line (`L12`).
-- The left column lists the records. "On this page" appears only for long
+- The left column lists **Project records**. **In this record** appears only for long
   records. The path above the page appears when you open a linked document;
-  each step goes back. Use the left and right arrow keys, or the arrows at
-  the end of the page, to change record.
+  each step goes back. Use **Previous page** and **Next page** inside a document. The record buttons
+  at the bottom name the destination. Arrow keys turn pages in a paged document
+  and switch records in its overview.
 - On a phone, the record view fills the screen.
 - The address keeps the selected project, the open canvas, the selected
   section card, and the open record. A reload returns to the same place.
