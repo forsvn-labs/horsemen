@@ -16,12 +16,12 @@ code changes, Git-state changes or implementation of recommended tasks.
 ## Establish the boundary
 
 Resolve the current project from the user's target, repository root, and
-STRUCTURE. Read applicable AGENTS instructions and all four records, including
+ANATOMY. Read applicable AGENTS instructions and all four records, including
 PROGRESS's snapshot, gates, and Next action. A hook snapshot is orientation,
 not a substitute for this review. For legacy projects read STATUS; identify
 missing records without inventing VISION or providers.
 
-Use STRUCTURE and BRAIN to identify related repositories, submodules, trackers,
+Use ANATOMY and BRAIN to identify related repositories, submodules, trackers,
 release/deployment sources, and relevant outside knowledge. Inspect only this
 project's sources, not every account or repository on the machine. Confirm an
 ambiguous project boundary before broadening it. A non-Git project still gets
@@ -89,7 +89,7 @@ checks and state what that gap prevents you from concluding.
 - **TECHSTACK:** Reconcile tools, stack, resources and integrations with manifests,
   configuration and observed usage. Distinguish installed from connected and
   tested; link access rules in BRAIN and keep unknowns explicit.
-- **STRUCTURE:** Verify relevant repository/worktree entry points, commands,
+- **ANATOMY:** Verify relevant repository/worktree entry points, commands,
   and brain locations. Do not add transient worktrees as permanent structure.
 
 In plain inspect, list maintainable fact corrections without writing them.

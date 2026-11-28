@@ -37,17 +37,17 @@ preambles). The goal is the current format with no lost information.
    | PROGRESS status table (`Status \| Item \| What it means \| Date`) | One bullet per row under the matching status section; the Technical details table stays |
    | STATUS long verification narratives | The linked release or verification document; PROGRESS keeps one line and the link in a toggle |
    | ROADMAP plans | PROGRESS `Up next` (committed) or Roadmap (planned and ideas) |
-   | INDEX or tree listings | STRUCTURE repository map (meaningful map only) |
-   | Drive, Notion, or Confluence folder listings | STRUCTURE brain map |
+   | INDEX or tree listings | ANATOMY repository map (meaningful map only) |
+   | Drive, Notion, or Confluence folder listings | BRAIN provider map |
    | MEMORY, lessons, decisions | The decision home that BRAIN's save rules name |
    | Old BRAIN `Key decisions` index | The decision home; drop the index from BRAIN |
-   | Old BRAIN rows for repository files (`docs/...`) | STRUCTURE repository map |
+   | Old BRAIN rows for repository files (`docs/...`) | ANATOMY repository map |
    | Old VISION features, architecture, or tool choices | Leave VISION unchanged during routine adoption; move detail only as part of an authorized VISION revision |
    | "Working authority" and "Intended provider (cutover not verified)" preambles | Delete the boilerplate only after you move every specific restriction into BRAIN Access rules: account and scope, approved route, pending destination, recorded access failures (for example a 401 with its date), and writes that wait on them. A wanted provider move becomes a BRAIN Open question |
    | Release gates, acceptance checklists, rehearsal steps | PROGRESS Gates in the snapshot toggle (one line each, link the checklist) |
-   | Mandatory domain reading (task README, manifest, contract) | STRUCTURE Read before changing |
+   | Mandatory domain reading (task README, manifest, contract) | ANATOMY Read before changing |
    | Historical, unresolved outcomes of an archived project | An archive ledger in `docs/` (moved unchanged) that PROGRESS links; never active rows |
-   | Provider links (Drive folder, Linear project) | BRAIN Providers table; STRUCTURE brain map |
+   | Provider links (Drive folder, Linear project) | BRAIN Providers table; BRAIN provider map |
 
 3. **Rebuild PROGRESS.** Use the three-part template: Latest day (open toggle),
    Historical ships (collapsed, proof links), Upcoming roadmap (collapsed).
@@ -69,14 +69,14 @@ preambles). The goal is the current format with no lost information.
    (old name: `Knowledge home:`). Fill the Providers table and "What lives in
    the brain". Open each provider and confirm that what BRAIN claims is
    there; a claim you cannot find becomes an Open question, not a row. Move
-   repository files and folder-level detail to STRUCTURE.
+   repository files and folder-level detail to BRAIN.
    Preserve the initial setup choices. Fill exact save destinations and bin
    rules from existing evidence; ask only for missing choices that affect a
    needed write. Never assume a new provider or invent an intake folder.
    Set `Visibility:` from the repository host (for example
    `gh repo view --json visibility`). In a public repository, move private
    links to the private registry and keep only the neutral project key.
-6. **Restructure STRUCTURE.** Rename `## Code` to `## Repository` and verify
+6. **Restructure ANATOMY.** Rename `## Code` to `## Repository` and verify
    every path. Add "Where new work goes". Replace the old Knowledge section
    with a `## Brain` map: one subsection per provider, its folder tree, key
    documents, and how to open them.
@@ -131,3 +131,5 @@ preambles). The goal is the current format with no lost information.
 Migrate one project first and review it with the owner. Then migrate the rest
 one repository per branch and pull request. Do not batch unrelated
 repositories into one change.
+
+For a legacy STRUCTURE.md, inspect both files and preserve all unique content. Move architecture into ANATOMY.md only when approved; retain a single relative link to ANATOMY.md where old links still depend on STRUCTURE.md. Keep external provider routes in BRAIN.

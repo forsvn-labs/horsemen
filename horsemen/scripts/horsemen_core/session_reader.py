@@ -7,6 +7,7 @@ import subprocess
 from urllib.parse import quote
 
 from . import gui
+from .legacy import anatomy_conflict, is_anatomy_pointer
 from .canvas import inside
 
 
@@ -30,7 +31,7 @@ class SessionReader(gui.GitHubReader):
         return [{'full_name': self.repo}]
 
     def scan_repo(self, repo):
-        candidates = [self.root / n for n in [*gui.FILES.values(), 'STATUS.md']]
+        candidates = [self.root / n for n in [*gui.FILES.values(), 'STATUS.md', 'STRUCTURE.md']]
         folder = inside(self.root, self.root / gui.CANVAS_DIR)
         if folder and folder.is_dir():
             candidates.extend(folder.glob('*.canvas'))
@@ -77,7 +78,23 @@ class SessionReader(gui.GitHubReader):
 
     def load_record(self, project, key, default):
         file = project['files'].get(key)
-        return self._text(file['path'], default) if file else dict(name=default, error='Record is missing from this project root.')
+        if not file:
+            return dict(name=default, error='Record is missing from this project root.')
+        rec = self._text(file['path'], Path(file['path']).name)
+        if key == 'structure' and 'content' in rec:
+            old = file.get('legacy')
+            error = None
+            if rec['name'] == 'STRUCTURE.md' and is_anatomy_pointer(rec['content']):
+                error = 'ANATOMY.md is missing; STRUCTURE.md is only a pointer.'
+            elif old:
+                previous = self._text(old['path'], 'STRUCTURE.md')
+                if 'error' in previous:
+                    error = 'Could not verify legacy STRUCTURE.md.'
+                elif anatomy_conflict(rec['content'], previous['content']):
+                    error = 'ANATOMY.md and STRUCTURE.md differ. Reconcile them before using the record.'
+            if error:
+                return dict(name=rec['name'], error=error)
+        return rec
 
     def load_document(self, project, link):
         return self._text(link['path'], Path(link['path']).name)

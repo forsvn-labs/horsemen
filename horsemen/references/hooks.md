@@ -44,13 +44,13 @@ output. The script uses only these supported fields:
    (summary, Next action, status table, Roadmap, and the Technical details
    toggle with evidence and Gates), capped at 60 whole lines and 3,000
    characters.
-3. STRUCTURE's "Read before changing" section, when present.
-   It does not inject VISION, BRAIN, the rest of STRUCTURE, or the log. If any
+3. ANATOMY's "Read before changing" section, when present.
+   It does not inject VISION, BRAIN, the rest of ANATOMY, or the log. If any
    injected part does not fit, the output says so and tells the agent to read
    the rest before acting. Legacy projects get an instruction to read
    STATUS.md before project work.
 4. Up to six health lines, for example: commits since PROGRESS changed,
-   missing paths in STRUCTURE, an undefined `Brain:` line, an unconfirmed
+   missing paths in ANATOMY, an undefined `Brain:` line, an unconfirmed
    vision, an old PROGRESS format, open questions, legacy file names.
 
 A Git repository with no records gets one line: offer setup, do not start it.
@@ -70,21 +70,21 @@ rest on demand with the `read` tool or `horsemen.py show`
 | Canvases | The names of the canvas files. No line when the project has none. Names that do not fit become `+N more`, then a count |
 | Next action | The `Next action:` line of the PROGRESS snapshot. A line over 240 characters is cut with `…` |
 | Gates | Always. In full when the gates have 300 characters or less. Longer gates become "Read progress#Gates before you act"; a gate is never cut. A snapshot without gates says so |
-| STRUCTURE reading list | One line that names `structure#Read before changing`, when the section exists |
+| ANATOMY reading list | One line that names `anatomy#Read before changing`, when the section exists |
 | Health | Up to three lines: canvas problems first, then the lines of the usual order |
 | Read line | Always. It names the `read` tool and `horsemen show`, and asks for the review of the four records |
 
 The gates are a `Gates:` line with its list, or the lines below a `Gates`
 heading, in the PROGRESS snapshot. The root, the gates, and the read line
 always stay. When the limit is near, the other lines go in this order:
-health, canvases, next action, STRUCTURE reading list. A legacy project gets
+health, canvases, next action, ANATOMY reading list. A legacy project gets
 the instruction to read STATUS.md before project work in place of the next
 action and the gates.
 
 ### What stop checks
 
 Stop does not ask for a routine review. Session-start text already tells the
-agent to review VISION, BRAIN, PROGRESS, and STRUCTURE before it finishes,
+agent to review VISION, BRAIN, PROGRESS, and ANATOMY before it finishes,
 including discussions and work in outside tools that local Git cannot see.
 A routine block at every stop hid the task report in hosts that show only the
 last turn. The review must not create edits, dates, or documents without a
@@ -96,7 +96,7 @@ temp folder. When one is available, stop compares the project to it:
 | Rule | Fires when | Asks the agent to |
 | --- | --- | --- |
 | Progress | Work commits (commits that touch files other than the records) exist after the last PROGRESS change, and PROGRESS has no uncommitted edits | Update PROGRESS, or say why no update is needed |
-| Structure | A folder at depth 1 or 2 was added, removed, or renamed, and STRUCTURE did not change | Update STRUCTURE |
+| Structure | A folder at depth 1 or 2 was added, removed, or renamed, and ANATOMY did not change | Update ANATOMY |
 | Changelog | PROGRESS gained a `Shipped` bullet (including partly shipped), and CHANGELOG did not change (or does not exist) | Add the shipped part to CHANGELOG, creating the file if needed |
 | Vision | VISION changed since the last VISION reminder | Reuse the owner's agreement, check README, PROGRESS, and BRAIN for conflicts, and log an agreed direction change |
 | Publish | A record, or a file in `.horsemen/canvas/` or `.horsemen/media/`, changed in this session, and its content differs from the remote default branch (`origin/HEAD`, as of the last fetch). It counts uncommitted, unpushed, and unmerged edits. Projects without a remote default branch are skipped | Commit and push when the project's rules allow, so readers of GitHub, such as the hosted viewer, see the change |
@@ -110,7 +110,7 @@ the pointer's health line report it. A project without canvases gets the
 same stop text as before.
 
 Triggered rules go into one reminder under 1,200 characters, with the
-review instructions and the request to end with the full task report. When the agent updates STRUCTURE
+review instructions and the request to end with the full task report. When the agent updates ANATOMY
 or CHANGELOG, the current tree or shipped list becomes the new baseline, so a
 later move or release fires the rule again. An unchanged drift detail does
 not repeat, and a stop without new drift does not block.
@@ -164,14 +164,14 @@ covers each one marked with a test ID.
 | F10 | Git missing, slow, or failing | No crash; every Git call has a timeout |
 | F11 | Empty or malformed stdin | Fall back to the current folder; exit 0 |
 | F12 | Records contain invalid UTF-8 | Read with replacement; no crash |
-| F13 | Records are stale | Report commits since PROGRESS changed and missing STRUCTURE paths |
+| F13 | Records are stale | Report commits since PROGRESS changed and missing ANATOMY paths |
 | F15 | Large repository | Finish in under 1 second; never walk the full tree |
 | F16 | Template placeholders remain | Flag them |
 | F19 | Nested project inside a repository | Nearest folder with a record wins |
 | F3b | A snapshot line is too long to fit | Never cut silently; say the injection is incomplete |
 | F5b | Legacy STATUS.md holds gates | Tell the agent to read it before project work |
 | F20 | Git is slow | Shared time budget; output within the host deadline |
-| F21 | STRUCTURE lists mandatory reading | Inject "Read before changing" |
+| F21 | ANATOMY lists mandatory reading | Inject "Read before changing" |
 
 ### Stop
 
@@ -195,7 +195,7 @@ covers each one marked with a test ID.
 | S3 | No commits and no record edits | Do not block; do not edit records |
 | S4 | Work commits, PROGRESS unchanged | Block once with the progress reminder |
 | S5 | Commits touch only records | Do not block |
-| S6 | Folder added, removed, or renamed; STRUCTURE unchanged | Structure reminder |
+| S6 | Folder added, removed, or renamed; ANATOMY unchanged | Structure reminder |
 | S7 | New `Shipped` bullet (including partly shipped); CHANGELOG unchanged | Changelog reminder |
 | S8 | Edited record has lint errors | Lint reminder with the errors |
 | S9 | VISION changed | One downstream-review reminder |
@@ -205,7 +205,7 @@ covers each one marked with a test ID.
 | S16 | Output must be valid JSON for both hosts | One JSON object; reason under 1,200 characters |
 | S17 | Any internal error | Exit 0 with no output |
 | S18 | Untracked folder existed before the session | Not structure drift (found in live use) |
-| S19 | Folder added after STRUCTURE was already updated once | Structure rule fires again |
+| S19 | Folder added after ANATOMY was already updated once | Structure rule fires again |
 | S20 | Second release after CHANGELOG was already updated once | Changelog rule fires again |
 | S21 | New `Shipped` bullet in a project without CHANGELOG.md | Reminder to create CHANGELOG.md with the shipped part only |
 | S22 | The session writes a canvas file that breaks a rule | Canvas errors reminder, one time for the same errors; no note for a valid or repaired file |
@@ -221,7 +221,7 @@ covers each one marked with a test ID.
 | PT5 | A long root path, 20 canvases with long names, a long next action, and many problems | Still 700 characters or less, with the gates, the record names, and the read line |
 | PT6 | Pointer mode outside a project, or with malformed stdin | Print nothing; exit 0 |
 | PT7 | Only legacy `STATUS.md` exists | The instruction to read it before project work |
-| PT8 | STRUCTURE has a "Read before changing" section | One line that names the section to read |
+| PT8 | ANATOMY has a "Read before changing" section | One line that names the section to read |
 | PT9 | More than three health findings | Three health lines at most, canvas problems first |
 | PT10 | `hooks install --pointer`, then `hooks install` | Only the SessionStart command changes; `status` names pointer mode; a later install without the option gives the earlier commands |
 
@@ -235,11 +235,11 @@ covers each one marked with a test ID.
 | C3b | Log headings out of order, duplicated, or in the future; more than 30 entries | Warning |
 | C4 | VISION lacks a core section or a `Confirmed:` line | Warning |
 | C4b | VISION holds engineering content (a code block or a file path) | Warning: it is a business document |
-| C5 | STRUCTURE names a path (containing `/`) that does not exist | Error |
-| C5b | A top-level entry is not mentioned in STRUCTURE | Warning |
+| C5 | ANATOMY names a path (containing `/`) that does not exist | Error |
+| C5b | A top-level entry is not mentioned in ANATOMY | Warning |
 | C6 | BRAIN has no `Brain:` line, or it says Undefined | Warning. `Brain: None` (all knowledge in the repository) is valid |
 | C6b | BRAIN names a provider but has no Providers table | Warning |
-| C6c | BRAIN lists a repository file as brain knowledge | Warning: repository files belong in STRUCTURE |
+| C6c | BRAIN lists a repository file as brain knowledge | Warning: repository files belong in ANATOMY |
 | C7 | `{{...}}` template placeholders remain | Warning |
 | C9 | README or AGENTS.md does not link the four records | Warning |
 | C15 | README.md is missing | Warning: every project has a README |
@@ -269,15 +269,15 @@ covers each one marked with a test ID.
 | C3h | No blank line after `</summary>` | Warning: GitHub does not render the Markdown inside |
 | C3i | Dated heading carries a headline (`## 2026-11-02 · Paid launch`) | Parsed as a log date |
 | C3j | Item names differ only in case, bold, or backticks between the two tables | Still matched |
-| C5e | STRUCTURE Brain section names provider folders | Not checked as repository paths |
-| C5f | BRAIN names a provider but STRUCTURE has no Brain section | Warning |
+| C5e | ANATOMY Brain section names provider folders | Not checked as repository paths |
+| C5f | BRAIN names a provider but ANATOMY has no Brain section | Warning |
 | C5g | A nested tree node does not exist at its full path (parent joined with child) | Error |
 | C5h | Tree drawn with `├──`, `└──`, and `│` | Each node resolves to its parent's path |
 | C5i | Tree drawn with indentation only | Same as C5h |
 | C5j | The first tree line names the project folder (`my-app/`), even when the local clone or worktree has another name | Treated as the root, not as a path |
 | C5k | Folder names with brackets (`[...locale]/`, `[slug].astro`) | Checked literally |
 | C5l | Pattern nodes (`*.png`, `<slug>/`, `...`) | Skipped |
-| C5m | A `mermaid` block in STRUCTURE | Not parsed as a tree |
+| C5m | A `mermaid` block in ANATOMY | Not parsed as a tree |
 | C5n | A file node under a file, or a node after a description with a slash | Only the first token of each line is a path |
 | C18 | A canvas file in `.horsemen/canvas/` is valid and in canonical form | No finding; a project without canvases gets no new finding |
 | C19 | A canvas file is valid but another tool wrote it in its own layout | Warning (`canvas-not-canonical`) |
@@ -326,7 +326,7 @@ temporary project. A hook count alone is not proof of a working install.
   those events.
 - Structure drift covers folders at depth 1 and 2. A moved file inside an
   unchanged folder is not detected; `check` still catches its broken path in
-  STRUCTURE.
+  ANATOMY.
 - Stop reports canvas problems that the session made, not older ones. Run
   `check` after a canvas edit.
 - Pointer mode finds gates in a `Gates:` line or below a `Gates` heading

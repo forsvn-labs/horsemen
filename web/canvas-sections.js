@@ -4,7 +4,7 @@
    Card text is a source excerpt only; nothing is inferred. */
 (function(root){
   const P=typeof module!=='undefined'&&module.exports?require('./previews.js'):root.HorsemenPreview;
-  const TITLES={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Structure',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
+  const TITLES={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Anatomy',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
   /* The ID rule of the canvas file format: a section card is "s-" plus the heading slug. */
   const NODE_ID=/^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/;
   const CARD={width:320,height:196},PITCH={x:360,y:248},COLUMNS=3,SLUG_MAX=56;

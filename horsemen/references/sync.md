@@ -5,15 +5,15 @@
 | Fact | Owner | Others may |
 | --- | --- | --- |
 | The declaration, why we exist, the world we are building, audience, beliefs, horizons, boundaries, how it sustains itself | VISION | README summarizes it in public words |
-| Which providers play which role, the owner's setup choices, accounts, access routes, exact save destinations, write and bin permissions, access holds | BRAIN | STRUCTURE maps the brain; PROGRESS links the tracker project |
-| Decisions | Where BRAIN's save rules put them (the brain, or a repository file that STRUCTURE maps) | VISION records direction changes only |
+| Which providers play which role, the owner's setup choices, accounts, access routes, exact save destinations, write and bin permissions, access holds | BRAIN | BRAIN routes directly to the tracker and approved originals |
+| Decisions | Where BRAIN's save rules put them (the brain, or a repository file that ANATOMY maps) | VISION records direction changes only |
 | Status of a work item, blockers, roadmap, dated updates, evidence, gates | PROGRESS | A tracker holds task detail; PROGRESS links it in a toggle |
-| Repository paths, commands, where new work goes | STRUCTURE (repository map) | README repeats setup commands |
-| Folders and key documents inside each provider, and how to open them | STRUCTURE (brain map) | - |
+| Repository paths, commands, where new work goes | ANATOMY (repository map) | README repeats setup commands |
+| Folders and key documents inside each provider, and how to open them | BRAIN or its linked provider index | - |
 | What reached people | CHANGELOG | PROGRESS keeps latest-day ships plus Historical ships with proof |
 | Pending, partly shipped, blocked, and roadmap items | PROGRESS | CHANGELOG holds only the shipped part of a partly shipped item |
-| Tools, stack, resources, integrations and verified usage | TECHSTACK | README summarizes setup; STRUCTURE links commands; BRAIN owns permissions |
-| Pitch for newcomers, install and use steps | README (cut down from VISION and the install guide) | STRUCTURE holds the full command list |
+| Tools, stack, resources, integrations and verified usage | TECHSTACK | README summarizes setup; ANATOMY links commands; BRAIN owns permissions |
+| Pitch for newcomers, install and use steps | README (cut down from VISION and the install guide) | ANATOMY holds the full command list |
 | Agent rules for this project | AGENTS.md | `CLAUDE.md` imports it |
 
 When you are about to write a fact in a second place, link to the owner
@@ -25,7 +25,7 @@ Use this proactively at task start and task end for the knowledge area the task 
 directory; the original documents hold the knowledge.
 
 1. Read the saved provider, account, root, exact destination, and write and
-   cleanup rules in BRAIN. Follow STRUCTURE to the area needed. Initial
+   cleanup rules in BRAIN. Follow BRAIN to the area needed. Initial
    interview answers remain in force; do not rely on memory or repeat the
    interview. A new user instruction can change those choices within its
    stated scope. Record a lasting change with its date.
@@ -57,7 +57,7 @@ directory; the original documents hold the knowledge.
    place until answered. Never empty the bin, delete unique history, or
    move material to a different provider as routine cleanup.
 8. Read back the saved section and confirm its location. Check the moved
-   items and recovery index. Then update BRAIN's directory and STRUCTURE's
+   items and recovery index. Then update BRAIN's directory or linked
    map if locations changed. A mounted write proves a local save; it does
    not prove cloud sync. Report that limit when it matters.
 
@@ -74,7 +74,7 @@ task can finish it without rebuilding the chat.
 | Brain and tracker choices, account, root, exact save targets, write and cleanup permission | BRAIN; private registry for private IDs in a public project | Save setup answers once, with their date or source; record unresolved choices explicitly |
 | Lasting decisions, reasons, and research | The exact original named by BRAIN's save rules | Update it in place; link instead of copying into records or a new session summary |
 | Current work, delivery evidence, blockers, next action, unsaved knowledge | PROGRESS | Review at task end; keep old evidence dates and name who can resolve a blocker |
-| Repository and brain locations, bin and restore index | STRUCTURE | Correct after a move; keep access permissions in BRAIN |
+| Repository locations; external locations and recovery | ANATOMY for code; BRAIN for knowledge | Correct the affected route after a move |
 | Stale documents and unique history | Agreed bin or existing archive, with a recovery index | Preserve source and restore location; age and a paused project do not mean completion |
 | Installed skill and hook paths | Host settings and the installed package; source and install procedure in repository docs | Check actual files and hook targets; a recorded install or a hook count is not current proof |
 | Session baseline and prior drift reminders | Disposable hook cache, described in hooks.md | Isolate by project and session; preserve on resume; never use it as project truth or permission |
@@ -91,17 +91,17 @@ when evidence or the user's answer resolves them.
 | Work finished, not released | Move the bullet to `Ready to ship` | - |
 | Released or delivered, with evidence | Move the bullet to `Shipped`, evidence in the toggle, dated entry for stakeholders, CHANGELOG entry | README "What you get" and Use if newcomers should know |
 | Part of an item delivered | Bullet to `Shipped` as `(partly shipped date)` (what is out, what is left); CHANGELOG gets the shipped part only | Gates; split the rest into its own bullet when it becomes separate work |
-| Install, setup, or run steps changed | README Install and Use, STRUCTURE commands | Full install guide, if one exists |
+| Install, setup, or run steps changed | README Install and Use, ANATOMY commands | Full install guide, if one exists |
 | Blocked or decision needed | Bullet to `Blocked` or `Needs decision`, with the blocker or decider | `Health:` in the header |
 | Priority changed | Move items between `Up next` and Roadmap (owner confirms) | VISION if the reason is a direction change |
 | Item dropped | Remove the bullet; log "Dropped X: reason" | - |
-| Folder, module, or entry point moved | STRUCTURE repository map | README commands |
-| New tool, dependency, resource or integration | TECHSTACK inventory; STRUCTURE commands and paths if changed | README setup; BRAIN only if provider or access rules changed |
-| Knowledge moved inside a provider | STRUCTURE brain map | BRAIN "What lives in the brain" if the location changed |
+| Folder, module, or entry point moved | ANATOMY repository map | README commands |
+| New tool, dependency, resource or integration | TECHSTACK inventory; ANATOMY commands and paths if changed | README setup; BRAIN only if provider or access rules changed |
+| Knowledge moved inside a provider | BRAIN provider map | BRAIN "What lives in the brain" if the location changed |
 | Lasting knowledge changed without a local edit | Exact original chosen by BRAIN's save rules | Task review of all four records; local Git cannot detect this |
-| Stale copy retired | Agreed bin and recovery index | References, BRAIN, and STRUCTURE if locations changed |
-| Provider added or replaced, or access changed | BRAIN (owner confirms), then STRUCTURE brain map | Migrate or link old material |
-| Knowledge moved from the repository to the brain, or back | BRAIN and both STRUCTURE maps | Links in other records |
+| Stale copy retired | Agreed bin and recovery index | References, BRAIN, and ANATOMY if locations changed |
+| Provider added or replaced, or access changed | BRAIN (owner confirms) | Migrate or link old material |
+| Knowledge moved from the repository to the brain, or back | BRAIN and the relevant code location in ANATOMY | Links in other records |
 | Decision made | Where BRAIN's save rules say | VISION if it changes direction or scope |
 | Direction changed | VISION and Direction changes line (owner confirms) | README pitch, PROGRESS `Up next` and Roadmap, BRAIN |
 | Project paused or archived | PROGRESS `Stage` and `Health`, a final log line with the true end state | VISION Direction changes |
@@ -122,8 +122,8 @@ When you read records for a task, also look for:
 - BRAIN listing a repository file, or VISION describing features or
   architecture.
 - README describing a capability that PROGRESS does not show as shipped.
-- BRAIN and STRUCTURE naming different locations for the same knowledge.
-- A recorded decision that VISION or STRUCTURE contradicts.
+- Two competing external knowledge routes in BRAIN.
+- A recorded decision that VISION or ANATOMY contradicts.
 
 ## Resolving contradictions
 
@@ -141,10 +141,10 @@ When you read records for a task, also look for:
 
 | Document | Rule |
 | --- | --- |
-| TECHSTACK.md | Companion inventory of tools, stack, resources and integrations: purpose, verified version or plan, usage, source/date and limits. Link BRAIN for access and STRUCTURE for commands. Never credentials, permission grants, status history or a replacement knowledge store |
+| TECHSTACK.md | Companion inventory of tools, stack, resources and integrations: purpose, verified version or plan, usage, source/date and limits. Link BRAIN for access and ANATOMY for commands. Never credentials, permission grants, status history or a replacement knowledge store |
 | README.md | Not a record; every project keeps one. VISION and the install guide cut down to one screen: pitch, shipped capabilities, install, use, record links. No roadmap, status, or business model. Updates with VISION and with install steps |
 | CHANGELOG.md | Not a record; every project that has shipped anything keeps one. Only what reached people, newest first, version and date or date headings. No `Unreleased` section; pending and partly done work stays in PROGRESS |
-| CONTRIBUTING, INSTALL, deployment, architecture docs | Optional. Own their detail. STRUCTURE links each one under Other documents. Do not repeat their content in the four records |
+| CONTRIBUTING, INSTALL, deployment, architecture docs | Optional. Own their detail. ANATOMY links each one under Other documents. Do not repeat their content in the four records |
 | docs/progress-log.md | Archive of older PROGRESS log entries, unchanged, newest first |
 | Decision records (in the brain, or a repository file) | Date, decision, reason, alternatives. BRAIN's save rules choose the home |
 | ROADMAP, INDEX, MEMORY, STATUS (legacy) | Migrate per [adopt](adopt.md), then delete |
@@ -198,8 +198,8 @@ nonempty text is not proof or permission. Existing checker gates still apply.
 | --- | --- | --- |
 | VISION | Owner request or agreed direction change; never infer intent from code | README pitch, PROGRESS priorities, BRAIN |
 | PROGRESS | Evidence for status; delivery evidence for shipped; owner agreement for priority changes | CHANGELOG and README when delivered; VISION when priorities change |
-| BRAIN | Exact original and existing save rules; owner agreement for provider or permission changes | STRUCTURE locations |
-| STRUCTURE | Observed paths, commands, or provider locations; no invented map | BRAIN for moved knowledge, README for commands |
+| BRAIN | Exact original and existing save rules; owner agreement for provider or permission changes | ANATOMY locations |
+| ANATOMY | Observed paths, commands, or provider locations; no invented map | BRAIN for moved knowledge, README for commands |
 
 The event type and evidence must match what changed. A caller must not label
 a delivery as a routine status change to avoid its evidence gate. The trusted

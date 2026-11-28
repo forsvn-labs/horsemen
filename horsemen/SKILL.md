@@ -1,73 +1,45 @@
 ---
 name: horsemen
-description: Set up and maintain VISION, PROGRESS, BRAIN, and STRUCTURE, with README, CHANGELOG, and TECHSTACK. Use before project work and before finishing each project task, including discussions and work outside Git, or for "horsemen brain/vision/structure/status/init/update/upgrade/inspect/inspect-and-update/check/diagram/help", "inspect and proceed", project status, adoption, handoff, knowledge filing, or "horsemen". Preserve the owner's direction, update progress from evidence, and keep knowledge in its agreed location. Legacy STATUS.md is PROGRESS.
+description: Find and maintain the four project records (BRAIN, VISION, PROGRESS, ANATOMY). Use for project orientation, verified status, handoff, adoption, or explicitly scoped record updates. Keep vendor choices in project routing.
 ---
 
 # Horsemen
 
-The four records let a person or an agent with no context understand a
-project in minutes, without rebuilding it from chats and scattered files.
-They live as Markdown files at the project root, for every kind of project:
-software, business, growth, research, or personal.
+Open AGENTS.md, then BRAIN. Follow only the sources needed for the task. Each
+record has one authoritative working source; the roles do not require a vendor.
 
-| Record | Answers | Written for | Owns | Does not own |
-| --- | --- | --- | --- | --- |
-| VISION.md | Why must this exist, and what world does it build? | Owner, partners, investors | The manifesto: declaration, why we exist, the world we are building, who we build for, what we believe, how we get there, what we will never become | Features, specs, architecture, decisions, status |
-| PROGRESS.md | What shipped, what is in the pipeline, what waits? | Stakeholders and users first; technical details in toggles | Status bullets per item, roadmap, dated updates, evidence and gates (in toggles) | Direction, specs |
-| BRAIN.md | What do we know outside the repository, and how do we reach it? | Agents and the team | Providers (Markdown folder, Obsidian, Drive, Notion, ...), what each holds, where past discussions with agents live, access routes, save rules, access holds | Repository files, folder trees |
-| STRUCTURE.md | Where is everything? | Agents and builders | Repository map (code, commands, where new work goes) and brain map (folders and key documents per provider, how to open them) | Access rules, status |
-
-VISION is the project's manifesto: the grand mission in the owner's voice,
-not a PRD, an ADR, or a plan. Make it ambitious, entrepreneurial and grounded
-in real value; adapt business sustainability to mission, impact and funding for
-nonprofits. Never invent owner intent or turn inspiration into unsupported claims.
-
-PROGRESS has three toggled parts: the latest day (shipped, up next, decisions
-and relevant active work), historical ships with delivery proof, and the
-upcoming roadmap. Use plain language and Markdown headings that remain readable
-without HTML. BRAIN and STRUCTURE split
-knowledge this way: BRAIN says which providers exist, what each holds, and
-how to get in; STRUCTURE shows how the repository and each provider are
-organized inside.
-
-Three supporting documents are not records, but every project keeps them and
-they change whenever their sources change:
-
-| Document | What it is | Updates when |
+| Core record | Owns | Does not own |
 | --- | --- | --- |
-| README.md | VISION and the install guide, cut down to one screen: what it is, who it is for, how to install or reach it, how to start | VISION's pitch or audience changes; install or run steps change; a capability ships that newcomers should know |
-| TECHSTACK.md | Current tools, stack, resources and integrations: purpose, verified version or plan, source, and limits | A tool, dependency, integration, resource, or its usage changes |
-| CHANGELOG.md | Only what reached people, newest first. Never pending, half-done, or planned work | A PROGRESS item becomes `Shipped` or `Partly shipped` (the shipped part only) |
+| BRAIN | The project map: authoritative links to Vision, Progress, Anatomy, design, business knowledge, and original assets; provider access and save rules | Copies of source content |
+| VISION | Owner-approved purpose, users, outcomes, principles, and non-goals | Tickets or implementation details |
+| PROGRESS | Current work, next actions, blockers, decisions required, and delivery evidence | A second backlog or invented ship status |
+| ANATOMY | How the system fits together: flows, boundaries, repo paths, prerequisites, tests, and release commands | External knowledge map or duplicate tool inventory |
 
-PROGRESS covers more than CHANGELOG: pending, partly shipped, blocked, and
-roadmap items as well as shipped ones. Optional guides (CONTRIBUTING, a full
-install or deployment guide) are linked from STRUCTURE and README. Published
-team guides use the destination and available document tools named by BRAIN.
+Supporting documents are not Horsemen. README onboards humans; CHANGELOG links
+to what reached users; TECHSTACK.md (or the project's equivalent) inventories
+tools and integrations and is linked by Anatomy. For UI projects, DESIGN.md
+can hold reusable visual rules in the open format. BRAIN points to approved
+design sources; a UI ticket links the exact approved frame and a dated private
+export when needed. Do not publish private locators or treat drafts as specs.
 
 ## Orient before you act
 
-1. Before any project work, read the PROGRESS latest-day snapshot with Next action and Gates
-   (for legacy layouts, everything above the first dated heading) and STRUCTURE's "Read
-   before changing" section. The session-start hook injects both; read them
-   yourself only if they were not injected or the injection says it is
-   incomplete. In a legacy project, read STATUS.md in full instead. In
-   pointer mode the hook injects the Next action and the Gates only; read
-   the other parts when the task needs them, with the `read` tool or
-   `horsemen.py show`.
-2. Read VISION before a decision about scope, priority, or design.
-3. Read BRAIN before you search for, cite, or save knowledge outside the
-   repository.
-4. Read STRUCTURE before you create, move, or look for code, folders, or
-   documents, in the repository or in the brain.
-5. Open only the section you need. Follow links for detail. Do not load a
-   whole knowledge backend to answer one question.
+1. Read BRAIN's routes. Verify the specific provider, project, and access
+   before relying on it. A named destination is not a verified migration.
+2. Read PROGRESS for the next action and gates. Honor holds and distinguish
+   work ready to ship from work that reached users.
+3. Read VISION for scope or direction and ANATOMY for how to implement, test,
+   or ship. Open only the sections you need.
+4. If an established project still uses STRUCTURE.md or STATUS.md, use its
+   working source until a verified change. If two substantive records conflict,
+   surface the conflict rather than choosing silently.
 
 ## Commands
 
 Use [command routing](references/commands.md) for `horsemen brain`, `vision`,
-`structure`, `status`, `init`, `update`,
+`anatomy`, `progress`, `init`, `update`,
 `upgrade`, `inspect`, `inspect-and-update`, `check`, `diagram` and `help`. These are agent workflows,
-not additional legacy Python script commands. The optional standalone CLI
+not additional legacy Python script commands. `structure` and `status` remain compatibility aliases. The optional standalone CLI
 implements a smaller deterministic subset; see [CLI parity and release gates](references/cli.md).
 The script commands `show`, `canvas apply` and `mcp` are in [canvases](references/canvas.md).
 `horsmen` is a conversational alias.
@@ -114,7 +86,7 @@ TECHSTACK is a companion, not a fifth Horseman or a second BRAIN. It describes
 the full stack, tools, integrations and resources in use and their purpose. Cover frontend,
 backend, data, infrastructure, testing and developer tools where applicable;
 mark unused layers and unknowns rather than inventing a stack. BRAIN still owns account scope,
-authorization and knowledge destinations; STRUCTURE owns paths and commands.
+authorization and knowledge destinations; ANATOMY owns paths and commands.
 Link to those owners instead of copying their rules. Never record secrets.
 Keep TECHSTACK concise enough for a junior to middle-level engineer. For each
 tool, explain the project need, what it needs to work, and how it helps.
@@ -164,7 +136,7 @@ hook's silence are not proof that the records are current.
 | VISION | Keep it unchanged during routine work, including format upgrades. Update only when the user asks for a revision or has agreed to a direction change during the task. If the work drifted without that agreement, flag the conflict and ask before changing intent. Reuse confirmation already given; do not ask again |
 | BRAIN | Reuse the setup choices and filing rules from the initial interview. Save only useful, lasting knowledge; update the exact original document, not a new task summary. Check stale material in the area touched by this task and use the agreed bin or ask about the specific cleanup. Follow [brain care](references/sync.md#brain-care) |
 | PROGRESS | Record changed results, work that remains, and blockers in straightforward words. Avoid business and technical jargon. Keep evidence in the toggle and distinguish finished work from delivered work |
-| STRUCTURE | Fix changed paths, commands, entry points, and brain locations. Include document moves and bin locations when they affect how people find things |
+| ANATOMY | Fix changed code paths, commands, boundaries, and entry points. Keep external document routes and recovery locations in BRAIN |
 
 Check README, CHANGELOG, and TECHSTACK when their sources changed. Run `check` after
 record edits. If nothing worth recording changed, leave files and dates alone.
@@ -190,10 +162,10 @@ user-facing checklist just to prove the review happened.
 | Work started, finished, blocked, or reprioritized | Move the PROGRESS bullet to its status section; update the `Updated:` date, and the dated entry when there is an outcome | Task review; stop hook adds commit evidence when available |
 | Work shipped (with evidence) | PROGRESS bullet to `Shipped` with evidence in the toggle; a dated entry for stakeholders; a CHANGELOG entry; README if newcomers should know | Stop hook checks the PROGRESS and CHANGELOG pair |
 | Part of an item shipped | PROGRESS bullet to `Shipped`, marked `(partly shipped date)`, saying what is out and what is left; CHANGELOG gets the shipped part only | Stop hook checks the pair |
-| Install, setup, or run steps changed | README Install and Use; STRUCTURE commands | Instruction |
-| Code or folders reorganized | Update STRUCTURE's repository map | Stop hook and `check` detect drift |
-| Knowledge moved inside a provider | STRUCTURE's brain map | Instruction |
-| Provider added, replaced, or access changed | BRAIN (owner confirms), then STRUCTURE's brain map | `check` warns on a missing map |
+| Install, setup, or run steps changed | README Install and Use; ANATOMY commands | Instruction |
+| Code or folders reorganized | Update ANATOMY's repository map | Stop hook and `check` detect drift |
+| Knowledge moved inside a provider | BRAIN's provider map | Instruction |
+| Provider added, replaced, or access changed | BRAIN (owner confirms) | Verify the new source before changing the route |
 | Direction changed | Reuse the owner's agreement, update VISION, log the change, rewrite the README pitch, review downstream; ask only if intent is unclear | Task review; stop hook flags a VISION edit |
 | Agent enters an unfamiliar project | Orient (above) | Session-start hook; AGENTS.md entrypoint |
 
@@ -207,7 +179,7 @@ The owner writes VISION; agents write the rest.
   agents keep BRAIN and the documents it routes to current within the saved
   write and cleanup permissions. Record those choices, exact destinations,
   and permissions in BRAIN, so another session can use them.
-- PROGRESS, STRUCTURE, README, CHANGELOG, and TECHSTACK are maintained automatically
+- PROGRESS, ANATOMY, README, CHANGELOG, and TECHSTACK are maintained automatically
   from evidence: the codebase, releases, deployments, and the tracker. Do
   not ask the owner what the evidence already shows.
 
@@ -283,7 +255,7 @@ If nothing material changed, change nothing; do not refresh dates.
   inside the relevant toggle, with delivery proof beside shipped outcomes. Update `Updated:` only when the snapshot
   changes. Keep dated historical ships with their proof; do not invent an outcome
   for a day without one. Preserve unique existing activity logs. Editing the records themselves is not progress.
-- STRUCTURE: describe the new reality after a move, with exact paths, in the
+- ANATOMY: describe the new reality after a move, with exact paths, in the
   repository map or the brain map.
 - BRAIN: fix a moved location after you find the item again; record a new
   provider only after the user chooses it. Keep exact filing destinations,

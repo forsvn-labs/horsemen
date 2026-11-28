@@ -92,9 +92,9 @@ def main(argv=None):
     sub.add_parser('canvas', help='Change one canvas file in .horsemen/canvas; does not commit')
     sub.add_parser('mcp', help='Run the local MCP server, or register it: mcp install, mcp status')
     if not compatibility:
-        hidden = {'export-patch', 'init', 'update', 'upgrade'}
+        hidden = {'export-patch', 'init', 'update', 'upgrade', 'structure', 'status'}
         sub._choices_actions[:] = [a for a in sub._choices_actions if a.dest not in hidden]
-        sub.metavar = '{brain,vision,structure,status,check,inspect,plan,show,canvas,mcp}'
+        sub.metavar = '{brain,vision,progress,anatomy,check,inspect,plan,show,canvas,mcp}'
     args = parser.parse_args(argv)
     legacy.git = git_read  # This CLI process only; compatibility scripts stay unchanged.
     try:

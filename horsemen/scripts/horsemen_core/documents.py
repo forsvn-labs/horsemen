@@ -10,12 +10,18 @@ from .plans import digest, read_original
 from .patches import unique_object
 
 NAMES = {'brain': 'BRAIN.md', 'vision': 'VISION.md',
-         'structure': 'STRUCTURE.md', 'status': 'PROGRESS.md'}
+         'anatomy': 'ANATOMY.md', 'structure': 'ANATOMY.md', 'progress': 'PROGRESS.md', 'status': 'PROGRESS.md'}
 
 
 def document_name(root, command):
     name = NAMES[command]
-    if command == 'status':
+    if name == legacy.ANATOMY:
+        current = read_original(root, name)
+        old = read_original(root, legacy.LEGACY_ANATOMY)
+        if legacy.anatomy_conflict(current, old):
+            raise ValueError('ANATOMY.md and STRUCTURE.md differ. Reconcile them before a single-record operation.')
+        return legacy.anatomy_name(current, old)
+    if name == 'PROGRESS.md':
         current = read_original(root, name)
         old = read_original(root, 'STATUS.md')
         if current is not None and old is not None and not legacy.is_pointer(old):

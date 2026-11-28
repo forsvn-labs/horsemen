@@ -110,7 +110,7 @@ fails; the command does not invent content or update other records.
 | VISION.md | Why does this project exist? |
 | PROGRESS.md | What shipped, what waits, and what comes next? |
 | BRAIN.md | Where is outside knowledge, and how may we use it? |
-| STRUCTURE.md | Where is everything? |
+| ANATOMY.md | How does the system work and how do I change it? |
 
 README, CHANGELOG, and TECHSTACK support these records. Existing provider
 originals remain the source of truth; Horsemen does not create a second store.

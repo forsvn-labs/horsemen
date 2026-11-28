@@ -24,7 +24,7 @@ LINE = 100
 RECORD_LIMIT = 2 * 1024 * 1024
 NOT_WRITTEN = '; nothing written'
 TARGETS = 'use "" (index), a record (progress), a section (progress#Shipped), a canvas (progress.canvas), or an element (progress.canvas#id)'
-NO_RECORDS = 'no Horsemen records (VISION, BRAIN, PROGRESS, STRUCTURE) in {}. Ask the user before you set them up.'
+NO_RECORDS = 'no Horsemen records (VISION, BRAIN, PROGRESS, ANATOMY) in {}. Ask the user before you set them up.'
 
 Reply = namedtuple('Reply', 'ok text code')  # code: 0 done, 1 refused, 2 input that cannot be used
 
@@ -80,6 +80,14 @@ def record_file(root, name):
     """(file name, bytes) of a record, or (file name, None). Legacy STATUS.md stands in for a missing PROGRESS.md."""
     filename = canvas.RECORDS[name]
     data = _file_bytes(root, filename, RECORD_LIMIT)
+    if name == 'structure':
+        old = _file_bytes(root, legacy.LEGACY_ANATOMY, RECORD_LIMIT)
+        current_text = _markdown(data) if data is not None else None
+        old_text = _markdown(old) if old is not None else None
+        if legacy.anatomy_conflict(current_text, old_text):
+            raise ValueError('ANATOMY.md and STRUCTURE.md differ. Reconcile them before reading Anatomy.')
+        if legacy.anatomy_name(current_text, old_text) == legacy.LEGACY_ANATOMY:
+            return legacy.LEGACY_ANATOMY, old
     if data is None and name == 'progress':
         legacy_data = _file_bytes(root, legacy.LEGACY_PROGRESS, RECORD_LIMIT)
         if legacy_data is not None:
@@ -344,7 +352,7 @@ def _element(root, name, element):
         lines = [node['text']] if kind == 'note' else []
         skip = canvas.NODE_FIRST + ('color',) + (('text',) if kind == 'note' else ())
         lines += [f'{clip(flat(key), 40)}: {_value(node[key])}' for key in sorted(node) if key not in skip]
-        if kind == 'section' and node['file'] in canvas.RECORDS.values():
+        if kind == 'section' and node['file'] in (*canvas.RECORDS.values(), legacy.LEGACY_ANATOMY):
             lines.append(f"read: {node['file'][:-3].lower()}{flat(node['subpath'])}")
         touching = [_edge_text(edge) for edge in edges if element in (edge['fromNode'], edge['toNode'])]
         if touching:
@@ -388,7 +396,15 @@ def read(root, target, max_chars=None, offset=0, if_rev=None):
     if not is_workspace(root):
         return _fail(NO_RECORDS.format(clip(str(root), 160)))
     limit = max_chars or DEFAULT_LIMIT
+    target = re.sub(r'^anatomy(?=(?:\.md)?(?:#|$))', 'structure', target, flags=re.I)
     record, board = _RECORD.fullmatch(target), _CANVAS.fullmatch(target)
+    try:
+        return _read_target(root, target, record, board, limit, offset, if_rev)
+    except ValueError as error:
+        return _fail(str(error))
+
+
+def _read_target(root, target, record, board, limit, offset, if_rev):
     if target == '':
         found, limit = _index(root), min(limit, INDEX_LIMIT)
     elif record and record.group(1).lower() in canvas.RECORDS and not record.group(2):

@@ -219,14 +219,14 @@ on 2026-10-20.
 ## Access problems
 
 - Moved: search the Tiny Notes folder by title, then fix the location here
-  and in STRUCTURE.
+  and in ANATOMY.
 - No access: report it. Do not use another account.
 ```
 
-### STRUCTURE.md
+### ANATOMY.md
 
 ~~~markdown
-# Structure
+# Anatomy
 
 One Next.js app with an API. Research, pricing, and designs live in Google Drive.
 
@@ -338,7 +338,7 @@ Paste the notes from a meeting, edit the draft, and select **Send**.
 - [VISION.md](VISION.md): what Tiny Notes becomes and why
 - [PROGRESS.md](PROGRESS.md): what shipped, what is left, what comes next
 - [BRAIN.md](BRAIN.md): research and business material outside this repository
-- [STRUCTURE.md](STRUCTURE.md): map of the code and the Drive folders
+- [ANATOMY.md](ANATOMY.md): system, change, and verification map
 - [CHANGELOG.md](CHANGELOG.md): what reached users
 ```
 
@@ -375,7 +375,7 @@ Reading was checked; writes still follow BRAIN. Plan and storage limits are
 unknown. Frontend, backend, data, hosting, testing and developer tools need
 verification before this inventory is complete.
 
-Access and permissions: [BRAIN](BRAIN.md). Paths and commands: [STRUCTURE](STRUCTURE.md).
+Access and permissions: [BRAIN](BRAIN.md). Paths and commands: [ANATOMY](ANATOMY.md).
 ````
 
 ## Non-software: Studio pilot (growth experiment)
@@ -538,10 +538,10 @@ Bin and move permission: Not decided. Keep stale copies in place until
 Hung chooses the bin and approves the specific move. Preserve history.
 ```
 
-### STRUCTURE.md
+### ANATOMY.md
 
 ~~~markdown
-# Structure
+# Anatomy
 
 No code. All working material lives in Google Drive.
 
@@ -585,14 +585,14 @@ larger rollout; it does not claim that a repeatable sales channel is proven.
 ## Access
 
 The working material is in Hung's Google Drive. Ask Hung for access; the
-folder map is in [STRUCTURE.md](STRUCTURE.md).
+provider map is in [BRAIN.md](BRAIN.md).
 
 ## Project records
 
 - [VISION.md](VISION.md): what the studio channel becomes and why
 - [PROGRESS.md](PROGRESS.md): pitches, pilots, and the next decision
 - [BRAIN.md](BRAIN.md): where the pipeline and decks live
-- [STRUCTURE.md](STRUCTURE.md): map of the Drive folders
+- [ANATOMY.md](ANATOMY.md): system and verification map
 - [CHANGELOG.md](CHANGELOG.md): what reached studios
 ```
 
@@ -625,5 +625,5 @@ Reading was checked; writes still follow BRAIN. Plan and storage limits are
 unknown. Frontend, backend, data, hosting, testing and developer tools need
 verification before this inventory is complete.
 
-Access and permissions: [BRAIN](BRAIN.md). Paths and commands: [STRUCTURE](STRUCTURE.md).
+Access and permissions: [BRAIN](BRAIN.md). Paths and commands: [ANATOMY](ANATOMY.md).
 ````

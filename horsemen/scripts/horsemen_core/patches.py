@@ -4,7 +4,7 @@ import json
 import os
 import stat
 from pathlib import Path
-from .plans import DOCUMENTS, digest, read_original
+from .plans import EDITABLE, digest, read_original
 
 
 def unique_object(pairs):
@@ -50,7 +50,7 @@ def export_patch(root, plan_path):
         if not isinstance(item,dict) or set(item)!=allowed:
             raise ValueError('Invalid plan change fields; approval data is not accepted.')
         name=item['file']
-        if not isinstance(name,str) or name not in DOCUMENTS or name in seen:
+        if not isinstance(name,str) or name not in EDITABLE or name in seen:
             raise ValueError('Invalid or duplicate document target.')
         seen.add(name)
         before,after=item['before'],item['after']

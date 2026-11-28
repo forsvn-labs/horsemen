@@ -22,9 +22,11 @@ edits, unique owner content and unchanged dates. A denied action stops that
 action; finish independent work. An uncertain write requires a fresh read
 before any retry. Never claim a provider save from a local file or cache.
 
-### brain / vision / structure / status
+### brain / vision / anatomy / progress
 
-Read/report just the named record by default: BRAIN.md, VISION.md, STRUCTURE.md,
+Legacy aliases: `structure` → `anatomy`; `status` → `progress`. If both Anatomy filenames contain different substantive content, reconcile before reading or updating either.
+
+Read/report just the named record by default: BRAIN.md, VISION.md, ANATOMY.md,
 or PROGRESS.md (legacy STATUS.md where applicable). No writes, bulk sync,
 companion refresh or provider-original updates. This read-only boundary overrides
 routine maintenance. Report missing content and access limits, not invented facts.
@@ -47,7 +49,7 @@ see [CLI parity](cli.md). Existing Brain adapter revision/authorization rules st
 
 ### init
 
-Set up missing VISION, PROGRESS, BRAIN, STRUCTURE, README, CHANGELOG and
+Set up missing VISION, PROGRESS, BRAIN, ANATOMY, README, CHANGELOG and
 TECHSTACK using the [initialization procedure](../SKILL.md#initialize).
 Use verified project evidence. Ask for missing owner intent and provider
 choices rather than inventing them. Existing records are inputs, not files
@@ -115,7 +117,7 @@ features shipped. Fixing findings is a separate `update` or `upgrade` scope.
 ### diagram
 
 Explain a named topic or the project's connections. Verify the facts and
-find the existing visual first through STRUCTURE and the owning documents.
+find the existing visual first through ANATOMY and the owning documents.
 Preserve the existing format and canonical location unless the user requests
 a change. Reuse the current view for the same question; no duplicate v2 files.
 
@@ -137,7 +139,7 @@ renderer is available. Syntax checks alone are not proof of readability.
 
 Keep diagrams factual and small, with named components and labeled arrows.
 Mark planned or unknown edges, not invented infrastructure. Link the same
-visual from TECHSTACK and STRUCTURE rather than keeping duplicate diagrams.
+visual from TECHSTACK and ANATOMY rather than keeping duplicate diagrams.
 Do not publish private data, upload to a hosted renderer, or create a public
 share without applicable approval. Store code-bound diagrams with the code;
 other knowledge follows BRAIN's existing source and permission rules.
@@ -150,7 +152,7 @@ Show this short menu and one example, without reading private project data:
 
 | Command | Result |
 | --- | --- |
-| brain / vision / structure / status | Read one record; add `update` for an explicitly scoped edit |
+| brain / vision / anatomy / progress | Read one record; add `update` for an explicitly scoped edit |
 | init | Set up missing project records |
 | update | Refresh changed facts and relevant Brain originals |
 | upgrade | Migrate project documents without losing content |

@@ -485,3 +485,24 @@ test('the saved index lists canvas files without their text; an index from befor
   assert.deepEqual(Object.keys((await t.loadProject(t.snapshot().projects[0].id)).canvases).sort(), ['launch-plan', 'progress'], 'a restored project has its canvases');
   assert.equal(state(canvasFake()).restore({ ...index, version: 1 }, 'operator'), false, 'an index from before canvas files starts a new scan');
 });
+
+test('Anatomy links and readers support old, migrated, and conflicting roots', async () => {
+  const entry = (path, sha) => ({path, sha, size: 100, type: 'blob', mode: '100644'});
+  const legacy = entry('STRUCTURE.md','legacy'), canonical = entry('ANATOMY.md','canonical');
+  const project = {repo:'owner/repo',revision:'rev'};
+  const data = {legacy:'# Structure\n\n## Map\nOld project.',canonical:'# Anatomy\n\n## Map\nNew project.'};
+  const reader = new R.Reader(async url => ({
+    encoding:'base64', content:Buffer.from(data[url.split('/').at(-1)]).toString('base64')
+  }));
+  const load = (...paths) => reader.loadRecord({...project, files:R.discoverRoots([entry('VISION.md','vision'),...paths])['']},'structure','ANATOMY.md');
+  assert.match((await load(legacy)).content,/Old project/);
+  assert.match((await load(legacy, canonical)).error,/differ/);
+  data.legacy = '# Structure\n\n[See Anatomy](ANATOMY.md).\n';
+  assert.match((await load(legacy)).error,/missing/);
+  assert.match((await load(legacy,canonical)).content,/New project/);
+  assert.match((await load(canonical,legacy)).content,/New project/);
+  for(const key of ['anatomy','structure']) {
+    assert.equal(R.shareTarget(new URL('https://h.test/owner/repo?record='+key)).record,'structure');
+    assert.equal(R.shareURL('https://h.test',project,key),'https://h.test/owner/repo?record=anatomy');
+  }
+});

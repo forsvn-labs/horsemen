@@ -10,8 +10,8 @@ CLI share their checker and version. Nothing contacts a provider by default.
 | --- | --- |
 | `horsemen brain` | Read and check BRAIN.md: knowledge locations and access rules |
 | `horsemen vision` | Read and check VISION.md: owner direction |
-| `horsemen structure` | Read and check STRUCTURE.md: project map |
-| `horsemen status` | Read and check PROGRESS.md, or legacy STATUS.md |
+| `horsemen anatomy` | Read and check ANATOMY.md: project map |
+| `horsemen progress` | Read and check PROGRESS.md, or legacy STATUS.md |
 | `horsemen check PATH` | Validate all local records, including cross-record rules |
 | `horsemen inspect PATH` | Check records and show local Git state and progress |
 | `horsemen plan --help` | Setup, migration, edit proposals and review patches |
@@ -46,7 +46,7 @@ horsemen brain update --path /path/to/project --changes edit.json --dry-run --js
 horsemen brain update --path /path/to/project --changes edit.json --exclusive --json
 ```
 
-Use the same syntax for `vision`, `structure`, and `status`. The edit file is
+Use the same syntax for `vision`, `anatomy`, and `progress`. The older `structure` and `status` commands remain aliases. The edit file is
 one JSON object, not the batch format used by the older plan command:
 
 ```json

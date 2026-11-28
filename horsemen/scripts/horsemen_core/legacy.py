@@ -26,10 +26,12 @@ from datetime import date, timedelta
 from urllib.parse import unquote
 from pathlib import Path
 
-RECORDS = ["VISION.md", "BRAIN.md", "PROGRESS.md", "STRUCTURE.md"]
+ANATOMY = "ANATOMY.md"
+LEGACY_ANATOMY = "STRUCTURE.md"
+RECORDS = ["VISION.md", "BRAIN.md", "PROGRESS.md", ANATOMY]
 LEGACY_PROGRESS = "STATUS.md"
-SUPPORTING = ["README.md", "CHANGELOG.md", "TECHSTACK.md", "TECH.md", "AGENTS.md", "CLAUDE.md", "ROADMAP.md"]
-MARKERS = RECORDS + [LEGACY_PROGRESS]
+SUPPORTING = ["README.md", "CHANGELOG.md", "DESIGN.md", "TECHSTACK.md", "TECH.md", "AGENTS.md", "CLAUDE.md", "ROADMAP.md"]
+MARKERS = RECORDS + [LEGACY_PROGRESS, LEGACY_ANATOMY]
 RECORD_FILES = set(MARKERS + SUPPORTING)
 STATES = {"shipped", "partly shipped", "ready to ship", "in progress", "up next", "blocked", "needs decision"}
 SHIPPED = {"shipped", "partly shipped"}
@@ -438,10 +440,10 @@ def is_path_like(root, token, strict):
 
 
 def check_paths(root, name, text, add):
-    for count, token in enumerate(path_tokens(text, trees=name == "STRUCTURE.md", root=root)):
+    for count, token in enumerate(path_tokens(text, trees=name in (ANATOMY, LEGACY_ANATOMY), root=root)):
         if count > 200:
             break
-        if is_path_like(root, token, name == "STRUCTURE.md") and not (root / token).exists():
+        if is_path_like(root, token, name in (ANATOMY, LEGACY_ANATOMY)) and not (root / token).exists():
             add("error", "structure-missing-path", name, f"Path `{token}` does not exist.")
 
 
@@ -474,6 +476,23 @@ def is_pointer(text):
     return len(body) <= 400 and "PROGRESS.md" in body and "|" not in body and not re.search(rf"(?m)^##\s+{DATE}", text)
 
 
+def is_anatomy_pointer(text):
+    """Only recognize a single explicit relative link, not a short real record."""
+    if text is None:
+        return False
+    return re.fullmatch(r"(?:#[ \t]+[^\n]+\n+)?\s*\[[^\]\n]+\]\((?:\./)?ANATOMY\.md\)\.?", text.lstrip("\ufeff").strip()) is not None
+
+
+def anatomy_name(current, old):
+    if current is None and old is not None and not is_anatomy_pointer(old):
+        return LEGACY_ANATOMY
+    return ANATOMY
+
+
+def anatomy_conflict(current, old):
+    return current is not None and old is not None and current != old and not is_anatomy_pointer(old)
+
+
 def core(name):
     """A sibling module of this package. It also loads when this file runs as a script."""
     import importlib
@@ -497,8 +516,12 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
         report["errors" if level == "error" else "warnings"].append({"code": code, "file": file, "message": message})
 
     texts = {name: (read(root / name) if only is None else selected_text if name == only else None)
-             for name in RECORDS + [LEGACY_PROGRESS] + SUPPORTING}
-    report["records"] = [n for n in MARKERS if texts[n] is not None]
+             for name in MARKERS + SUPPORTING}
+    anatomy = anatomy_name(texts[ANATOMY], texts[LEGACY_ANATOMY])
+    report["info"]["anatomy_file"] = anatomy
+    if anatomy_conflict(texts[ANATOMY], texts[LEGACY_ANATOMY]):
+        add("error", "two-anatomy-owners", ANATOMY,
+            "ANATOMY.md and STRUCTURE.md differ. Reconcile their content before using the record.")
     progress_name = "PROGRESS.md"
     if texts["PROGRESS.md"] is not None and texts[LEGACY_PROGRESS] is not None:
         if is_pointer(texts[LEGACY_PROGRESS]):
@@ -511,7 +534,9 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
         progress_name = LEGACY_PROGRESS
         add("warning", "legacy-status", "STATUS.md", "Legacy name. Migrate STATUS.md to PROGRESS.md (references/adopt.md).")
     report["info"]["progress_file"] = progress_name
-    for name in RECORDS:
+    selected = ("VISION.md", "BRAIN.md", progress_name, anatomy)
+    report["records"] = [n for n in selected if texts[n] is not None]
+    for name in (anatomy if n == ANATOMY else n for n in RECORDS):
         if texts[name] is None and not (name == "PROGRESS.md" and progress_name == LEGACY_PROGRESS):
             add("error", "missing-record", name, f"{name} is missing.")
     if texts["ROADMAP.md"] is not None:
@@ -544,7 +569,7 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
         if re.search(r"(?m)^(```|~~~)", prose) or any("/" in tok or re.search(r"\.[a-z]{1,5}$", tok)
                                                          for tok in re.findall(r"`([^`\n]+)`", prose)):
             add("warning", "vision-engineering-content", "VISION.md", "VISION holds code or file paths. It is a business and "
-                "operating document; move engineering detail to STRUCTURE or a spec that BRAIN points to.")
+                "operating document; move engineering detail to Anatomy or a spec that BRAIN points to.")
         if not re.search(rf"Confirmed:\**\s*{DATE}", vision):
             add("warning", "vision-unconfirmed", "VISION.md", "No `Confirmed: YYYY-MM-DD`. The owner has not confirmed this vision.")
         questions = sections(vision).get("open questions", "")
@@ -584,21 +609,21 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
                 if hits:
                     add("error", "private-locator", name, f"Public repository exposes a private locator: {hits[0][:60]}")
 
-    for name in ("STRUCTURE.md", "BRAIN.md"):
+    for name in (anatomy, "BRAIN.md"):
         if texts[name] is not None:
             text = texts[name]
-            if name == "STRUCTURE.md":
+            if name in (ANATOMY, LEGACY_ANATOMY):
                 text = re.sub(r"(?ms)^##\s+Brain\b.*?(?=^##\s|\Z)", "", text)
             check_paths(root, name, text, add)
-    if texts["STRUCTURE.md"] is not None and report["info"].get("brain_providers") \
-            and not any(k.startswith("brain") for k in sections(texts["STRUCTURE.md"])):
+    if anatomy == LEGACY_ANATOMY and texts[anatomy] is not None and report["info"].get("brain_providers") \
+            and not any(k.startswith("brain") for k in sections(texts[anatomy])):
         add("warning", "structure-no-brain-map", "STRUCTURE.md", "BRAIN names a provider, but STRUCTURE has no `## Brain` "
             "section mapping its folders and key documents.")
-    if texts["STRUCTURE.md"] is not None and not fast:
-        structure = texts["STRUCTURE.md"]
+    if texts[anatomy] is not None and not fast:
+        structure = texts[anatomy]
         for entry in top_level(root, top if top is not None else git_top(root)):
             if not re.search(r"(?<![\w.-])" + re.escape(entry) + r"(?![\w-])", structure):
-                add("warning", "structure-unmentioned", "STRUCTURE.md", f"Top-level entry `{entry}` is not mentioned.")
+                add("warning", "structure-unmentioned", anatomy, f"Top-level entry `{entry}` is not mentioned.")
 
     if texts["TECHSTACK.md"] is None and report["records"]:
         add("warning", "techstack-missing", "TECHSTACK.md", "No TECHSTACK.md. Inventory tools, stack, resources and integrations from evidence; mark unknowns.")
@@ -618,7 +643,8 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
         text = texts[name]
         if text is None or (name == "AGENTS.md" and root == Path.home()):
             continue
-        wanted = [n if n != "PROGRESS.md" else progress_name for n in RECORDS]
+        wanted = (["BRAIN.md"] if name == "AGENTS.md" and anatomy == ANATOMY else
+                  [progress_name if n == "PROGRESS.md" else anatomy if n == ANATOMY else n for n in RECORDS])
         absent = [n for n in wanted if n not in text]
         if absent:
             add("warning", "entry-links", name, f"{label} does not link: " + ", ".join(absent) + ".")
@@ -760,8 +786,9 @@ def orient(root, top):
     progress_name = report["info"]["progress_file"]
     present = report["records"]
     lines = [f"Horsemen records for {root}: " + ", ".join(present) + "."]
+    anatomy = report["info"]["anatomy_file"]
     lines.append("Before acting, respect the gates and constraints below. Read VISION.md, BRAIN.md, or the rest of "
-                 "STRUCTURE.md when the task needs direction, knowledge, or locations. Before finishing each task, use horsemen "
+                 f"{anatomy} when the task needs direction, knowledge, or locations. Before finishing each task, use horsemen "
                  "to review all four records silently, including work outside Git. Keep unchanged records and dates unchanged. "
                  "Do not replace the actual task report with skill maintenance; report it only if asked, or for necessary permission questions and actionable blockers.")
     incomplete = []
@@ -776,15 +803,15 @@ def orient(root, top):
     elif progress_name == LEGACY_PROGRESS:
         lines += ["", "Status lives in legacy STATUS.md (old format, not injected). Read it before project work: it holds "
                       "the current gates, blockers, and next actions. Migrate it to PROGRESS.md with the horsemen skill when status next changes."]
-    structure = read(root / "STRUCTURE.md")
+    structure = read(root / anatomy) if "two-anatomy-owners" not in codes_of(report) else None
     if structure is not None:
         first = next((body for title, body in sections(structure).items() if title.startswith("read before")), None)
         if first and first.strip():
             body = first.strip().splitlines()
             kept, complete = clip(body, READ_FIRST_CHARS)
-            lines += ["", "STRUCTURE.md, read before changing:", *kept]
+            lines += ["", f"{anatomy}, read before changing:", *kept]
             if not complete:
-                incomplete.append("the STRUCTURE.md 'Read before changing' section")
+                incomplete.append(f"the {anatomy} 'Read before changing' section")
     if incomplete:
         lines.append("Injected text is incomplete. Read the rest of " + " and ".join(incomplete) + " before acting.")
     health = health_lines(root, top, report, progress_name)
@@ -883,9 +910,10 @@ def pointer_text(root, top):
         gates = "Status lives in legacy STATUS.md. Read it before project work: it holds the gates and the next action."
     else:
         gates = "PROGRESS.md is missing, so no gates are known."
-    structure = read(root / "STRUCTURE.md")
+    anatomy = report["info"]["anatomy_file"]
+    structure = read(root / anatomy) if "two-anatomy-owners" not in codes_of(report) else None
     if structure is not None and any(title.startswith("read before") and body.strip() for title, body in sections(structure).items()):
-        structure_line = "STRUCTURE.md has a Read before changing list: read structure#Read before changing first."
+        structure_line = f"{anatomy} has a Read before changing list: read {'structure' if anatomy == LEGACY_ANATOMY else 'anatomy'}#Read before changing first."
     health = []
     try:
         names = sorted(n[:-7] for n in os.listdir(root / ".horsemen" / "canvas") if n.endswith(".canvas"))
@@ -1051,9 +1079,9 @@ def stop(payload):
                 before = set(state["dirs"])
                 added, removed = sorted(after - before), sorted(before - after)
                 fingerprint = "|".join(added) + "/" + "|".join(removed)
-                if now.get("STRUCTURE.md") != state.get("structure_hash", base_hashes.get("STRUCTURE.md")):
+                if (now.get(ANATOMY) or now.get(LEGACY_ANATOMY)) != state.get("structure_hash", base_hashes.get(ANATOMY) or base_hashes.get(LEGACY_ANATOMY)):
                     # STRUCTURE was repaired: the current tree becomes the new baseline, so later moves re-arm the rule.
-                    state["structure_hash"], state["dirs"] = now.get("STRUCTURE.md"), sorted(after)
+                    state["structure_hash"], state["dirs"] = now.get(ANATOMY) or now.get(LEGACY_ANATOMY), sorted(after)
                 elif (added or removed) and reminded.get("structure") != fingerprint:
                     reminded["structure"] = fingerprint
                     parts = []
@@ -1061,7 +1089,7 @@ def stop(payload):
                         parts.append("added " + ", ".join(added[:6]))
                     if removed:
                         parts.append("removed " + ", ".join(removed[:6]))
-                    notes.append(f"Structure: folders {'; '.join(parts)} since session start, but STRUCTURE.md did not change. "
+                    notes.append(f"Structure: folders {'; '.join(parts)} since session start, but {ANATOMY if now.get(ANATOMY) else LEGACY_ANATOMY} did not change. "
                                  "Update its map and any moved knowledge locations in BRAIN.md.")
 
     shipped_now = shipped_items(read(root / "PROGRESS.md"))

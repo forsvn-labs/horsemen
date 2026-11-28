@@ -85,6 +85,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn('techstack-missing', {r['code'] for r in report['warnings']})
         self.assertEqual(before, self.snapshot())
     def test_add_companion_clears_warning_without_touching_four_records(self):
+        (self.root/'STRUCTURE.md').rename(self.root/'ANATOMY.md')
+        (self.root/'STRUCTURE.md').write_text('[Anatomy](ANATOMY.md).\n')
+        readme = self.root/'README.md'
+        readme.write_text(readme.read_text().replace('STRUCTURE.md','ANATOMY.md'))
         originals = {n: (self.root/n).read_bytes() for n in horsemen.RECORDS}
         (self.root/'TECHSTACK.md').write_text('# Technology\n\nPython: local scripts, version unknown.\n')
         code, report = self.env.check(self.root)
