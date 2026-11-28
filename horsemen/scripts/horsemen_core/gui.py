@@ -17,7 +17,7 @@ from .legacy import anatomy_conflict, is_anatomy_pointer, sections
 from .gui_links import canvas_links, connections
 
 FILES = {'vision': 'VISION.md', 'progress': 'PROGRESS.md', 'brain': 'BRAIN.md',
-         'structure': 'ANATOMY.md', 'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'techstack': 'TECHSTACK.md'}
+         'structure': 'ANATOMY.md', 'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'design-doc': 'DESIGN.md', 'techstack': 'TECHSTACK.md'}
 EXCLUDED = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor'}
 MAX_FILE = 512 * 1024
 

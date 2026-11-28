@@ -52,7 +52,8 @@ class CLI(unittest.TestCase):
         self.assertEqual(shown.returncode,0,shown.stdout+shown.stderr)
         self.assertIn('ANATOMY',shown.stdout)
         plan=json.loads(self.run_cli('upgrade','--plan','--json').stdout)['plan']
-        self.assertFalse(any(c['file']=='ANATOMY.md' for c in plan['changes']))
+        self.assertFalse(any(c.get('source')=='STRUCTURE.md' for c in plan['changes']))
+        self.assertTrue(any(c.get('source')=='TECHSTACK.md' and c['file']=='ANATOMY.md' for c in plan['changes']))
         old.write_text(source + '\nConflicting substantive material.\n')
         for command in ('anatomy','structure'):
             p=self.run_cli(command,'--json')
@@ -264,6 +265,9 @@ class CLI(unittest.TestCase):
         self.assertEqual(self.run_cli('init','--plan','--json').returncode,2)
     def test_noop_upgrade(self):
         (self.root/'STRUCTURE.md').rename(self.root/'ANATOMY.md')
+        anatomy=self.root/'ANATOMY.md'
+        anatomy.write_text(anatomy.read_text()+'\n## Tech stack\n\nPython: local CLI.\n')
+        (self.root/'TECHSTACK.md').write_text('See [ANATOMY.md → Tech stack](ANATOMY.md#tech-stack).\n')
         for name in ('README.md','AGENTS.md'):
             p=self.root/name
             p.write_text(p.read_text().replace('STRUCTURE.md','ANATOMY.md'))
@@ -289,7 +293,9 @@ class CLI(unittest.TestCase):
         (self.root/'TECH.md').write_text('Unique old facts')
         before=(self.root/'TECHSTACK.md').read_bytes()
         p=self.plan('upgrade'); self.assertEqual(p['status'],'needs_input')
-        self.assertEqual(p['changes'][0]['action'],'reconcile')
+        self.assertEqual(p['changes'][0]['action'],'migration_review')
+        self.assertEqual(p['changes'][0]['file'],'ANATOMY.md')
+        self.assertEqual(p['changes'][0]['source'],'TECH.md')
         self.assertEqual(before,(self.root/'TECHSTACK.md').read_bytes())
         self.assertEqual((self.root/'TECH.md').read_text(),'Unique old facts')
     def test_upgrade_old_name_only(self):

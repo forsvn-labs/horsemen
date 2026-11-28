@@ -4,7 +4,7 @@
    server never parses or keeps record content. tests/test_hosted_reader.cjs
    checks parity with the Python reader. Change both sides together. */
 (function (root) {
-  const FILES = { vision: 'VISION.md', progress: 'PROGRESS.md', brain: 'BRAIN.md', structure: 'ANATOMY.md', readme: 'README.md', changelog: 'CHANGELOG.md', techstack: 'TECHSTACK.md' };
+  const FILES = { vision: 'VISION.md', progress: 'PROGRESS.md', brain: 'BRAIN.md', structure: 'ANATOMY.md', readme: 'README.md', changelog: 'CHANGELOG.md', 'design-doc': 'DESIGN.md', techstack: 'TECHSTACK.md' };
   const EXCLUDED = new Set(['.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor']);
   const MAX_FILE = 512 * 1024;
   /* An own property, also for a key such as __proto__. */

@@ -625,8 +625,9 @@ def check(root, top=None, fast=False, only=None, selected_text=None):
             if not re.search(r"(?<![\w.-])" + re.escape(entry) + r"(?![\w-])", structure):
                 add("warning", "structure-unmentioned", anatomy, f"Top-level entry `{entry}` is not mentioned.")
 
-    if texts["TECHSTACK.md"] is None and report["records"]:
-        add("warning", "techstack-missing", "TECHSTACK.md", "No TECHSTACK.md. Inventory tools, stack, resources and integrations from evidence; mark unknowns.")
+    inline_stack = sections(texts[anatomy] or "").get("tech stack", "").strip()
+    if not inline_stack and texts["TECHSTACK.md"] is None and report["records"]:
+        add("warning", "techstack-missing", "TECHSTACK.md", "Add a populated Tech stack section to ANATOMY.md. Inventory verified tools, resources and integrations; mark unknowns.")
 
     readme = texts["README.md"]
     if readme is None and report["records"]:
@@ -1152,7 +1153,7 @@ def stop(payload):
             notes.append("Canvas: " + " ".join(cards[:3]) + " The card broke in this session. Repair it with canvas_edit or `horsemen.py canvas apply`.")
 
     save_state(path, state)
-    return completion_reminder(notes)
+    return completion_reminder(notes, legacy_structure=not bool(now.get(ANATOMY)) and bool(now.get(LEGACY_ANATOMY)))
 
 
 def unpublished_records(root, top, names, files=()):
@@ -1186,12 +1187,16 @@ def unpublished_records(root, top, names, files=()):
     return (out, ref) if out else None
 
 
-def completion_reminder(notes):
+def completion_reminder(notes, legacy_structure=False):
     """Block only for specific drift. A block forces one more agent turn, and hosts show that turn as the final reply,
     so a routine block would hide the task report. SessionStart carries the routine end-of-task review."""
     if not notes:
         return None
-    reason = ("Horsemen found record drift. Fix it in VISION, BRAIN, PROGRESS, or STRUCTURE (and README, CHANGELOG, or TECHSTACK if affected). "
+    files = ("VISION, BRAIN, PROGRESS, or STRUCTURE (and README, CHANGELOG, or TECHSTACK if affected). "
+             if legacy_structure else
+             "BRAIN, VISION, PROGRESS, or ANATOMY (and DESIGN, README, or CHANGELOG if affected). "
+             "Reconcile unique legacy TECHSTACK facts into ANATOMY. ")
+    reason = ("Horsemen found record drift. Fix it in " + files +
               "Honor read-only commands: plain inspect and check report proposed changes without writing. Keep VISION unless the user agreed "
               "to a change. Also open relevant brain originals; update or archive only when authorized. Leave unchanged files and dates alone. "
               "Do this silently, with no Horsemen section unless asked; still surface permission questions and actionable blockers. "

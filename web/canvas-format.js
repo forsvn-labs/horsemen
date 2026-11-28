@@ -12,7 +12,7 @@
   const NAME = /^[a-z0-9][a-z0-9-]{0,63}$/, ID = /^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$/, COLOR = /^(?:[1-6]|#[0-9A-Fa-f]{6})$/;
   const CONTROL = /[\u0000-\u001f]/, URL_SPACE = /[\u0020\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000\ufeff]/, CONFLICT = /(?:^|\n)(?:<{7}|={7}|>{7})/;
   const SIDES = ['top', 'right', 'bottom', 'left'], ENDS = ['none', 'arrow'], BACKGROUNDS = ['cover', 'ratio', 'repeat'];
-  const RESERVED = ['home', 'vision', 'progress', 'brain', 'structure', 'readme', 'changelog', 'techstack'];
+  const RESERVED = ['home', 'vision', 'progress', 'brain', 'structure', 'readme', 'changelog', 'design-doc', 'techstack'];
   const FOLDER = '.horsemen/canvas/', MEDIA_FOLDER = '.horsemen/media/';
   const MEDIA = ['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.csv', '.tsv', '.xlsx'];
   const IMAGE = /\.(?:png|jpe?g|gif|webp|svg)$/i, SHEET = /\.(?:csv|tsv|xlsx)$/i, MARKDOWN = /\.(?:md|markdown)$/i, CANVAS = /\.canvas$/;

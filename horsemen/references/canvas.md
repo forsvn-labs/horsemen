@@ -19,7 +19,7 @@ record. A file holds only what someone added or moved.
 The format is [JSON Canvas 1.0](https://jsoncanvas.org/spec/1.0/) with limits
 and a fixed way to write the file: one element on each line, in a fixed order.
 Then Git shows a change to one element as one changed line. The
-[design](https://github.com/hungv47/horsemen/blob/main/docs/product/canvas-workspace.md)
+[design](https://github.com/forsvn-labs/horsemen/blob/main/docs/product/canvas-workspace.md)
 has the full rules.
 
 ## When to change a canvas

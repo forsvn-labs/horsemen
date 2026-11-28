@@ -7,7 +7,7 @@ available for larger artwork.
 ## App mark
 
 Junction connects four tiles in one loop. The tiles represent Vision, Progress,
-Brain, and Structure, in reading order. The tiles and the open center stay
+Brain, and Anatomy, in reading order. The tiles and the open center stay
 visible at 16 px. A dark violet background sets the same contrast in every theme.
 
 Open the [logo study](../show-me/logo/index.html) in a browser to compare Junction,

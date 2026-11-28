@@ -141,6 +141,7 @@ for (const bad of ['', '#', '#p=short', '#p=' + id + '&x=1', '#p=' + id + '&r=VI
   assert.ok(parsed === null || (parsed.p === id && parsed.n === null), 'bad hash: ' + bad);
 }
 assert.equal(S.formatHash({ p: id }), '#p=' + id);
+assert.deepEqual(S.parseHash(S.formatHash({p:id,c:'design-doc',n:'s-overview',r:'design-doc'})), {p:id,c:'design-doc',n:'s-overview',r:'design-doc'});
 assert.equal(S.formatHash({ p: id, r: 'vision' }), '#p=' + id + '&r=vision');
 assert.equal(S.formatHash({ p: id, c: 'progress', n: 's-shipped', r: 'progress' }), '#p=' + id + '&c=progress&n=s-shipped&r=progress');
 assert.equal(S.formatHash({ p: id, c: 'home', n: 's-shipped' }), '#p=' + id, 'Home needs no canvas in the link');

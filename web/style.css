@@ -1,6 +1,6 @@
 /* Horsemen · a calm reading desk. Each theme is its own visual world: fonts, shapes, borders,
    shadows, spacing, the canvas, focus, and colours. The record pigments keep their meaning in all of them:
-   Vision = gilt · Progress = vermilion · Brain = indigo · Structure = verdigris.
+   Vision = gilt · Progress = vermilion · Brain = indigo · Anatomy = verdigris.
    A browser downloads a font only when the page uses it, so each theme loads only its own files. */
 @font-face{font-family:Cleft;src:url(/assets/fonts/cleft.woff2) format('woff2');font-weight:100 900;font-display:swap}
 @font-face{font-family:Gravure;src:url(/assets/fonts/gravure.woff2) format('woff2');font-weight:100 900;font-display:swap}

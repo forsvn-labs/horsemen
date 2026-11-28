@@ -72,7 +72,7 @@ test('links, sections, and discovery match the Python reader', async () => {
     { kind: 'links', text: linkText.replace(/\n/g, '\r\n'), source: 'a/b/VISION.md', repo: 'o/r', revision: 'c'.repeat(40) },
     { kind: 'links', text: many, source: 'BRAIN.md', repo: 'o/r', revision: 'd'.repeat(40) },
     ...sectionTexts.map(text => ({ kind: 'sections', text })),
-    { kind: 'roots', entries: entries(['one/VISION.md', 'one/STATUS.md', 'one/BRAIN.md', 'one/STRUCTURE.md', 'two/VISION.md', 'two/PROGRESS.md', 'node_modules/pkg/VISION.md', 'node_modules/pkg/PROGRESS.md', 'README.md', 'three/BRAIN.md', 'three/STRUCTURE.md']) },
+    { kind: 'roots', entries: entries(['one/VISION.md', 'one/STATUS.md', 'one/BRAIN.md', 'one/STRUCTURE.md', 'two/VISION.md', 'two/PROGRESS.md', 'two/DESIGN.md', 'node_modules/pkg/VISION.md', 'node_modules/pkg/PROGRESS.md', 'README.md', 'three/BRAIN.md', 'three/STRUCTURE.md']) },
     { kind: 'roots', entries: [...entries(['VISION.md', 'PROGRESS.md', 'STATUS.md', 'CHANGELOG.md']), { path: 'BRAIN.md', type: 'blob', mode: '120000', sha: 'x', size: 1 }, { path: 'STRUCTURE.md', type: 'tree', mode: '040000', sha: 'x' }] },
     { kind: 'roots', entries: entries(['STATUS.md', 'PROGRESS.md', 'BRAIN.md']) },
   ];

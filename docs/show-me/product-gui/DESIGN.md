@@ -9,7 +9,7 @@ The canvas starts with a readable arrangement, then lets operators drag every
 artifact. The world has no pan boundary. Wheel and pinch zoom around the pointer;
 Fit recovers the whole project. Reset restores the initial arrangement. Progress
 gets the largest surface because it answers the immediate question. Vision is
-a concise brief, Brain a source directory, and Structure a navigable tree.
+a concise brief, Brain a source directory, and Anatomy a navigable tree.
 Supporters sit along a lower rail. Connections show actual relationships in the
 fictional example. Selection opens a side peek with full content and source.
 

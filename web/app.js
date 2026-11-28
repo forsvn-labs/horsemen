@@ -1,6 +1,6 @@
 'use strict';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structure:'ANATOMY.md',readme:'README.md',changelog:'CHANGELOG.md',techstack:'TECHSTACK.md'};
+const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structure:'ANATOMY.md',readme:'README.md',changelog:'CHANGELOG.md','design-doc':'DESIGN.md',techstack:'TECHSTACK.md'};
 let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
 /* Canvases: Home shows the records. Each record has a canvas of its sections; a canvas file
    (.horsemen/canvas/<name>.canvas) adds its elements at their saved places. A file with another name is a board.
@@ -9,7 +9,7 @@ let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
 let canvasKey='home',needsFit=false,shownProject=null,canvasFiles=new Map(),canvasView=null,recordsLoaded=false;const sectionSpots=new Map(),sectionNodes=new Map(),lastCanvas=new Map(),cameras=new Map();
 const F=HorsemenCanvasFormat,V=HorsemenCanvasView;
 const session=$('meta[name="horsemen-session"]').content;
-const titles={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Anatomy',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
+const titles={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Anatomy',readme:'README',changelog:'Changelog','design-doc':'Design',techstack:'Tech stack (legacy)'};
 const icon=(name,cls='icon')=>'<svg class="'+cls+'" aria-hidden="true"><use href="/assets/icons/'+(name.startsWith('seal-')?'seals':'icons')+'.svg#'+name+'"/></svg>';
 const kindIcon=kind=>kind==='document'?'document':kind==='external'?'external':'link';
 const {escapeHTML,safeURL}=HorsemenMarkdown;
@@ -62,11 +62,16 @@ const viewChoices=()=>{try{const saved=JSON.parse(localStorage.getItem('horsemen
 const viewMode=key=>['rich','list'].includes(viewChoices()[key])?viewChoices()[key]:HorsemenViews.defaultMode(key);
 function setViewMode(key,mode){const saved=viewChoices();saved[key]=mode==='list'?'list':'rich';try{localStorage.setItem('horsemen-peek-views',JSON.stringify(saved))}catch{}}
 /* A record that does not follow its template reads as its own document. */
-const documentHTML=record=>{const text=HorsemenViews.withoutTitle(record.content||'');return '<div class="view view-document" data-layout="document">'+(text.trim()?'<div class="prose document">'+renderMarkdown(text,record.url)+'</div>':'<p class="empty-note">This record is empty.</p>')+'</div>'};
+const documentBody=record=>{
+  const text=record.content||'';
+  return /(?:^|\/)DESIGN\.md$/.test(record.path||record.name||'')
+    ? text.replace(/^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*\r?\n/, '') : text;
+};
+const documentHTML=record=>{const text=HorsemenViews.withoutTitle(documentBody(record));return '<div class="view view-document" data-layout="document">'+(text.trim()?'<div class="prose document">'+renderMarkdown(text,record.url)+'</div>':'<p class="empty-note">This record is empty.</p>')+'</div>'};
 function overviewHTML(key,record){return HorsemenViews.render(key,record,{mode:viewMode(key),progressRecord:records.progress,now:Date.now(),links:record.connections?.length||0})||documentHTML(record)}
 /* Stated facts ("Updated: 2026-11-18 · Stage: pilot") form the quiet line under the record name. Dates show as relative time. */
 function factsLine(record){
-  const facts=HorsemenPreview.facts(record.content||'');
+  const facts=HorsemenPreview.facts(documentBody(record));
   return facts.map(f=>{const m=f.value.match(/^(\d{4}-\d{2}-\d{2})\b\s*(.*)$/),r=m&&HorsemenViews.relative(m[1]);return {text:r?f.label+' '+r.text.toLocaleLowerCase()+(m[2]?' '+m[2]:''):f.label+': '+f.value,title:r?r.iso:''}});
 }
 const entryTitle=entry=>Object.hasOwn(titles,entry.key)?titles[entry.key]:entry.record?.name||entry.link?.title||'Document';
@@ -225,14 +230,17 @@ function renderPeekPath(){
     if(last)el.className='here';else el.onclick=()=>{peekRequest++;peekTrail.length=i+1;peekMode='overview';renderPeek()};path.append(el);
   });
 }
-const readable=()=>Object.keys(names).filter(key=>records[key]&&!records[key].error);
+/* Keep old direct links valid without listing a migrated stack twice. */
+const stackRedirect=()=>!!records.structure?.content&&/^See \[ANATOMY\.md → Tech stack\]\(ANATOMY\.md#tech-stack\)\.$/.test(records.techstack?.content?.trim()||'');
+const listable=key=>key!=='techstack'||!stackRedirect();
+const readable=()=>Object.keys(names).filter(key=>listable(key)&&records[key]&&!records[key].error);
 /* Where focus returns when a record closes: its Home card, or on a record canvas the card or control that opened the reading view. */
 const recordOpener=key=>{const card=recordCards.find(b=>b.dataset.artifact===key);return card&&!card.hidden?card:opener?.isConnected&&!opener.hidden?opener:$('[data-canvas="'+canvasKey+'"]')};
 function stepRecord(delta){const order=readable(),at=order.indexOf(peekTrail[0]?.key);if(order.length<2)return;const key=order[(Math.max(at,0)+delta+order.length)%order.length];openPeek(key,recordOpener(key))}
 let outlineTargets=[];
 function renderPeekNav(){
   const list=$('#peek-records'),root=peekTrail[0]?.key;list.replaceChildren();
-  for(const key of Object.keys(names)){
+  for(const key of Object.keys(names).filter(listable)){
     const r=records[key],b=document.createElement('button');b.className='peek-record '+key+(r?.error?' missing':'');b.dataset.record=key;b.disabled=!r||!!r.error;
     b.innerHTML=icon(key)+'<span>'+escapeHTML(titles[key])+'</span>';if(r?.error)b.title=names[key]+' is missing or unreadable';
     if(key===root)b.setAttribute('aria-current',peekTrail.length===1?'page':'true');
@@ -358,7 +366,7 @@ function setPrivacy(p){$('#privacy').hidden=!p?.private||p.working_copy;$('#priv
 const isRecordKey=key=>Object.hasOwn(names,key);
 const hasCanvas=key=>key==='home'||(isRecordKey(key)?!!records[key]&&!records[key].error:canvasFiles.has(key)&&!F.reserved(key));
 const boardKeys=()=>[...canvasFiles.keys()].filter(name=>!F.reserved(name)).sort();
-const canvasKeys=()=>projects[current]?['home',...Object.keys(names).filter(hasCanvas),...boardKeys()]:[];
+const canvasKeys=()=>projects[current]?['home',...Object.keys(names).filter(key=>listable(key)&&hasCanvas(key)),...boardKeys()]:[];
 const canvasTitle=key=>key==='home'?'Home':isRecordKey(key)?titles[key]:V.title(key);
 /* The card of an ID on the open canvas. A canvas element can have the ID of a record ("progress"); the hidden Home card is not it. */
 const cardOf=id=>$((canvasKey==='home'?'':'.canvas-node')+'[data-artifact="'+id+'"]');
@@ -430,7 +438,7 @@ function setTone(el,color){const tone=V.tone(color);if(tone?.preset)el.dataset.t
 function buildCanvas(){
   for(const el of $$('.canvas-node'))el.remove();sectionSpots.clear();sectionNodes.clear();canvasView=null;
   const home=canvasKey==='home',p=projects[current];
-  for(const el of recordCards)el.hidden=!home;world.dataset.canvas=canvasKey;
+  for(const el of recordCards)el.hidden=!home||(el.dataset.artifact==="design-doc"&&!records["design-doc"]?.path||!listable(el.dataset.artifact));world.dataset.canvas=canvasKey;
   if(!home&&p){
     /* In edit mode (hosted, canvas-editor.js) the draft of this canvas shows in place of its file. */
     const file=window.HorsemenEditor?.file(canvasKey)??canvasFiles.get(canvasKey)??null;
@@ -589,7 +597,7 @@ async function clearWorkspace(){
 }
 $('#connect').onclick=()=>{closeMenus();scan()};$('#clear').onclick=()=>{closeMenus();clearWorkspace()};
 const canvas=$('.canvas'), world=$('#map');
-const defaults={vision:[0,0],progress:[360,0],brain:[0,248],structure:[360,248],readme:[0,496],changelog:[233,496],techstack:[466,496]};
+const defaults={vision:[0,0],progress:[360,0],brain:[0,248],structure:[360,248],readme:[0,496],changelog:[233,496],'design-doc':[466,496],techstack:[699,496]};
 let layouts={},camera={x:30,y:30,z:1},gesture=null,spaceDown=false,suppressClick=null,pinch=null;
 const pointers=new Map();let highestLayer=2;
 let selected=new Set(),tool='select';const expandedConnections=new Map(),baseRelations=[],loadingLinks=new Set();

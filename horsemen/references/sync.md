@@ -12,7 +12,7 @@
 | Folders and key documents inside each provider, and how to open them | BRAIN or its linked provider index | - |
 | What reached people | CHANGELOG | PROGRESS keeps latest-day ships plus Historical ships with proof |
 | Pending, partly shipped, blocked, and roadmap items | PROGRESS | CHANGELOG holds only the shipped part of a partly shipped item |
-| Tools, stack, resources, integrations and verified usage | TECHSTACK | README summarizes setup; ANATOMY links commands; BRAIN owns permissions |
+| Tools, stack, resources, integrations and verified usage | ANATOMY → Tech stack | README summarizes setup; BRAIN owns permissions |
 | Pitch for newcomers, install and use steps | README (cut down from VISION and the install guide) | ANATOMY holds the full command list |
 | Agent rules for this project | AGENTS.md | `CLAUDE.md` imports it |
 
@@ -96,7 +96,7 @@ when evidence or the user's answer resolves them.
 | Priority changed | Move items between `Up next` and Roadmap (owner confirms) | VISION if the reason is a direction change |
 | Item dropped | Remove the bullet; log "Dropped X: reason" | - |
 | Folder, module, or entry point moved | ANATOMY repository map | README commands |
-| New tool, dependency, resource or integration | TECHSTACK inventory; ANATOMY commands and paths if changed | README setup; BRAIN only if provider or access rules changed |
+| New tool, dependency, resource or integration | ANATOMY stack, commands, and paths | README setup; BRAIN only if provider or access rules changed |
 | Knowledge moved inside a provider | BRAIN provider map | BRAIN "What lives in the brain" if the location changed |
 | Lasting knowledge changed without a local edit | Exact original chosen by BRAIN's save rules | Task review of all four records; local Git cannot detect this |
 | Stale copy retired | Agreed bin and recovery index | References, BRAIN, and ANATOMY if locations changed |
@@ -141,7 +141,7 @@ When you read records for a task, also look for:
 
 | Document | Rule |
 | --- | --- |
-| TECHSTACK.md | Companion inventory of tools, stack, resources and integrations: purpose, verified version or plan, usage, source/date and limits. Link BRAIN for access and ANATOMY for commands. Never credentials, permission grants, status history or a replacement knowledge store |
+| ANATOMY.md → Tech stack | Verified tools, stack, resources and integrations, what they need and what they do. Link BRAIN for access. No credentials, permission grants, or status history. |
 | README.md | Not a record; every project keeps one. VISION and the install guide cut down to one screen: pitch, shipped capabilities, install, use, record links. No roadmap, status, or business model. Updates with VISION and with install steps |
 | CHANGELOG.md | Not a record; every project that has shipped anything keeps one. Only what reached people, newest first, version and date or date headings. No `Unreleased` section; pending and partly done work stays in PROGRESS |
 | CONTRIBUTING, INSTALL, deployment, architecture docs | Optional. Own their detail. ANATOMY links each one under Other documents. Do not repeat their content in the four records |

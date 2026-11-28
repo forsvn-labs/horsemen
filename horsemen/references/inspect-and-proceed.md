@@ -86,7 +86,7 @@ checks and state what that gap prevents you from concluding.
   proposes them; compound mode applies them only within saved permissions.
   Note missing destinations and access holds. Do not imply that an
   unqueried provider was checked or create a replacement knowledge store.
-- **TECHSTACK:** Reconcile tools, stack, resources and integrations with manifests,
+- **ANATOMY → Tech stack:** Reconcile tools, stack, resources and integrations with manifests,
   configuration and observed usage. Distinguish installed from connected and
   tested; link access rules in BRAIN and keep unknowns explicit.
 - **ANATOMY:** Verify relevant repository/worktree entry points, commands,

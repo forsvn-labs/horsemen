@@ -155,7 +155,7 @@ horsemen plan export-patch /path/to/project --plan-file plan.json > review.patch
 
 These commands never apply changes. Init identifies missing documents and
 owner/provider inputs at the exact directory supplied. Upgrade proposes
-STATUS→PROGRESS and TECH→TECHSTACK migration review, including both-file
+STATUS→PROGRESS and legacy TECH/TECHSTACK→ANATOMY migration review, including both-file
 reconciliation, without deleting or renaming content. Update takes the existing
 `{"changes": [...]}` format: unique root `file`, exact `before`, `after`,
 nonempty `evidence`, and optional `owner_agreement`. It preserves review gaps

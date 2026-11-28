@@ -356,7 +356,7 @@ Paste the notes from a meeting, edit the draft, and select **Send**.
 - Beta opened to ten consultants. Paste notes and get a draft summary.
 ```
 
-### TECHSTACK.md
+### TECHSTACK.md (historical example; put the inventory in ANATOMY.md for new work)
 
 ````markdown
 # Technology and tools
@@ -606,7 +606,7 @@ provider map is in [BRAIN.md](BRAIN.md).
 - Pitch deck v2 sent to five studios, with invitation samples built from each studio's own photos.
 ```
 
-### TECHSTACK.md
+### TECHSTACK.md (historical example; put the inventory in ANATOMY.md for new work)
 
 ````markdown
 # Technology and tools
