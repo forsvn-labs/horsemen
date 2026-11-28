@@ -25,7 +25,7 @@ turns them into a design and a build plan.
 | Topic | Proposal |
 | --- | --- |
 | Workspace | One project root in one GitHub repository. A switcher at the top of the sidebar changes workspace. |
-| Sidebar | Lists the artifacts of the workspace: Home, Vision, Progress, Brain, Structure, README, Changelog, Tech stack, then boards. |
+| Sidebar | Lists the artifacts of the workspace: Home, Vision, Progress, Brain, Anatomy, then supporting documents and boards. The stack is part of Anatomy. |
 | Canvas for each artifact | The app generates it from the record's headings. No file is necessary. A saved canvas file adds notes, media, links, groups, and connectors. |
 | Source of truth | Markdown records stay the source of truth. A canvas refers to a record section; it does not copy the text. |
 | File format | [JSON Canvas 1.0](https://jsoncanvas.org/spec/1.0/) with limits and three optional keys, in `.horsemen/canvas/<name>.canvas`. One element on each line. |

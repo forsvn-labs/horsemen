@@ -13,6 +13,13 @@ class Tests(unittest.TestCase):
     def tearDown(self): self.temp.cleanup()
     def codes(self): return {(x['file'],x['code']) for k in ('errors','warnings') for x in horsemen.check(self.root)[k]}
     def test_missing_companion_warns(self): self.assertIn(('TECHSTACK.md','techstack-missing'),self.codes())
+    def test_inline_anatomy_stack_replaces_companion(self):
+        (self.root/'ANATOMY.md').write_text('# Anatomy\n\n## Tech stack\n\nPython: local CLI.\n')
+        self.assertFalse((self.root/'TECHSTACK.md').exists())
+        self.assertNotIn(('TECHSTACK.md','techstack-missing'),self.codes())
+    def test_empty_inline_stack_still_warns(self):
+        (self.root/'ANATOMY.md').write_text('# Anatomy\n\n## Tech stack\n\n## Commands\n\nNo commands.\n')
+        self.assertIn(('TECHSTACK.md','techstack-missing'),self.codes())
     def test_legacy_name_needs_migration_without_mutation(self):
         old=self.root/'TECH.md'; old.write_text('# Owner inventory\nKeep this.\n')
         before=old.read_bytes()
@@ -57,7 +64,7 @@ class Tests(unittest.TestCase):
         self.assertEqual(before,{p.name:(p.read_bytes(),p.stat().st_mtime_ns) for p in self.root.iterdir()})
     def test_stop_reviews_real_brain_and_techstack(self):
         reason=horsemen.completion_reminder(['Progress: drift.'])['reason']
-        self.assertIn('TECHSTACK',reason); self.assertIn('open relevant brain originals',reason)
+        self.assertIn('ANATOMY',reason); self.assertIn('DESIGN',reason); self.assertIn('TECHSTACK',reason); self.assertIn('open relevant brain originals',reason)
         self.assertIn('authorized',reason); self.assertIn('silently',reason)
     def test_no_project_not_inferred_from_companion(self):
         (self.root/'PROGRESS.md').unlink(); (self.root/'TECHSTACK.md').write_text('# Technology\n')

@@ -13,12 +13,12 @@ record has one authoritative working source; the roles do not require a vendor.
 | BRAIN | The project map: authoritative links to Vision, Progress, Anatomy, design, business knowledge, and original assets; provider access and save rules | Copies of source content |
 | VISION | Owner-approved purpose, users, outcomes, principles, and non-goals | Tickets or implementation details |
 | PROGRESS | Current work, next actions, blockers, decisions required, and delivery evidence | A second backlog or invented ship status |
-| ANATOMY | How the system fits together: flows, boundaries, repo paths, prerequisites, tests, and release commands | External knowledge map or duplicate tool inventory |
+| ANATOMY | How the system fits together: flows, boundaries, repo paths, tech stack, prerequisites, tests, and release commands | External knowledge map |
 
 Supporting documents are not Horsemen. README onboards humans; CHANGELOG links
-to what reached users; TECHSTACK.md (or the project's equivalent) inventories
-tools and integrations and is linked by Anatomy. For UI projects, DESIGN.md
-can hold reusable visual rules in the open format. BRAIN points to approved
+to what reached users, using delivery evidence from PROGRESS. For UI projects,
+[DESIGN.md](https://github.com/google-labs-code/design.md) holds reusable
+visual rules in the open format. BRAIN points to approved
 design sources; a UI ticket links the exact approved frame and a dated private
 export when needed. Do not publish private locators or treat drafts as specs.
 
@@ -82,13 +82,15 @@ and does not override a write hold. Ask for missing approval or report the
 exact blocked save. Keep PROGRESS useful for catching up: changed outcomes
 and open blockers with links to originals, not a maintenance activity log.
 
-TECHSTACK is a companion, not a fifth Horseman or a second BRAIN. It describes
-the full stack, tools, integrations and resources in use and their purpose. Cover frontend,
+Put the full tool and integration inventory under `## Tech stack` in
+ANATOMY.md. TECHSTACK.md is a legacy source to consolidate, not a second
+owner or a required file. Preserve a redirect only if an existing reader
+or link needs it. Cover frontend,
 backend, data, infrastructure, testing and developer tools where applicable;
 mark unused layers and unknowns rather than inventing a stack. BRAIN still owns account scope,
 authorization and knowledge destinations; ANATOMY owns paths and commands.
 Link to those owners instead of copying their rules. Never record secrets.
-Keep TECHSTACK concise enough for a junior to middle-level engineer. For each
+Keep the stack concise enough for a junior to middle-level engineer. For each
 tool, explain the project need, what it needs to work, and how it helps.
 Use short plain-language descriptions; link detailed setup and evidence.
 
@@ -138,7 +140,7 @@ hook's silence are not proof that the records are current.
 | PROGRESS | Record changed results, work that remains, and blockers in straightforward words. Avoid business and technical jargon. Keep evidence in the toggle and distinguish finished work from delivered work |
 | ANATOMY | Fix changed code paths, commands, boundaries, and entry points. Keep external document routes and recovery locations in BRAIN |
 
-Check README, CHANGELOG, and TECHSTACK when their sources changed. Run `check` after
+Check DESIGN, README, and CHANGELOG when their sources changed. Run `check` after
 record edits. If nothing worth recording changed, leave files and dates alone.
 If a needed save is blocked, record the exact destination and what remains
 unsaved in PROGRESS's Technical details; report it in the handoff. Do not
@@ -179,7 +181,7 @@ The owner writes VISION; agents write the rest.
   agents keep BRAIN and the documents it routes to current within the saved
   write and cleanup permissions. Record those choices, exact destinations,
   and permissions in BRAIN, so another session can use them.
-- PROGRESS, ANATOMY, README, CHANGELOG, and TECHSTACK are maintained automatically
+- PROGRESS, ANATOMY, DESIGN, README, and CHANGELOG are maintained automatically
   from evidence: the codebase, releases, deployments, and the tracker. Do
   not ask the owner what the evidence already shows.
 
@@ -228,9 +230,10 @@ How to ask:
    the depth the gaps require. Run the
    [provider interview](references/interviews.md#providers) for the brain and
    the task tracker.
-3. Write the four records from [templates](references/templates.md), plus TECHSTACK from verified tools and integrations, the
-   AGENTS.md entrypoint (`CLAUDE.md` contains `@AGENTS.md`), README, and
-   CHANGELOG (with a first entry once anything has shipped).
+3. Write the four records from [templates](references/templates.md). Include
+   the verified stack directly in ANATOMY. Write the AGENTS.md entrypoint
+   (`CLAUDE.md` contains `@AGENTS.md`), README, and, where applicable, DESIGN
+   for the interface and CHANGELOG for verified delivered work.
 4. Run `python3 <this-skill>/scripts/horsemen.py check` and fix every error.
    Exception: a record that waits for the owner's answers stays missing; list
    it as pending instead of writing filler to pass the check.
@@ -351,7 +354,7 @@ through AGENTS.md. Details, install commands, and failure modes:
 
 - [commands.md](references/commands.md): command routing, read/write boundaries and diagrams
 
-- [templates.md](references/templates.md): the four records, the README, CHANGELOG, and TECHSTACK supporters, AGENTS.md, with the rules for each
+- [templates.md](references/templates.md): the four records, the DESIGN, README, and CHANGELOG supporters, AGENTS.md, with the rules for each
 - [examples.md](references/examples.md): filled examples for a software and a non-software project
 - [interviews.md](references/interviews.md): vision discovery, provider selection, and quick interviews for ambiguous updates
 - [sync.md](references/sync.md): ownership, brain care, saved state, change propagation, contradictions

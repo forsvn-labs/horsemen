@@ -23,6 +23,10 @@ read-only, unless the site offers the optional editor app for canvas files
 (see [edit a canvas](#edit-a-canvas-hosted)).
 See [the hosted viewer](../worker/README.md).
 
+
+Design appears when the project has a root DESIGN.md. Tech stack belongs in
+Anatomy; the viewer still opens legacy TECHSTACK.md links.
+
 ## Discuss a working copy
 
 Run `python3 scripts/serve_gui.py --project /path/to/project` from this source checkout.
@@ -117,7 +121,7 @@ can [edit a canvas](#edit-a-canvas-hosted). The format and its limits are in
 [the canvas workspace design](../docs/product/canvas-workspace.md#canvas-file-format).
 
 - **Which canvas.** A file with the name of a record (`vision`, `progress`,
-  `brain`, `structure`, `readme`, `changelog`, `techstack`) belongs to the
+  `brain`, `structure`, `readme`, `changelog`, `design-doc`, `techstack`) belongs to the
   canvas of that record. A file with another name is a board. The rail lists
   the boards after the records, in name order, with the name in title case
   (`launch-plan` shows as "Launch plan"). A project can have 20 canvas files.
@@ -333,9 +337,10 @@ branch.
   need attention), Up next, and shipped work by day, newest first. Proof
   links are small chips. The board is the second layout. Vision: the purpose
   sentence, then simple sections. Brain: the sources, each with its access
-  line. Structure: the tree, with Copy buttons for commands. Changelog shows the latest day as bullets and earlier dates in a table.
-  Open a date for details. New entries are marked after the first visit on this browser. Tech stack: a compact table. README and linked documents: the
-  rendered document.
+  line. Anatomy: the tree and verification commands, with Copy buttons. The
+  document holds the stack. Changelog shows the latest day as bullets and
+  earlier dates in a table. Open a date for details. Design, README, and linked
+  documents open in the reader; a legacy Tech stack still has its compact table.
 - Dates show as relative time, such as "2 days ago". Hover shows the exact
   date. Each item has a small link to its source line (`L12`).
 - The left column lists **Project records**. **In this record** appears only for long
@@ -357,7 +362,7 @@ branch.
 
 The default look is a calm reading desk: bone paper, ink, and one pigment
 for each record. Vision is gilt, Progress is vermilion, Brain is indigo, and
-Structure is verdigris. The pigment appears on the record icon and a few
+Anatomy is verdigris. The pigment appears on the record icon and a few
 labels only. Names and icons carry the same meaning without colour.
 
 ### Themes

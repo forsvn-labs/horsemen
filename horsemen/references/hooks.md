@@ -348,7 +348,7 @@ is internal guidance, not a user-facing update to paste into the reply.
 
 ## TECHSTACK companion and proactive brain care
 
-TECHSTACK.md is tracked as a companion, not a fifth record or project-root marker.
+The canonical stack lives in ANATOMY.md. Legacy TECHSTACK.md is tracked for drift, not as a core record or project-root marker.
 `check` warns with `techstack-missing` when an existing project lacks it. Link,
 placeholder and public-locator checks also cover TECHSTACK. The inventory grants
 no permission. Stop guidance requests inspection of relevant brain originals

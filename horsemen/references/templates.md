@@ -368,11 +368,13 @@ Conventions: {{naming, layering, or ownership rules an agent must follow}}.
 
 ## Tech stack
 
-See [TECHSTACK.md](TECHSTACK.md) or the project's declared equivalent.
+{{Describe the verified runtime, frontend, backend, data, deployment, testing,
+and integrations directly here. For each layer, explain what it needs and
+what it does. Link manifests or setup instructions for details.}}
 
 ## Other documents
 
-- {{README.md: pitch and setup. CHANGELOG.md: what shipped. TECHSTACK.md: tools and integrations. docs/...}}
+- {{README.md: pitch and setup. CHANGELOG.md: what shipped. DESIGN.md: visual rules, when applicable. docs/...}}
 ~~~
 
 Rules:
@@ -396,8 +398,8 @@ Rules:
 
 ## Supporting documents
 
-README, CHANGELOG, and TECHSTACK are not records, but every project keeps all three, and
-they change whenever their sources change (see [sync](sync.md)).
+README, CHANGELOG, and DESIGN (where applicable) are supporting documents,
+not core records. See [sync](sync.md).
 
 ### README.md
 
@@ -434,7 +436,7 @@ VISION changes; rewrite the steps when the install changes.
 - [BRAIN.md](BRAIN.md): knowledge outside this repository
 - [ANATOMY.md](ANATOMY.md): system, change, and verification map
 - [CHANGELOG.md](CHANGELOG.md): what shipped
-- [TECHSTACK.md](TECHSTACK.md): tools, stack, resources, and integrations
+- [DESIGN.md](DESIGN.md): visual guidance, when applicable
 ```
 
 For a project without software, use `## Access` or `## Get started` instead
@@ -472,14 +474,18 @@ changed, leave files and dates alone.
 - [VISION.md](VISION.md): what the project becomes and why
 - [PROGRESS.md](PROGRESS.md): what shipped, what is left, what comes next
 - [BRAIN.md](BRAIN.md): knowledge outside this repository and how to reach it
-- [ANATOMY.md](ANATOMY.md): system, change, and verification map
+- [ANATOMY.md](ANATOMY.md): system, tech stack, and verification map
+
+Supporting standards: [README.md](README.md), [CHANGELOG.md](CHANGELOG.md),
+and [DESIGN.md](DESIGN.md) where applicable. Omit links to files that do not apply.
 
 {{Project-specific agent rules, if any.}}
 ```
 
-### TECHSTACK.md
+### TECHSTACK.md (legacy input)
 
-TECHSTACK owns the current tool and integration inventory. It is not a lockfile,
+Use this inventory format under ANATOMY.md → Tech stack, not as a new file.
+That section owns the current tool and integration inventory. It is not a lockfile,
 architecture design, status log, credential store, or permission registry.
 Include non-code projects: research tools and workflow resources matter too.
 Use “Not used” only after checking, and “Unknown” when evidence is missing.

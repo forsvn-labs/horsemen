@@ -47,6 +47,8 @@
       const tools=toolsTable(text).rows.map(row=>row[0]).filter(Boolean);
       if(tools.length)add('Tools',tools.join(' · '));else from('Tools & purpose',/tools|stack|dependencies|technologies/i);
       from('Connections',/runtime|integration|connections/i);
+    }else if(key==='design-doc'){
+      from('Overview',/^overview$/i);
     }else if(key==='readme'){
       const intro=blocks.find(b=>b.heading===title);add('About',excerpt(intro));from('Get started',/get started|quick.?start|install|setup/i);
     }

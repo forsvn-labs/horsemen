@@ -62,7 +62,7 @@ browser ──/gh/* (CSRF token + encrypted cookie)──▶ Worker ──user t
   the app must be installed on it. Otherwise the page says so. Agents can write
   these links in reports without any API.
 - **Public view.** A link to a public repository, such as
-  `https://horsemen.forsvn.com/hungv47/horsemen`, opens without sign-in. The
+  `https://horsemen.forsvn.com/forsvn-labs/horsemen`, opens without sign-in. The
   Worker first checks that the repository is public, then reads it through
   `/pub/...` without any user token. It reads only repository routes. GitHub
   allows 60 such requests an hour per Cloudflare IP; set the optional secret

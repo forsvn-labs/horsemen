@@ -49,8 +49,7 @@ see [CLI parity](cli.md). Existing Brain adapter revision/authorization rules st
 
 ### init
 
-Set up missing VISION, PROGRESS, BRAIN, ANATOMY, README, CHANGELOG and
-TECHSTACK using the [initialization procedure](../SKILL.md#initialize).
+Set up missing core records and supporting files, with the stack in ANATOMY, using the [initialization procedure](../SKILL.md#initialize).
 Use verified project evidence. Ask for missing owner intent and provider
 choices rather than inventing them. Existing records are inputs, not files
 to replace. When records already exist, check gaps and offer `upgrade` for
@@ -139,7 +138,7 @@ renderer is available. Syntax checks alone are not proof of readability.
 
 Keep diagrams factual and small, with named components and labeled arrows.
 Mark planned or unknown edges, not invented infrastructure. Link the same
-visual from TECHSTACK and ANATOMY rather than keeping duplicate diagrams.
+visual from ANATOMY rather than keeping duplicate diagrams.
 Do not publish private data, upload to a hosted renderer, or create a public
 share without applicable approval. Store code-bound diagrams with the code;
 other knowledge follows BRAIN's existing source and permission rules.

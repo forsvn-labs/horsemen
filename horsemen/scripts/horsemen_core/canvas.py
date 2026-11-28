@@ -41,7 +41,7 @@ NAME = re.compile(r'[a-z0-9][a-z0-9-]{0,63}')
 ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_-]{0,63}')
 COLOR = re.compile(r'[1-6]|#[0-9A-Fa-f]{6}')
 RECORDS = {'vision': 'VISION.md', 'progress': 'PROGRESS.md', 'brain': 'BRAIN.md', 'structure': 'ANATOMY.md',
-           'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'techstack': 'TECHSTACK.md'}
+           'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'design-doc': 'DESIGN.md', 'techstack': 'TECHSTACK.md'}
 MEDIA = {'.png': 'PNG', '.jpg': 'JPEG', '.jpeg': 'JPEG', '.gif': 'GIF', '.webp': 'WebP', '.svg': 'SVG',
          '.csv': 'CSV', '.tsv': 'TSV', '.xlsx': 'XLSX'}
 IMAGES = ('.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg')

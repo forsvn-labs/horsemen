@@ -11,7 +11,8 @@ Visibility: public
 | Why this project exists | [VISION.md](VISION.md) |
 | Current work and release evidence | [PROGRESS.md](PROGRESS.md) |
 | System, test and release map | [ANATOMY.md](ANATOMY.md), which links the full stack |
-| Viewer design | [Product design records](docs/product/) |
+| Viewer design | [DESIGN.md](DESIGN.md); [product design records](docs/product/) |
+| Getting started and shipped changes | [README.md](README.md) and [CHANGELOG.md](CHANGELOG.md) |
 
 ## Providers
 

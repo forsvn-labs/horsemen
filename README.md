@@ -8,6 +8,11 @@ Horsemen keeps four Markdown records useful: why the project exists, what has
 shipped, where its knowledge lives, and where to find its parts. It works for
 software, business, research, and personal projects.
 
+Start with [BRAIN](BRAIN.md) for the project map, [VISION](VISION.md) for
+direction, [PROGRESS](PROGRESS.md) for next actions and evidence, and
+[ANATOMY](ANATOMY.md) for the system and tech stack. [DESIGN.md](DESIGN.md)
+describes the viewer; [CHANGELOG.md](CHANGELOG.md) records what shipped.
+
 Three ways to use it today:
 
 | See your projects in the browser | Keep records current with your agent | Check records without AI |
@@ -34,7 +39,7 @@ themes from the account menu.
 Copy a link to a project or record, such as
 `horsemen.forsvn.com/owner/repo?record=progress`. Anyone can open a link to a
 public repository without signing in, for example
-<https://horsemen.forsvn.com/hungv47/horsemen>. A link to a private repository
+<https://horsemen.forsvn.com/forsvn-labs/horsemen>. A link to a private repository
 opens for people with GitHub access to it. The viewer stores no project data on the server. A site can also offer canvas
 editing through a second, optional GitHub App; only people who add that app can
 save, and each save is one commit by them. When the default branch is
@@ -51,7 +56,7 @@ Install with the [skills.sh CLI](https://skills.sh/docs/cli). You need Node.js
 and npm; no repository clone is required:
 
 ```sh
-npx skills add hungv47/horsemen --skill horsemen
+npx skills add forsvn-labs/horsemen --skill horsemen
 ```
 
 Choose your agent and installation scope when prompted. This installs the
@@ -70,19 +75,20 @@ It must not invent them. [Skill instructions](horsemen/SKILL.md).
 For the standalone CLI, clone the repository and install into an isolated environment:
 
 ```sh
-git clone https://github.com/hungv47/horsemen.git
+git clone https://github.com/forsvn-labs/horsemen.git
 cd horsemen
 python3 -m venv .venv
 .venv/bin/python -m pip install .
-.venv/bin/horsemen status --path /path/to/project
+.venv/bin/horsemen progress --path /path/to/project
 .venv/bin/horsemen brain --path /path/to/project --json
 ```
 
 This does not install the agent skill or change host hooks. To run without
 installation: `PYTHONPATH=horsemen/scripts python3 -B -m horsemen_core --help`.
 
-Read one record with `horsemen brain`, `horsemen vision`, `horsemen structure`,
-or `horsemen status`. Use `horsemen check` for all records and `horsemen inspect`
+Read one record with `horsemen brain`, `horsemen vision`, `horsemen progress`,
+or `horsemen anatomy`. The older `status` and `structure` commands remain aliases.
+Use `horsemen check` for all records and `horsemen inspect`
 for local project context. Setup and migration proposals live under `horsemen plan`.
 
 Agents can read a project with few tokens and change a canvas file:
@@ -112,8 +118,8 @@ fails; the command does not invent content or update other records.
 | BRAIN.md | Where is outside knowledge, and how may we use it? |
 | ANATOMY.md | How does the system work and how do I change it? |
 
-README, CHANGELOG, and TECHSTACK support these records. Existing provider
-originals remain the source of truth; Horsemen does not create a second store.
+README, CHANGELOG, and DESIGN (where applicable) support these records. The
+tech stack lives in ANATOMY. Existing provider originals remain the source of truth; Horsemen does not create a second store.
 
 ## Status and limits
 

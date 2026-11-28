@@ -8,7 +8,7 @@ from pathlib import Path
 from .legacy import is_anatomy_pointer
 
 DOCUMENTS = ('VISION.md','PROGRESS.md','BRAIN.md','ANATOMY.md','README.md','CHANGELOG.md','TECHSTACK.md','AGENTS.md','CLAUDE.md')
-MIGRATIONS = {'STATUS.md':'PROGRESS.md','TECH.md':'TECHSTACK.md','STRUCTURE.md':'ANATOMY.md'}
+MIGRATIONS = {'STATUS.md':'PROGRESS.md','TECH.md':'ANATOMY.md','TECHSTACK.md':'ANATOMY.md','STRUCTURE.md':'ANATOMY.md'}
 EDITABLE = (*DOCUMENTS, 'STRUCTURE.md', 'DESIGN.md')
 
 def digest(text):
@@ -49,6 +49,8 @@ def lifecycle_plan(command, root, report, changes_path=None):
     legacy={name:read_original(root,name) for name in MIGRATIONS}
     if command=='init':
         for name,text in originals.items():
+            if name == "TECHSTACK.md":
+                continue  # The stack belongs in Anatomy on new projects.
             if text is not None:
                 continue
             older=next((old for old,target in MIGRATIONS.items() if target==name and legacy[old] is not None),None)
@@ -64,6 +66,8 @@ def lifecycle_plan(command, root, report, changes_path=None):
     elif command=='upgrade':
         for old,new in MIGRATIONS.items():
             if legacy[old] is None: continue
+            if old == 'TECHSTACK.md' and legacy[old].strip() == 'See [ANATOMY.md → Tech stack](ANATOMY.md#tech-stack).':
+                continue  # Kept only for callers of the old route.
             if old == 'STRUCTURE.md' and (is_anatomy_pointer(legacy[old]) or legacy[old] == originals[new]): continue
             both=originals[new] is not None
             result['changes'].append({'file':new,'source':old,'action':'reconcile' if both else 'migration_review',

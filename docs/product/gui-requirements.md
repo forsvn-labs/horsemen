@@ -26,7 +26,7 @@ the editing boundary, or whether public shares are snapshots or live views.
 | Vision | Show purpose, audience, boundaries, and unresolved owner decisions. |
 | Progress | Show next action, shipped outcomes, ready work, blockers, and linked proof. Preserve the difference between ready and shipped. |
 | Brain | Show knowledge destinations and access boundaries. A link is not access to its contents. |
-| Structure | Show navigable paths, entry points, and commands. |
+| Anatomy | Show architecture, paths, entry points, commands, and the tech stack. |
 | Supporters | Render README as a guide, CHANGELOG as release history with delivery evidence, PR/commit references, and before/after PR screenshots, and TECHSTACK as components and their roles. Unknown artifacts keep a readable source view. |
 | Public share | Preview the exact included artifacts and linked assets before publishing. Make removal possible. Exclude private source data from public responses. |
 

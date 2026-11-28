@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-11-28
+
+- Open Anatomy to read how the system works and how to test it. The old Structure commands and viewer links still work. [PR #53](https://github.com/forsvn-labs/horsemen/pull/53).
+
 ## 2026-11-24
 
 - Open Daily changes for the next action and the latest project update. Expand a date to read older changes. In the reader, Next page stays in the current record and Next record opens the following record.

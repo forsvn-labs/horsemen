@@ -80,14 +80,12 @@ preambles). The goal is the current format with no lost information.
    every path. Add "Where new work goes". Replace the old Knowledge section
    with a `## Brain` map: one subsection per provider, its folder tree, key
    documents, and how to open them.
-7. **Supporters and entrypoints.** Create or reconcile TECHSTACK from manifests,
-   configuration, usage evidence, and scoped provider reads. Keep unknowns
-   explicit; do not install or connect tools to fill it. Link setup guides and
-   preserve user-authored inventory. Migrate an existing TECH.md to TECHSTACK.md
-   only within the task's file-change permission; update its inbound links.
-   If both files exist, compare and reconcile unique owner content before any
-   removal. Never overwrite either file blindly. The checker only reports a
-   missing TECHSTACK.md; it does not rename or delete files. Rewrite README as the cut-down VISION
+7. **Stack, supporters, and entrypoints.** Put the verified stack directly in
+   ANATOMY under `## Tech stack`. Reconcile any TECH.md and TECHSTACK.md before
+   retiring them; preserve unique facts and keep a pointer only for existing
+   readers or inbound links. Explicitly mark unknown tools. Do not connect or
+   install tools to fill the record. For a UI, use the open DESIGN.md format
+   and link the approved source. Rewrite README as the cut-down VISION
    pitch plus working install and use steps; keep every working command.
    Create CHANGELOG if it is missing, from shipped evidence only, with the
    original dates; do not reconstruct entries you cannot prove. Remove
