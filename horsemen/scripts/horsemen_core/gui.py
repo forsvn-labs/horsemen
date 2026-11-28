@@ -13,11 +13,11 @@ import subprocess
 import threading
 import time
 from urllib.parse import parse_qs, quote, urlsplit
-from .legacy import sections
+from .legacy import anatomy_conflict, is_anatomy_pointer, sections
 from .gui_links import canvas_links, connections
 
 FILES = {'vision': 'VISION.md', 'progress': 'PROGRESS.md', 'brain': 'BRAIN.md',
-         'structure': 'STRUCTURE.md', 'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'techstack': 'TECHSTACK.md'}
+         'structure': 'ANATOMY.md', 'readme': 'README.md', 'changelog': 'CHANGELOG.md', 'techstack': 'TECHSTACK.md'}
 EXCLUDED = {'.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor'}
 MAX_FILE = 512 * 1024
 
@@ -123,7 +123,7 @@ def gh_json(path, paginate=False):
     return data
 
 def discover_roots(entries):
-    reverse = {v:k for k,v in FILES.items()}; reverse['STATUS.md'] = 'progress'
+    reverse = {v:k for k,v in FILES.items()}; reverse['STATUS.md'] = 'progress'; reverse['STRUCTURE.md'] = 'structure'
     roots = {}
     for entry in entries:
         path = PurePosixPath(entry['path'])
@@ -133,7 +133,13 @@ def discover_roots(entries):
         files = roots.setdefault(root, {})
         key = reverse[path.name]
         if key == 'progress' and key in files and path.name == 'STATUS.md': continue
-        files[key] = {k:entry.get(k) for k in ('path','sha','size')}
+        info = {k:entry.get(k) for k in ('path','sha','size')}
+        if key == 'structure' and key in files:
+            if path.name == 'STRUCTURE.md':
+                files[key]['legacy'] = info
+                continue
+            info['legacy'] = files[key]
+        files[key] = info
     return {root:files for root,files in roots.items()
             if len(set(files) & {'vision','progress','brain','structure'}) >= 2
             and ('vision' in files or 'progress' in files)}
@@ -239,6 +245,16 @@ class GitHubReader:
             content = base64.b64decode(encoded, validate=True)
             if len(content) > MAX_FILE: raise ProviderError('Record exceeds the size limit.', 413)
             text = content.decode('utf-8-sig')
+            if key == 'structure':
+                if name == 'STRUCTURE.md' and is_anatomy_pointer(text):
+                    raise ProviderError('ANATOMY.md is missing; STRUCTURE.md is only a pointer.')
+                old = file.get('legacy')
+                if old and old['sha'] != file['sha']:
+                    previous = self.load_record({**project, 'files': {'legacy': old}}, 'legacy', 'STRUCTURE.md')
+                    if 'error' in previous:
+                        raise ProviderError('Could not verify legacy STRUCTURE.md.')
+                    if anatomy_conflict(text, previous['content']):
+                        raise ProviderError('ANATOMY.md and STRUCTURE.md differ. Reconcile them before using the record.')
             rec.update(content=text, sections=dict(sections(text)), connections=connections(text,path,project["repo"],project["revision"]))
         except ProviderError as error: rec['error'] = str(error)
         except (ValueError, UnicodeError, KeyError): rec['error'] = 'Record could not be decoded as UTF-8 Markdown.'

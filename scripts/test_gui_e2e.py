@@ -325,7 +325,7 @@ try:
     browser('click','#peek-more');browser('click','#show-document');browser('click','.reader-next');assert 'Search is available to the pilot group.' in browser('get','text','#peek-content')
     browser('click','#peek-more');browser('click','#show-source');assert '<summary>Latest day' in browser('get','text','#source-content'), 'Markdown source stays exact'
     browser('click','#peek-more');browser('click','#peek-menu [data-view-choice="list"]')
-    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Structure"')
+    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Anatomy"')
     assert value('JSON.stringify(document.querySelector("[data-copy]").dataset.copy)')=='python3 scripts/serve_gui.py'
     assert value('JSON.stringify(document.querySelector(".tree-path a").getAttribute("href"))')=='https://github.com/example/alpha/tree/'+'a'*40+'/app/', 'Tree paths open on GitHub'
     assert value('JSON.stringify(document.querySelector(".tree .tag.start").textContent)')=='start here'
@@ -342,7 +342,7 @@ try:
     assert value('JSON.stringify(location.hash)').endswith('&r=vision'), 'The address keeps the open record'
     browser('press','ArrowRight');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Progress"')
     browser('click','#peek-prev');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Vision"')
-    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Structure"')
+    browser('click','[data-record="structure"]');browser('wait','--fn','document.querySelector("#peek-title").textContent === "Anatomy"')
     assert value('JSON.stringify([...document.querySelectorAll(".tree-line")].map(e=>e.querySelector(".tree-note").textContent))')==['operator workspace','decisions and references','verification'], 'The map shows paths with their notes'
     browser('click','[data-record="brain"]');browser('click','.connection-grid li:first-child .connection-card')
     browser('wait','--fn','document.querySelector("#peek-title").textContent === "research.md"')

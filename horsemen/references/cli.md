@@ -5,7 +5,7 @@ reasoning, evidence gathering and authorized host/provider workflows.
 
 | Intent | Agent workflow | Executable CLI |
 | --- | --- | --- |
-| One record | `brain`, `vision`, `structure`, `status`: read/report by default | `horsemen brain [--path PATH] [--json]` (same for the other three) |
+| One record | `brain`, `vision`, `anatomy`, `progress`: read/report by default | `horsemen brain [--path PATH] [--json]` (same for the other three) |
 | Update one record | Explicit `COMMAND update`; only that original, within current permissions | `horsemen brain update --changes FILE --exclusive`: exact local edit; `--dry-run` only drafts |
 | Validate all records | `check`: read-only | `horsemen check PATH [--json]` |
 | Inspect project | `inspect`: connected review under BRAIN scope | `horsemen inspect PATH [--json]`: local records and Git only |

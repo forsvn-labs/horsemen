@@ -32,6 +32,55 @@ class CLI(unittest.TestCase):
             self.assertEqual(d['mode'],'read_only'); self.assertIn('content',d)
             self.assertTrue(all(x['file']==name for x in d['report']['errors']+d['report']['warnings']))
         self.assertEqual(before,{p.name:(p.read_bytes(),p.stat().st_mtime_ns) for p in self.root.glob('*.md')})
+    def test_anatomy_and_progress_aliases_and_migration(self):
+        old=self.root/'STRUCTURE.md'
+        canonical=self.root/'ANATOMY.md'
+        source=old.read_text()
+        def record(command):
+            p=self.run_cli(command,'--json')
+            self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+            return json.loads(p.stdout)
+        self.assertEqual(record('anatomy')['document'],'STRUCTURE.md')
+        self.assertEqual(record('progress')['content'],record('status')['content'])
+        plan=json.loads(self.run_cli('upgrade','--plan','--json').stdout)['plan']
+        self.assertTrue(any(c['file']=='ANATOMY.md' and c['action']=='migration_review' for c in plan['changes']))
+        canonical.write_text(source.replace('# Structure','# Anatomy'))
+        old.write_text('# Structure\n\n[See Anatomy](ANATOMY.md).\n')
+        self.assertEqual(record('structure')['document'],'ANATOMY.md')
+        self.assertEqual(record('anatomy')['content'],record('structure')['content'])
+        shown=self.run_cli('show','anatomy')
+        self.assertEqual(shown.returncode,0,shown.stdout+shown.stderr)
+        self.assertIn('ANATOMY',shown.stdout)
+        plan=json.loads(self.run_cli('upgrade','--plan','--json').stdout)['plan']
+        self.assertFalse(any(c['file']=='ANATOMY.md' for c in plan['changes']))
+        old.write_text(source + '\nConflicting substantive material.\n')
+        for command in ('anatomy','structure'):
+            p=self.run_cli(command,'--json')
+            self.assertEqual(p.returncode,2,p.stdout)
+            self.assertIn('differ',json.loads(p.stdout)['error'])
+        report=json.loads(self.run_cli('check','--json').stdout)['report']
+        self.assertIn('two-anatomy-owners',{e['code'] for e in report['errors']})
+        canonical.unlink()
+        old.write_text('[See Anatomy](ANATOMY.md).\n')
+        self.assertEqual(self.run_cli('anatomy','--json').returncode,1)
+
+    def test_brain_routes_without_duplicate_provider_map_in_anatomy(self):
+        original=self.root/'STRUCTURE.md'
+        source=original.read_text().split('## Brain',1)[0]
+        (self.root/'ANATOMY.md').write_text(source+'\n## Tech stack\n\n[Full stack](TECHSTACK.md).\n')
+        original.write_text('[See Anatomy](ANATOMY.md).\n')
+        (self.root/'DESIGN.md').write_text('# Design\n')
+        (self.root/'AGENTS.md').write_text('Start at [Brain](BRAIN.md).\n')
+        readme=self.root/'README.md'
+        readme.write_text(readme.read_text().replace('STRUCTURE.md','ANATOMY.md'))
+        brain=self.root/'BRAIN.md'
+        brain.write_text(brain.read_text()+'\n## Project routes\n\n[Vision](VISION.md) · [Progress](PROGRESS.md) · [Anatomy](ANATOMY.md) · [Design](DESIGN.md)\n')
+        p=self.run_cli('check','--json')
+        self.assertEqual(p.returncode,0,p.stdout+p.stderr)
+        r=json.loads(p.stdout)['report']
+        self.assertEqual(set(r['records']),{'BRAIN.md','VISION.md','PROGRESS.md','ANATOMY.md'})
+        self.assertFalse({'structure-no-brain-map','brain-repo-item','entry-links'} & {w['code'] for w in r['warnings']})
+
     def test_document_ignores_unrelated_broken_record(self):
         (self.root/'VISION.md').unlink(); (self.root/'VISION.md').symlink_to('/does/not/exist')
         self.assertEqual(self.run_cli('brain','--json').returncode,0)
@@ -214,6 +263,10 @@ class CLI(unittest.TestCase):
         (self.root/'TECHSTACK.md').symlink_to(Path(self.tmp.name)/'absent-private-file')
         self.assertEqual(self.run_cli('init','--plan','--json').returncode,2)
     def test_noop_upgrade(self):
+        (self.root/'STRUCTURE.md').rename(self.root/'ANATOMY.md')
+        for name in ('README.md','AGENTS.md'):
+            p=self.root/name
+            p.write_text(p.read_text().replace('STRUCTURE.md','ANATOMY.md'))
         self.assertEqual(self.plan('upgrade')['status'],'no_change')
     def test_update_requires_evidence_and_rejects_duplicates(self):
         text=(self.root/'TECHSTACK.md').read_text()

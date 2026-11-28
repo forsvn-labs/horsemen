@@ -4,6 +4,15 @@ Brain: None for this public project · Access verified: 2026-11-13 (local source
 
 Visibility: public
 
+## Project routes
+
+| Need | Authoritative source |
+| --- | --- |
+| Why this project exists | [VISION.md](VISION.md) |
+| Current work and release evidence | [PROGRESS.md](PROGRESS.md) |
+| System, test and release map | [ANATOMY.md](ANATOMY.md), which links the full stack |
+| Viewer design | [Product design records](docs/product/) |
+
 ## Providers
 
 No external knowledge provider has been selected for this standalone project.

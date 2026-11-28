@@ -11,10 +11,10 @@ class Commands(unittest.TestCase):
         self.assertIn('Route `help` and unknown commands before project discovery',self.commands())
         self.assertIn('`check` only reads local records',self.commands())
     def test_all_commands_have_routes(self):
-        for name in ('brain / vision / structure / status','init','update','upgrade','inspect','inspect-and-update','check','diagram','help'):
+        for name in ('brain / vision / anatomy / progress','init','update','upgrade','inspect','inspect-and-update','check','diagram','help'):
             self.assertIn('### '+name, self.commands())
     def test_single_record_scope_overrides_cascade(self):
-        section=self.commands().split('### brain / vision / structure / status')[1].split('### init')[0]
+        section=self.commands().split('### brain / vision / anatomy / progress')[1].split('### init')[0]
         for phrase in ('read-only boundary overrides', 'Preserve all other records', 'never substitute a local copy', '--exclusive'):
             self.assertIn(phrase, section)
     def test_agent_not_fake_cli(self):

@@ -4,7 +4,7 @@
    server never parses or keeps record content. tests/test_hosted_reader.cjs
    checks parity with the Python reader. Change both sides together. */
 (function (root) {
-  const FILES = { vision: 'VISION.md', progress: 'PROGRESS.md', brain: 'BRAIN.md', structure: 'STRUCTURE.md', readme: 'README.md', changelog: 'CHANGELOG.md', techstack: 'TECHSTACK.md' };
+  const FILES = { vision: 'VISION.md', progress: 'PROGRESS.md', brain: 'BRAIN.md', structure: 'ANATOMY.md', readme: 'README.md', changelog: 'CHANGELOG.md', techstack: 'TECHSTACK.md' };
   const EXCLUDED = new Set(['.git', 'node_modules', '.venv', 'venv', '__pycache__', 'vendor']);
   const MAX_FILE = 512 * 1024;
   /* An own property, also for a key such as __proto__. */
@@ -121,7 +121,7 @@
   }
 
   function discoverRoots(entries) {
-    const reverse = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [v, k])); reverse['STATUS.md'] = 'progress';
+    const reverse = Object.fromEntries(Object.entries(FILES).map(([k, v]) => [v, k])); reverse['STATUS.md'] = 'progress'; reverse['STRUCTURE.md'] = 'structure';
     /* A folder can have the name of a built-in key, such as __proto__: each root is an own property. */
     const roots = {}, own = (object, key) => Object.hasOwn(object, key) ? object[key] : undefined;
     for (const entry of entries) {
@@ -133,7 +133,12 @@
       const files = own(roots, root) || put(roots, root, {});
       const key = reverse[name];
       if (key === 'progress' && Object.hasOwn(files, key) && name === 'STATUS.md') continue;
-      files[key] = { path: entry.path ?? null, sha: entry.sha ?? null, size: entry.size ?? null };
+      const info = { path: entry.path ?? null, sha: entry.sha ?? null, size: entry.size ?? null };
+      if (key === 'structure' && Object.hasOwn(files, key)) {
+        if (name === 'STRUCTURE.md') { files[key].legacy = info; continue; }
+        info.legacy = files[key];
+      }
+      files[key] = info;
     }
     const out = {};
     for (const [root, files] of Object.entries(roots)) {
@@ -337,6 +342,15 @@
         if (file.size == null || file.size > MAX_FILE) throw new ProviderError('Record exceeds the 512 KiB size limit.', 413);
         if (blob === null) blob = await this.api(`/repos/${project.repo}/git/blobs/${file.sha}`);
         const text = decodeBlob(blob);
+        if (key === 'structure') {
+          const pointer = value => /^(?:#[ \t]+[^\n]+\n+)?\s*\[[^\]\n]+\]\((?:\.\/)?ANATOMY\.md\)\.?$/.test(value.trim());
+          if (name === 'STRUCTURE.md' && pointer(text)) throw new ProviderError('ANATOMY.md is missing; STRUCTURE.md is only a pointer.');
+          if (file.legacy && file.legacy.sha !== file.sha) {
+            const previous = await this.loadRecord({...project, files: {legacy: file.legacy}}, 'legacy', 'STRUCTURE.md');
+            if (previous.error) throw new ProviderError('Could not verify legacy STRUCTURE.md.');
+            if (previous.content !== text && !pointer(previous.content)) throw new ProviderError('ANATOMY.md and STRUCTURE.md differ. Reconcile them before using the record.');
+          }
+        }
         Object.assign(rec, { content: text, sections: sections(text), connections: await connections(text, path, project.repo, project.revision) });
       } catch (error) {
         rec.error = error instanceof ProviderError ? error.message : 'Record could not be decoded as UTF-8 Markdown.';
@@ -576,7 +590,8 @@
     let owner, repo;
     try { owner = decodeURIComponent(parts[0]); repo = decodeURIComponent(parts[1]); } catch { return null; }
     if (!OWNER.test(owner) || !REPO_NAME.test(repo) || repo === '.' || repo === '..' || RESERVED.has(owner.toLowerCase())) return null;
-    const record = url.searchParams.get('record');
+    const requested = url.searchParams.get('record');
+    const record = requested === 'anatomy' ? 'structure' : requested;
     return { repo: `${owner}/${repo}`, root: url.searchParams.get('root') || '', record: Object.hasOwn(FILES, record || '') ? record : null, ...viewLink(url.searchParams.get('canvas'), url.searchParams.get('node')) };
   }
   /* A place on a canvas: the canvas of a record or a board (the name of a canvas file), and at most one element on it.
@@ -591,7 +606,7 @@
     if (project.root) query.set('root', project.root);
     if (view.canvas) query.set('canvas', view.canvas);
     if (view.node) query.set('node', view.node);
-    if (record && Object.hasOwn(FILES, record)) query.set('record', record);
+    if (record === 'anatomy' || (record && Object.hasOwn(FILES, record))) query.set('record', record === 'structure' ? 'anatomy' : record);
     const qs = query.toString();
     return `${origin}/${project.repo.split('/').map(encodeURIComponent).join('/')}${qs ? '?' + qs : ''}`;
   }

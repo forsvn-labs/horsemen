@@ -1,6 +1,6 @@
 'use strict';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structure:'STRUCTURE.md',readme:'README.md',changelog:'CHANGELOG.md',techstack:'TECHSTACK.md'};
+const names={vision:'VISION.md',progress:'PROGRESS.md',brain:'BRAIN.md',structure:'ANATOMY.md',readme:'README.md',changelog:'CHANGELOG.md',techstack:'TECHSTACK.md'};
 let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
 /* Canvases: Home shows the records. Each record has a canvas of its sections; a canvas file
    (.horsemen/canvas/<name>.canvas) adds its elements at their saved places. A file with another name is a board.
@@ -9,7 +9,7 @@ let projects=[],current=0,zoom=1,records={},opener=null,request=0,scanRun=0;
 let canvasKey='home',needsFit=false,shownProject=null,canvasFiles=new Map(),canvasView=null,recordsLoaded=false;const sectionSpots=new Map(),sectionNodes=new Map(),lastCanvas=new Map(),cameras=new Map();
 const F=HorsemenCanvasFormat,V=HorsemenCanvasView;
 const session=$('meta[name="horsemen-session"]').content;
-const titles={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Structure',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
+const titles={vision:'Vision',progress:'Progress',brain:'Brain',structure:'Anatomy',readme:'README',changelog:'Changelog',techstack:'Tech stack'};
 const icon=(name,cls='icon')=>'<svg class="'+cls+'" aria-hidden="true"><use href="/assets/icons/'+(name.startsWith('seal-')?'seals':'icons')+'.svg#'+name+'"/></svg>';
 const kindIcon=kind=>kind==='document'?'document':kind==='external'?'external':'link';
 const {escapeHTML,safeURL}=HorsemenMarkdown;

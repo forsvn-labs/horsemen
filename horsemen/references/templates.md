@@ -23,7 +23,7 @@ saving. For example:
 
 - PROGRESS: “**PDF export:** Built. Waiting for Mai's release test.” Keep
   the passing test count and preview link in the evidence row.
-- BRAIN: “Meeting decisions live in Drive. Read access only.” STRUCTURE:
+- BRAIN: “Meeting decisions live in Drive. Read access only.” ANATOMY:
   “Drive → Client work → Decisions.” Link the actual folder when known.
 
 ## VISION.md
@@ -44,7 +44,7 @@ market size, traction, targets or impact; keep unconfirmed bets separate.
 Write it in the first person plural ("we"), in confident, plain prose. Each
 section is a short paragraph or a few bullets. No tables. Leave out
 features, screens, architecture, tools, file paths, and task lists. They
-belong in PROGRESS, STRUCTURE, or a spec that BRAIN points to.
+belong in PROGRESS, ANATOMY, or a spec that BRAIN points to.
 
 VISION comes from the owner. Write it only from the
 [vision interview](interviews.md#vision-discovery) or from the owner's own
@@ -230,7 +230,7 @@ BRAIN is the directory of the project's outside providers: the brain that
 holds knowledge outside this repository (documents, research, test lists,
 and the record of past discussions between the owner and agents), the task tracker, and any other
 provider the project needs. It says what each holds and how to reach it. It does not
-hold the knowledge itself, and it does not list repository files (STRUCTURE
+hold the knowledge itself, and it does not list repository files (ANATOMY
 maps those). The owner chooses the brain provider: a folder of Markdown files, an
 Obsidian vault, Google Drive, Notion, or anything an agent can reach. If all
 knowledge is in the repository, write
@@ -300,7 +300,7 @@ Setup choices: {{date and source of the owner's choices; list any unresolved cho
 ## Access problems
 
 - Moved or renamed: search by title in the same provider, then fix the
-  location here and in STRUCTURE.
+  location here and in ANATOMY.
 - Missing or no access: report it. Do not switch account, provider, sharing,
   credentials, or settings. Work that does not depend on that access continues.
 
@@ -309,19 +309,18 @@ Setup choices: {{date and source of the owner's choices; list any unresolved cho
 - {{Unresolved knowledge setup question. Who decides.}}
 ```
 
-## STRUCTURE.md
+## ANATOMY.md
 
-STRUCTURE is the map of where everything is. It has two parts: the technical
-structure inside the repository, and the business and document structure
-inside the brain, with how to open each part. BRAIN owns the access rules;
-STRUCTURE gives the concrete location and the command or link.
+ANATOMY explains the system: how inputs become outcomes, where the boundaries
+are, where to make a change, and how to verify it. Link the full tech stack at
+its actual file or provider. BRAIN owns routing to external sources.
 
 Target: under 150 lines. A map of what matters, not a full listing.
 
 ~~~markdown
-# Structure
+# Anatomy
 
-{{One line: what the repository holds and what the brain holds.}}
+{{One line: what the system does and where it runs.}}
 
 ## Map
 
@@ -367,25 +366,9 @@ Conventions: {{naming, layering, or ownership rules an agent must follow}}.
 
 - {{`path/README.md` before changing that domain; a manifest or contract an agent must load first.}}
 
-## Brain
+## Tech stack
 
-Access rules and accounts live in [BRAIN.md](BRAIN.md).
-
-### {{Provider}}: {{root}}
-
-Open with: {{connector, CLI command, or link}}.
-
-```text
-{{Root}}/
-├── {{Folder/}}              {{what it holds}}
-│   └── {{Subfolder/}}       {{what it holds}}
-├── {{bin/}}                 {{stale documents; recovery index inside, if configured}}
-└── {{Key document}}         {{what it is for}} (start here)
-```
-
-| Document | Location | Use it for |
-| --- | --- | --- |
-| {{Pricing model}} | {{Sales/Pricing (sheet)}} | {{current prices and discount rules}} |
+See [TECHSTACK.md](TECHSTACK.md) or the project's declared equivalent.
 
 ## Other documents
 
@@ -409,12 +392,7 @@ Rules:
   and where new work goes. Do not repeat the tree as a table.
 - A project without code replaces Map and How it fits together with
   `No code.` under Repository. Several repositories: one Map per repository.
-- **Brain** repeats `### Provider: root` for each provider in BRAIN, with the
-  same tree style. Map the folders people use and the few documents that
-  matter; do not dump a full listing. Skip the section when BRAIN says
-  `Brain: None`. `check` does not verify brain trees against the repository.
-- Read before changing is optional. Agents receive it at session start, so
-  keep it to the documents that are truly mandatory.
+
 
 ## Supporting documents
 
@@ -454,7 +432,7 @@ VISION changes; rewrite the steps when the install changes.
 - [VISION.md](VISION.md): what this becomes and why
 - [PROGRESS.md](PROGRESS.md): what shipped, what is left, what comes next
 - [BRAIN.md](BRAIN.md): knowledge outside this repository
-- [STRUCTURE.md](STRUCTURE.md): map of the repository and the brain
+- [ANATOMY.md](ANATOMY.md): system, change, and verification map
 - [CHANGELOG.md](CHANGELOG.md): what shipped
 - [TECHSTACK.md](TECHSTACK.md): tools, stack, resources, and integrations
 ```
@@ -494,7 +472,7 @@ changed, leave files and dates alone.
 - [VISION.md](VISION.md): what the project becomes and why
 - [PROGRESS.md](PROGRESS.md): what shipped, what is left, what comes next
 - [BRAIN.md](BRAIN.md): knowledge outside this repository and how to reach it
-- [STRUCTURE.md](STRUCTURE.md): map of the repository and the brain
+- [ANATOMY.md](ANATOMY.md): system, change, and verification map
 
 {{Project-specific agent rules, if any.}}
 ```
@@ -559,7 +537,7 @@ that a successful build deploys the project.}}
 - {{Tool: pinned or observed version/plan, source and date. Unknown if unverified.}}
 - {{Integration: observed connection, data direction and limits, source and date.}}
 
-Access and permissions: [BRAIN](BRAIN.md). Paths and commands: [STRUCTURE](STRUCTURE.md).
+Access and permissions: [BRAIN](BRAIN.md). Paths and commands: [ANATOMY](ANATOMY.md).
 
 ## Gaps and changes to verify
 

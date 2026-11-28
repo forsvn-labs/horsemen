@@ -5,8 +5,11 @@ import os
 import stat
 from pathlib import Path
 
-DOCUMENTS = ('VISION.md','PROGRESS.md','BRAIN.md','STRUCTURE.md','README.md','CHANGELOG.md','TECHSTACK.md','AGENTS.md','CLAUDE.md')
-MIGRATIONS = {'STATUS.md':'PROGRESS.md','TECH.md':'TECHSTACK.md'}
+from .legacy import is_anatomy_pointer
+
+DOCUMENTS = ('VISION.md','PROGRESS.md','BRAIN.md','ANATOMY.md','README.md','CHANGELOG.md','TECHSTACK.md','AGENTS.md','CLAUDE.md')
+MIGRATIONS = {'STATUS.md':'PROGRESS.md','TECH.md':'TECHSTACK.md','STRUCTURE.md':'ANATOMY.md'}
+EDITABLE = (*DOCUMENTS, 'STRUCTURE.md', 'DESIGN.md')
 
 def digest(text):
     return hashlib.sha256(text.encode()).hexdigest()
@@ -14,7 +17,7 @@ def digest(text):
 def read_original(root, name):
     # Bind the read to a directory descriptor and refuse final-component
     # symlinks at open time, rather than checking then following a new link.
-    if name not in DOCUMENTS and name not in MIGRATIONS:
+    if name not in EDITABLE and name not in MIGRATIONS:
         raise ValueError('Unsupported root document.')
     if not hasattr(os,'O_NOFOLLOW') or not hasattr(os,'O_DIRECTORY'):
         raise ValueError('Safe local planning requires no-follow directory reads on this platform.')
@@ -49,6 +52,8 @@ def lifecycle_plan(command, root, report, changes_path=None):
             if text is not None:
                 continue
             older=next((old for old,target in MIGRATIONS.items() if target==name and legacy[old] is not None),None)
+            if name == 'ANATOMY.md' and older and not is_anatomy_pointer(legacy[older]):
+                continue  # Existing legacy Anatomy is a working source, not a setup gap.
             gap = (f'Use upgrade to preserve existing {older}.' if older else
                    'Read existing owner intent; ask only for unresolved intent.' if name=='VISION.md' else
                    'Read existing provider choices, destinations and holds; ask only for unresolved scope.' if name=='BRAIN.md' else
@@ -59,6 +64,7 @@ def lifecycle_plan(command, root, report, changes_path=None):
     elif command=='upgrade':
         for old,new in MIGRATIONS.items():
             if legacy[old] is None: continue
+            if old == 'STRUCTURE.md' and (is_anatomy_pointer(legacy[old]) or legacy[old] == originals[new]): continue
             both=originals[new] is not None
             result['changes'].append({'file':new,'source':old,'action':'reconcile' if both else 'migration_review',
                                       'source_sha256':digest(legacy[old]),
@@ -82,7 +88,7 @@ def lifecycle_plan(command, root, report, changes_path=None):
             if not isinstance(change,dict) or set(change)-{'file','before','after','evidence','owner_agreement'}:
                 raise ValueError('Invalid change object or unsupported fields.')
             name=change.get('file')
-            if name not in DOCUMENTS or name in seen:
+            if name not in EDITABLE or name in seen:
                 raise ValueError('Each change must name a unique supported root document.')
             seen.add(name)
             before,after,evidence=change.get('before'),change.get('after'),change.get('evidence')
@@ -90,7 +96,7 @@ def lifecycle_plan(command, root, report, changes_path=None):
                 raise ValueError('before must be nonempty text and after must be text.')
             if not isinstance(evidence,list) or not evidence or any(not isinstance(e,str) or not e.strip() for e in evidence):
                 raise ValueError('Evidence references are required; they are not verified or authorization.')
-            source=originals[name]
+            source=read_original(root,name)
             if source is None or source.count(before)!=1:
                 result['changes'].append({'file':name,'action':'conflict','reason':'Original absent or anchor does not match exactly once.'})
                 result['status']='conflict'
